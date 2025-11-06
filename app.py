@@ -356,6 +356,7 @@ def dashboard():
                            expiring_items=expiring_items)
 
 @app.route("/items")
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF, ROLE_AUDITOR, ROLE_EXECUTIVE)
 def items():
     q = request.args.get("q", "").strip()
     cat = request.args.get("category", "").strip()
@@ -378,6 +379,7 @@ def items():
                           locations=locations, stock_map=stock_map)
 
 @app.route("/items/new", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
 def item_new():
     if request.method == "POST":
         from datetime import datetime as dt
@@ -415,6 +417,7 @@ def item_new():
     return render_template("item_form.html", item=None)
 
 @app.route("/items/<item_sku>/edit", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
 def item_edit(item_sku):
     from datetime import datetime as dt
     item = Item.query.get_or_404(item_sku)
@@ -442,6 +445,7 @@ def item_edit(item_sku):
     return render_template("item_form.html", item=item)
 
 @app.route("/intake", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
 def intake():
     items = Item.query.order_by(Item.name.asc()).all()
     locations = Location.query.order_by(Location.name.asc()).all()
@@ -474,7 +478,8 @@ def intake():
         notes = request.form.get("notes", "").strip() or None
 
         tx = Transaction(item_sku=item_sku, ttype="IN", qty=qty, location_id=location_id,
-                         donor_id=donor.id if donor else None, event_id=event_id, notes=notes)
+                         donor_id=donor.id if donor else None, event_id=event_id, notes=notes,
+                         created_by=current_user.full_name)
         db.session.add(tx)
         db.session.commit()
         flash("Intake recorded.", "success")
@@ -482,6 +487,7 @@ def intake():
     return render_template("intake.html", items=items, locations=locations, events=events)
 
 @app.route("/distribute", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF, ROLE_FIELD_PERSONNEL)
 def distribute():
     items = Item.query.order_by(Item.name.asc()).all()
     locations = Location.query.order_by(Location.name.asc()).all()
@@ -519,7 +525,8 @@ def distribute():
 
         tx = Transaction(item_sku=item_sku, ttype="OUT", qty=qty, location_id=location_id,
                          beneficiary_id=beneficiary.id if beneficiary else None, 
-                         distributor_id=distributor_id, event_id=event_id, notes=notes)
+                         distributor_id=distributor_id, event_id=event_id, notes=notes,
+                         created_by=current_user.full_name)
         db.session.add(tx)
         db.session.commit()
         flash("Distribution recorded.", "success")
@@ -527,11 +534,13 @@ def distribute():
     return render_template("distribute.html", items=items, locations=locations, distributors=distributors, events=events)
 
 @app.route("/transactions")
+@login_required
 def transactions():
     rows = Transaction.query.order_by(Transaction.created_at.desc()).limit(500).all()
     return render_template("transactions.html", rows=rows)
 
 @app.route("/reports/stock")
+@login_required
 def report_stock():
     locations = Location.query.order_by(Location.name.asc()).all()
     items = Item.query.order_by(Item.category.asc(), Item.name.asc()).all()
@@ -540,6 +549,7 @@ def report_stock():
     return render_template("report_stock.html", items=items, locations=locations, stock_map=stock_map)
 
 @app.route("/export/items.csv")
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
 def export_items():
     items = Item.query.all()
     df = pd.DataFrame([{
@@ -555,6 +565,7 @@ def export_items():
     return send_file(csv_path, as_attachment=True, download_name="items.csv", mimetype="text/csv")
 
 @app.route("/import/items", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
 def import_items():
     if request.method == "POST":
         f = request.files.get("file")
@@ -588,6 +599,7 @@ def import_items():
     return render_template("import_items.html")
 
 @app.route("/locations")
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
 def locations():
     locs = Location.query.order_by(Location.name.asc()).all()
     # Get stock counts per location
@@ -600,6 +612,7 @@ def locations():
     return render_template("locations.html", locations=locs, stock_by_loc=stock_by_loc)
 
 @app.route("/locations/new", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
 def location_new():
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -621,6 +634,7 @@ def location_new():
     return render_template("location_form.html", location=None)
 
 @app.route("/locations/<int:location_id>/edit", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
 def location_edit(location_id):
     location = Location.query.get_or_404(location_id)
     if request.method == "POST":
@@ -642,6 +656,7 @@ def location_edit(location_id):
     return render_template("location_form.html", location=location)
 
 @app.route("/locations/<int:location_id>/inventory")
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
 def location_inventory(location_id):
     location = Location.query.get_or_404(location_id)
     
@@ -659,6 +674,7 @@ def location_inventory(location_id):
     return render_template("location_inventory.html", location=location, rows=rows)
 
 @app.route("/distributors")
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
 def distributors():
     distrs = Distributor.query.order_by(Distributor.name.asc()).all()
     # Get distribution count per distributor
@@ -669,6 +685,7 @@ def distributors():
     return render_template("distributors.html", distributors=distrs, dist_count=dist_count)
 
 @app.route("/distributors/new", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
 def distributor_new():
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -687,6 +704,7 @@ def distributor_new():
     return render_template("distributor_form.html", distributor=None)
 
 @app.route("/distributors/<int:distributor_id>/edit", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
 def distributor_edit(distributor_id):
     distributor = Distributor.query.get_or_404(distributor_id)
     if request.method == "POST":
@@ -704,6 +722,7 @@ def distributor_edit(distributor_id):
     return render_template("distributor_form.html", distributor=distributor)
 
 @app.route("/disaster-events")
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
 def disaster_events():
     events = DisasterEvent.query.order_by(DisasterEvent.start_date.desc()).all()
     # Get transaction counts per event
@@ -714,6 +733,7 @@ def disaster_events():
     return render_template("disaster_events.html", events=events, event_txn_count=event_txn_count)
 
 @app.route("/disaster-events/new", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
 def disaster_event_new():
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -744,6 +764,7 @@ def disaster_event_new():
     return render_template("disaster_event_form.html", event=None)
 
 @app.route("/disaster-events/<int:event_id>/edit", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
 def disaster_event_edit(event_id):
     event = DisasterEvent.query.get_or_404(event_id)
     if request.method == "POST":
@@ -783,6 +804,144 @@ def init_db():
     db.create_all()
     ensure_seed_data()
     print("Database initialized.")
+
+@app.cli.command("create-admin")
+def create_admin():
+    """Create an admin user for the system"""
+    import getpass
+    
+    print("\n=== Create Administrator Account ===\n")
+    
+    email = input("Enter admin email: ").strip().lower()
+    if not email:
+        print("Error: Email cannot be empty")
+        return
+    
+    # Check if user already exists
+    existing = User.query.filter_by(email=email).first()
+    if existing:
+        print(f"Error: User with email '{email}' already exists")
+        return
+    
+    full_name = input("Enter full name: ").strip()
+    if not full_name:
+        print("Error: Full name cannot be empty")
+        return
+    
+    password = getpass.getpass("Enter password: ")
+    password_confirm = getpass.getpass("Confirm password: ")
+    
+    if password != password_confirm:
+        print("Error: Passwords do not match")
+        return
+    
+    if len(password) < 8:
+        print("Error: Password must be at least 8 characters")
+        return
+    
+    # Create admin user
+    admin = User(
+        email=email,
+        full_name=full_name,
+        role=ROLE_ADMIN,
+        is_active=True
+    )
+    admin.set_password(password)
+    
+    db.session.add(admin)
+    db.session.commit()
+    
+    print(f"\n✓ Admin user '{full_name}' created successfully!")
+    print(f"  Email: {email}")
+    print(f"  Role: Administrator\n")
+
+@app.cli.command("create-user")
+def create_user():
+    """Create a user with a specific role"""
+    import getpass
+    
+    print("\n=== Create User Account ===\n")
+    
+    email = input("Enter email: ").strip().lower()
+    if not email:
+        print("Error: Email cannot be empty")
+        return
+    
+    existing = User.query.filter_by(email=email).first()
+    if existing:
+        print(f"Error: User with email '{email}' already exists")
+        return
+    
+    full_name = input("Enter full name: ").strip()
+    if not full_name:
+        print("Error: Full name cannot be empty")
+        return
+    
+    print("\nAvailable roles:")
+    print("1. Warehouse Staff")
+    print("2. Field Personnel")
+    print("3. Inventory Manager")
+    print("4. Executive Management")
+    print("5. System Administrator")
+    print("6. Auditor")
+    
+    role_choice = input("\nSelect role (1-6): ").strip()
+    role_map = {
+        "1": ROLE_WAREHOUSE_STAFF,
+        "2": ROLE_FIELD_PERSONNEL,
+        "3": ROLE_INVENTORY_MANAGER,
+        "4": ROLE_EXECUTIVE,
+        "5": ROLE_ADMIN,
+        "6": ROLE_AUDITOR
+    }
+    
+    if role_choice not in role_map:
+        print("Error: Invalid role selection")
+        return
+    
+    role = role_map[role_choice]
+    
+    # Optional: assign location for warehouse staff
+    assigned_location_id = None
+    if role == ROLE_WAREHOUSE_STAFF:
+        locations = Location.query.all()
+        if locations:
+            print("\nAvailable locations:")
+            for idx, loc in enumerate(locations, 1):
+                print(f"{idx}. {loc.name}")
+            
+            loc_choice = input("\nAssign to location (number, or leave blank for none): ").strip()
+            if loc_choice and loc_choice.isdigit():
+                loc_idx = int(loc_choice) - 1
+                if 0 <= loc_idx < len(locations):
+                    assigned_location_id = locations[loc_idx].id
+    
+    password = getpass.getpass("\nEnter password: ")
+    password_confirm = getpass.getpass("Confirm password: ")
+    
+    if password != password_confirm:
+        print("Error: Passwords do not match")
+        return
+    
+    if len(password) < 8:
+        print("Error: Password must be at least 8 characters")
+        return
+    
+    user = User(
+        email=email,
+        full_name=full_name,
+        role=role,
+        is_active=True,
+        assigned_location_id=assigned_location_id
+    )
+    user.set_password(password)
+    
+    db.session.add(user)
+    db.session.commit()
+    
+    print(f"\n✓ User '{full_name}' created successfully!")
+    print(f"  Email: {email}")
+    print(f"  Role: {role}\n")
 
 if __name__ == "__main__":
     with app.app_context():

@@ -73,14 +73,54 @@
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto">
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('items') }}"><i class="bi bi-box-seam me-1"></i>Items</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('locations') }}"><i class="bi bi-geo-alt me-1"></i>Locations</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('distributors') }}"><i class="bi bi-people me-1"></i>Distributors</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('disaster_events') }}"><i class="bi bi-exclamation-triangle me-1"></i>Events</a></li>
-        <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('intake') }}"><i class="bi bi-arrow-down-circle me-1"></i>Intake</a></li>
-        <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('distribute') }}"><i class="bi bi-arrow-up-circle me-1"></i>Distribute</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions') }}"><i class="bi bi-list-ul me-1"></i>History</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('report_stock') }}"><i class="bi bi-clipboard-data me-1"></i>Reports</a></li>
+        {% if current_user.is_authenticated %}
+          {# Items - visible to most roles #}
+          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF', 'AUDITOR', 'EXECUTIVE'] %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('items') }}"><i class="bi bi-box-seam me-1"></i>Items</a></li>
+          {% endif %}
+          
+          {# Locations - visible to managers and warehouse staff #}
+          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF'] %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('locations') }}"><i class="bi bi-geo-alt me-1"></i>Locations</a></li>
+          {% endif %}
+          
+          {# Distributors - visible to managers #}
+          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER'] %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('distributors') }}"><i class="bi bi-people me-1"></i>Distributors</a></li>
+          {% endif %}
+          
+          {# Events - visible to managers #}
+          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER'] %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('disaster_events') }}"><i class="bi bi-exclamation-triangle me-1"></i>Events</a></li>
+          {% endif %}
+          
+          {# Intake - visible to warehouse staff and managers #}
+          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF'] %}
+            <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('intake') }}"><i class="bi bi-arrow-down-circle me-1"></i>Intake</a></li>
+          {% endif %}
+          
+          {# Distribute - visible to warehouse staff, field personnel, and managers #}
+          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF', 'FIELD_PERSONNEL'] %}
+            <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('distribute') }}"><i class="bi bi-arrow-up-circle me-1"></i>Distribute</a></li>
+          {% endif %}
+          
+          {# History and Reports - visible to all authenticated users #}
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions') }}"><i class="bi bi-list-ul me-1"></i>History</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('report_stock') }}"><i class="bi bi-clipboard-data me-1"></i>Reports</a></li>
+          
+          {# User dropdown #}
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-person-circle me-1"></i>{{ current_user.full_name }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+              <li><h6 class="dropdown-header">{{ current_user.email }}</h6></li>
+              <li><span class="dropdown-item-text"><small><i class="bi bi-shield-check me-1"></i>{{ current_user.role.replace('_', ' ').title() }}</small></span></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-1"></i>Logout</a></li>
+            </ul>
+          </li>
+        {% endif %}
       </ul>
     </div>
   </div>
