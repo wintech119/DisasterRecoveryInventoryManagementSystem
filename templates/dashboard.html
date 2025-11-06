@@ -222,8 +222,8 @@
             {% for category, stats in stock_by_category_preview %}
               <tr>
                 <td><strong>{{ category }}</strong></td>
-                <td class="text-center">{{ stats.items }}</td>
-                <td class="text-end">{{ "{:,}".format(stats.total_units) }}</td>
+                <td class="text-center">{{ stats['items'] }}</td>
+                <td class="text-end">{{ "{:,}".format(stats['total_units']) }}</td>
               </tr>
             {% else %}
               <tr><td colspan="3" class="text-center py-3 text-muted">No inventory data available.</td></tr>
@@ -234,8 +234,8 @@
             {% for category, stats in stock_by_category_full[5:] %}
               <tr>
                 <td><strong>{{ category }}</strong></td>
-                <td class="text-center">{{ stats.items }}</td>
-                <td class="text-end">{{ "{:,}".format(stats.total_units) }}</td>
+                <td class="text-center">{{ stats['items'] }}</td>
+                <td class="text-end">{{ "{:,}".format(stats['total_units']) }}</td>
               </tr>
             {% endfor %}
             </tbody>
