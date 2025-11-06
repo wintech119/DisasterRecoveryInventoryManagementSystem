@@ -31,6 +31,8 @@ class Item(db.Model):
     description = db.Column(db.Text, nullable=True)
     expiry_date = db.Column(db.Date, nullable=True)                        # Expiry date for perishable items
     storage_requirements = db.Column(db.Text, nullable=True)               # e.g., "Keep refrigerated", "Store in cool dry place"
+    attachment_filename = db.Column(db.String(255), nullable=True)         # Original filename of uploaded document/image
+    attachment_path = db.Column(db.String(500), nullable=True)             # Storage path (local or S3/Nexus URL in future)
 
 class Donor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
