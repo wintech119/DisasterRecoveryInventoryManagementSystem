@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
-<h3>Record Distribution (to Beneficiary)</h3>
-<form method="post" class="mt-3">
+<div class="mb-3">
+  <h3><i class="bi bi-arrow-up-circle text-danger me-2"></i>Record Distribution</h3>
+  <p class="text-muted">Log outgoing relief supplies to beneficiaries</p>
+</div>
+<div class="card">
+  <div class="card-body">
+<form method="post">
   <div class="row g-3">
     <div class="col-md-6">
       <label class="form-label">Item *</label>
@@ -42,14 +47,30 @@
       </select>
       <small class="text-muted">Person performing the distribution</small>
     </div>
+    <div class="col-md-6">
+      <label class="form-label">Disaster Event</label>
+      <select class="form-select" name="event_id">
+        <option value="">Select event (optional)...</option>
+        {% for ev in events %}
+          <option value="{{ ev.id }}">{{ ev.name }} - {{ ev.start_date.strftime("%Y-%m-%d") }}</option>
+        {% endfor %}
+      </select>
+      <small class="text-muted">Link this distribution to a specific disaster event</small>
+    </div>
     <div class="col-12">
       <label class="form-label">Notes</label>
-      <textarea class="form-control" name="notes" rows="2"></textarea>
+      <textarea class="form-control" name="notes" rows="2" placeholder="Additional information about this distribution..."></textarea>
     </div>
   </div>
   <div class="mt-3">
-    <button class="btn btn-primary">Record Distribution</button>
-    <a class="btn btn-secondary" href="{{ url_for('dashboard') }}">Cancel</a>
+    <button class="btn btn-primary" type="submit">
+      <i class="bi bi-check-circle me-1"></i>Record Distribution
+    </button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('dashboard') }}">
+      <i class="bi bi-x-circle me-1"></i>Cancel
+    </a>
   </div>
 </form>
+  </div>
+</div>
 {% endblock %}

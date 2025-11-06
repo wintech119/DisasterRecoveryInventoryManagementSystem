@@ -43,6 +43,16 @@ class Distributor(db.Model):
     contact = db.Column(db.String(200), nullable=True)
     organization = db.Column(db.String(200), nullable=True)
 
+class DisasterEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    event_type = db.Column(db.String(100), nullable=True)  # Hurricane, Earthquake, Flood, etc.
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=True)
+    description = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(50), nullable=False, default="Active")  # Active, Closed
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     item_sku = db.Column(db.String(64), db.ForeignKey("item.sku"), nullable=False)
@@ -52,6 +62,7 @@ class Transaction(db.Model):
     donor_id = db.Column(db.Integer, db.ForeignKey("donor.id"), nullable=True)
     beneficiary_id = db.Column(db.Integer, db.ForeignKey("beneficiary.id"), nullable=True)
     distributor_id = db.Column(db.Integer, db.ForeignKey("distributor.id"), nullable=True)
+    event_id = db.Column(db.Integer, db.ForeignKey("disaster_event.id"), nullable=True)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -60,6 +71,7 @@ class Transaction(db.Model):
     donor = db.relationship("Donor")
     beneficiary = db.relationship("Beneficiary")
     distributor = db.relationship("Distributor")
+    event = db.relationship("DisasterEvent")
 
 # ---------- Utility ----------
 def normalize_name(s: str) -> str:
@@ -221,6 +233,7 @@ def item_edit(item_sku):
 def intake():
     items = Item.query.order_by(Item.name.asc()).all()
     locations = Location.query.order_by(Location.name.asc()).all()
+    events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
     if request.method == "POST":
         item_sku = request.form["item_sku"]
         qty = int(request.form["qty"])
@@ -232,6 +245,7 @@ def intake():
             return redirect(url_for("intake"))
         
         donor_name = request.form.get("donor_name", "").strip() or None
+        event_id = int(request.form["event_id"]) if request.form.get("event_id") else None
         donor = None
         if donor_name:
             donor = Donor.query.filter_by(name=donor_name).first()
@@ -242,18 +256,19 @@ def intake():
         notes = request.form.get("notes", "").strip() or None
 
         tx = Transaction(item_sku=item_sku, ttype="IN", qty=qty, location_id=location_id,
-                         donor_id=donor.id if donor else None, notes=notes)
+                         donor_id=donor.id if donor else None, event_id=event_id, notes=notes)
         db.session.add(tx)
         db.session.commit()
         flash("Intake recorded.", "success")
         return redirect(url_for("dashboard"))
-    return render_template("intake.html", items=items, locations=locations)
+    return render_template("intake.html", items=items, locations=locations, events=events)
 
 @app.route("/distribute", methods=["GET", "POST"])
 def distribute():
     items = Item.query.order_by(Item.name.asc()).all()
     locations = Location.query.order_by(Location.name.asc()).all()
     distributors = Distributor.query.order_by(Distributor.name.asc()).all()
+    events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
     if request.method == "POST":
         item_sku = request.form["item_sku"]
         qty = int(request.form["qty"])
@@ -261,6 +276,7 @@ def distribute():
         beneficiary_name = request.form.get("beneficiary_name", "").strip() or None
         parish = request.form.get("parish", "").strip() or None
         distributor_id = int(request.form["distributor_id"]) if request.form.get("distributor_id") else None
+        event_id = int(request.form["event_id"]) if request.form.get("event_id") else None
         
         beneficiary = None
         if beneficiary_name:
@@ -285,12 +301,12 @@ def distribute():
 
         tx = Transaction(item_sku=item_sku, ttype="OUT", qty=qty, location_id=location_id,
                          beneficiary_id=beneficiary.id if beneficiary else None, 
-                         distributor_id=distributor_id, notes=notes)
+                         distributor_id=distributor_id, event_id=event_id, notes=notes)
         db.session.add(tx)
         db.session.commit()
         flash("Distribution recorded.", "success")
         return redirect(url_for("dashboard"))
-    return render_template("distribute.html", items=items, locations=locations, distributors=distributors)
+    return render_template("distribute.html", items=items, locations=locations, distributors=distributors, events=events)
 
 @app.route("/transactions")
 def transactions():
@@ -468,6 +484,80 @@ def distributor_edit(distributor_id):
         flash(f"Distributor updated successfully.", "success")
         return redirect(url_for("distributors"))
     return render_template("distributor_form.html", distributor=distributor)
+
+@app.route("/disaster-events")
+def disaster_events():
+    events = DisasterEvent.query.order_by(DisasterEvent.start_date.desc()).all()
+    # Get transaction counts per event
+    event_txn_count = {}
+    for ev in events:
+        count = Transaction.query.filter_by(event_id=ev.id).count()
+        event_txn_count[ev.id] = count
+    return render_template("disaster_events.html", events=events, event_txn_count=event_txn_count)
+
+@app.route("/disaster-events/new", methods=["GET", "POST"])
+def disaster_event_new():
+    if request.method == "POST":
+        name = request.form["name"].strip()
+        if not name:
+            flash("Event name is required.", "danger")
+            return redirect(url_for("disaster_event_new"))
+        
+        event_type = request.form.get("event_type", "").strip() or None
+        start_date_str = request.form.get("start_date", "").strip()
+        end_date_str = request.form.get("end_date", "").strip() or None
+        description = request.form.get("description", "").strip() or None
+        status = request.form.get("status", "Active").strip()
+        
+        if not start_date_str:
+            flash("Start date is required.", "danger")
+            return redirect(url_for("disaster_event_new"))
+        
+        from datetime import datetime as dt
+        start_date = dt.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = dt.strptime(end_date_str, "%Y-%m-%d").date() if end_date_str else None
+        
+        event = DisasterEvent(name=name, event_type=event_type, start_date=start_date, 
+                            end_date=end_date, description=description, status=status)
+        db.session.add(event)
+        db.session.commit()
+        flash(f"Disaster event '{name}' created successfully.", "success")
+        return redirect(url_for("disaster_events"))
+    return render_template("disaster_event_form.html", event=None)
+
+@app.route("/disaster-events/<int:event_id>/edit", methods=["GET", "POST"])
+def disaster_event_edit(event_id):
+    event = DisasterEvent.query.get_or_404(event_id)
+    if request.method == "POST":
+        name = request.form["name"].strip()
+        if not name:
+            flash("Event name is required.", "danger")
+            return redirect(url_for("disaster_event_edit", event_id=event_id))
+        
+        event_type = request.form.get("event_type", "").strip() or None
+        start_date_str = request.form.get("start_date", "").strip()
+        end_date_str = request.form.get("end_date", "").strip() or None
+        description = request.form.get("description", "").strip() or None
+        status = request.form.get("status", "Active").strip()
+        
+        if not start_date_str:
+            flash("Start date is required.", "danger")
+            return redirect(url_for("disaster_event_edit", event_id=event_id))
+        
+        from datetime import datetime as dt
+        start_date = dt.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = dt.strptime(end_date_str, "%Y-%m-%d").date() if end_date_str else None
+        
+        event.name = name
+        event.event_type = event_type
+        event.start_date = start_date
+        event.end_date = end_date
+        event.description = description
+        event.status = status
+        db.session.commit()
+        flash(f"Disaster event updated successfully.", "success")
+        return redirect(url_for("disaster_events"))
+    return render_template("disaster_event_form.html", event=event)
 
 # ---------- CLI for DB ----------
 @app.cli.command("init-db")

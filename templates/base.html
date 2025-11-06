@@ -3,22 +3,88 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GOJ Relief Inventory</title>
+  <title>GOJ Relief Inventory System</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --goj-green: #009639;
+      --goj-gold: #FDB913;
+      --goj-black: #000000;
+      --goj-light-green: #E8F5E9;
+    }
+    .navbar-goj {
+      background: linear-gradient(135deg, var(--goj-green) 0%, #007A2E 100%);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .navbar-brand {
+      font-weight: 700;
+      font-size: 1.3rem;
+    }
+    .navbar-brand img {
+      height: 40px;
+      margin-right: 10px;
+    }
+    .nav-link {
+      font-weight: 500;
+      transition: all 0.3s;
+    }
+    .nav-link:hover {
+      background-color: rgba(255,255,255,0.1);
+      border-radius: 5px;
+    }
+    .btn-primary {
+      background-color: var(--goj-green);
+      border-color: var(--goj-green);
+    }
+    .btn-primary:hover {
+      background-color: #007A2E;
+      border-color: #007A2E;
+    }
+    .card {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border: none;
+      border-radius: 10px;
+    }
+    .card-header {
+      background-color: var(--goj-light-green);
+      border-bottom: 2px solid var(--goj-green);
+      font-weight: 600;
+      border-radius: 10px 10px 0 0 !important;
+    }
+    .badge {
+      font-weight: 600;
+    }
+    h3, h4 {
+      color: var(--goj-green);
+      font-weight: 700;
+    }
+  </style>
 </head>
-<body>
-<nav class="navbar navbar-expand-lg bg-dark navbar-dark mb-4">
+<body style="background-color: #f8f9fa;">
+<nav class="navbar navbar-expand-lg navbar-dark navbar-goj mb-4">
   <div class="container-fluid">
-    <a class="navbar-brand" href="{{ url_for('dashboard') }}">GOJ Relief Inventory</a>
-    <div>
-      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('items') }}">Items</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('locations') }}">Locations</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('distributors') }}">Distributors</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('intake') }}">Intake</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('distribute') }}">Distribute</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions') }}">Transactions</a></li>
-        <li class="nav-item"><a class="nav-link" href="{{ url_for('report_stock') }}">Stock Report</a></li>
+    <a class="navbar-brand d-flex align-items-center" href="{{ url_for('dashboard') }}">
+      <svg width="40" height="40" viewBox="0 0 100 100" class="me-2">
+        <circle cx="50" cy="50" r="48" fill="#FDB913" stroke="#000" stroke-width="2"/>
+        <path d="M50 20 L60 40 L80 40 L65 55 L70 75 L50 60 L30 75 L35 55 L20 40 L40 40 Z" fill="#009639"/>
+        <text x="50" y="55" text-anchor="middle" font-size="20" font-weight="bold" fill="#000">GOJ</text>
+      </svg>
+      <span>Relief Inventory System</span>
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('items') }}"><i class="bi bi-box-seam me-1"></i>Items</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('locations') }}"><i class="bi bi-geo-alt me-1"></i>Locations</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('distributors') }}"><i class="bi bi-people me-1"></i>Distributors</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('disaster_events') }}"><i class="bi bi-exclamation-triangle me-1"></i>Events</a></li>
+        <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('intake') }}"><i class="bi bi-arrow-down-circle me-1"></i>Intake</a></li>
+        <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('distribute') }}"><i class="bi bi-arrow-up-circle me-1"></i>Distribute</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions') }}"><i class="bi bi-list-ul me-1"></i>History</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('report_stock') }}"><i class="bi bi-clipboard-data me-1"></i>Reports</a></li>
       </ul>
     </div>
   </div>

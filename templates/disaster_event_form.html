@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row">
+  <div class="col-md-8 mx-auto">
+    <div class="card">
+      <div class="card-header">
+        <h4 class="mb-0">
+          <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+          {% if event %}Edit Disaster Event{% else %}New Disaster Event{% endif %}
+        </h4>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Event Name *</label>
+            <input class="form-control" type="text" name="name" 
+                   value="{{ event.name if event else '' }}" 
+                   placeholder="e.g., Hurricane Beryl 2024" required>
+            <small class="text-muted">Descriptive name for the disaster event</small>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Event Type</label>
+            <select class="form-select" name="event_type">
+              <option value="">Select type...</option>
+              {% set event_types = ['Hurricane', 'Earthquake', 'Flood', 'Tropical Storm', 'Drought', 'Landslide', 'Other'] %}
+              {% for etype in event_types %}
+                <option value="{{ etype }}" {% if event and event.event_type == etype %}selected{% endif %}>
+                  {{ etype }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Start Date *</label>
+              <input class="form-control" type="date" name="start_date" 
+                     value="{{ event.start_date.strftime('%Y-%m-%d') if event else '' }}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">End Date</label>
+              <input class="form-control" type="date" name="end_date" 
+                     value="{{ event.end_date.strftime('%Y-%m-%d') if event and event.end_date else '' }}">
+              <small class="text-muted">Leave blank if ongoing</small>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Status *</label>
+            <select class="form-select" name="status" required>
+              <option value="Active" {% if not event or event.status == 'Active' %}selected{% endif %}>Active</option>
+              <option value="Closed" {% if event and event.status == 'Closed' %}selected{% endif %}>Closed</option>
+            </select>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" name="description" rows="4" 
+                      placeholder="Details about the disaster event...">{{ event.description if event else '' }}</textarea>
+          </div>
+          
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit">
+              <i class="bi bi-check-circle me-1"></i>
+              {% if event %}Update Event{% else %}Create Event{% endif %}
+            </button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('disaster_events') }}">
+              <i class="bi bi-x-circle me-1"></i>Cancel
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
