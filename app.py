@@ -37,6 +37,12 @@ class Beneficiary(db.Model):
     contact = db.Column(db.String(200), nullable=True)
     parish = db.Column(db.String(120), nullable=True)
 
+class Distributor(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    contact = db.Column(db.String(200), nullable=True)
+    organization = db.Column(db.String(200), nullable=True)
+
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     item_sku = db.Column(db.String(64), db.ForeignKey("item.sku"), nullable=False)
@@ -45,6 +51,7 @@ class Transaction(db.Model):
     location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)
     donor_id = db.Column(db.Integer, db.ForeignKey("donor.id"), nullable=True)
     beneficiary_id = db.Column(db.Integer, db.ForeignKey("beneficiary.id"), nullable=True)
+    distributor_id = db.Column(db.Integer, db.ForeignKey("distributor.id"), nullable=True)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -52,6 +59,7 @@ class Transaction(db.Model):
     location = db.relationship("Location")
     donor = db.relationship("Donor")
     beneficiary = db.relationship("Beneficiary")
+    distributor = db.relationship("Distributor")
 
 # ---------- Utility ----------
 def normalize_name(s: str) -> str:
