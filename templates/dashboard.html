@@ -105,18 +105,21 @@
       <div class="card-header">Recent Transactions</div>
       <div class="card-body p-0">
         <table class="table mb-0">
-          <thead><tr><th>When</th><th>Type</th><th>Item</th><th>Qty</th><th>Location</th></tr></thead>
+          <thead><tr><th>When</th><th>Type</th><th>Item</th><th>Qty</th><th>Location</th><th>Distributor</th></tr></thead>
           <tbody>
           {% for t in recent %}
             <tr>
               <td>{{ t.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
-              <td>{{ t.ttype }}</td>
+              <td>
+                <span class="badge bg-{% if t.ttype == 'IN' %}success{% else %}danger{% endif %}">{{ t.ttype }}</span>
+              </td>
               <td>{{ t.item.name }}</td>
               <td>{{ t.qty }} {{ t.item.unit }}</td>
               <td>{{ t.location.name if t.location else "—" }}</td>
+              <td>{% if t.ttype == 'OUT' and t.distributor %}{{ t.distributor.name }}{% else %}—{% endif %}</td>
             </tr>
           {% else %}
-            <tr><td colspan="5" class="text-center py-3">No transactions yet.</td></tr>
+            <tr><td colspan="6" class="text-center py-3">No transactions yet.</td></tr>
           {% endfor %}
           </tbody>
         </table>
