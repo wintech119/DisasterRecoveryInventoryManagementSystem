@@ -2,7 +2,10 @@ import os
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import func, case
+from functools import wraps
 import pandas as pd
 import secrets
 
@@ -76,7 +79,76 @@ class Transaction(db.Model):
     distributor = db.relationship("Distributor")
     event = db.relationship("DisasterEvent")
 
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(200), unique=True, nullable=False, index=True)
+    full_name = db.Column(db.String(200), nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    role = db.Column(db.String(50), nullable=False)  # WAREHOUSE_STAFF, FIELD_PERSONNEL, INVENTORY_MANAGER, EXECUTIVE, ADMIN, AUDITOR
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    assigned_location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)  # For warehouse staff
+    last_login_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    assigned_location = db.relationship("Location")
+    
+    def set_password(self, password):
+        """Hash and set the user's password"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Verify password against hash"""
+        return check_password_hash(self.password_hash, password)
+    
+    def get_id(self):
+        """Required by Flask-Login"""
+        return str(self.id)
+
+# ---------- Flask-Login Configuration ----------
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
+login_manager.login_message = "Please log in to access this page."
+login_manager.login_message_category = "warning"
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# ---------- Role Constants ----------
+ROLE_WAREHOUSE_STAFF = "WAREHOUSE_STAFF"
+ROLE_FIELD_PERSONNEL = "FIELD_PERSONNEL"
+ROLE_INVENTORY_MANAGER = "INVENTORY_MANAGER"
+ROLE_EXECUTIVE = "EXECUTIVE"
+ROLE_ADMIN = "ADMIN"
+ROLE_AUDITOR = "AUDITOR"
+
+ALL_ROLES = [
+    ROLE_WAREHOUSE_STAFF,
+    ROLE_FIELD_PERSONNEL,
+    ROLE_INVENTORY_MANAGER,
+    ROLE_EXECUTIVE,
+    ROLE_ADMIN,
+    ROLE_AUDITOR
+]
+
 # ---------- Utility ----------
+def role_required(*allowed_roles):
+    """Decorator to restrict access to specific roles"""
+    def decorator(f):
+        @wraps(f)
+        @login_required
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                flash("Please log in to access this page.", "warning")
+                return redirect(url_for("login"))
+            if current_user.role not in allowed_roles:
+                flash("You don't have permission to access this page.", "danger")
+                return redirect(url_for("dashboard"))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
 def normalize_name(s: str) -> str:
     return " ".join((s or "").strip().lower().split())
 
@@ -117,8 +189,53 @@ def ensure_seed_data():
     # Seed categories via a sample item (not necessary, categories are free text)
     db.session.commit()
 
+# ---------- Authentication Routes ----------
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        
+        if not email or not password:
+            flash("Please enter both email and password.", "danger")
+            return redirect(url_for("login"))
+        
+        user = User.query.filter_by(email=email).first()
+        
+        if user and user.check_password(password):
+            if not user.is_active:
+                flash("Your account has been deactivated. Please contact an administrator.", "danger")
+                return redirect(url_for("login"))
+            
+            login_user(user, remember=True)
+            user.last_login_at = datetime.utcnow()
+            db.session.commit()
+            
+            flash(f"Welcome back, {user.full_name}!", "success")
+            
+            next_page = request.args.get("next")
+            if next_page:
+                return redirect(next_page)
+            return redirect(url_for("dashboard"))
+        else:
+            flash("Invalid email or password.", "danger")
+            return redirect(url_for("login"))
+    
+    return render_template("login.html")
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    flash("You have been logged out.", "info")
+    return redirect(url_for("login"))
+
 # ---------- Routes ----------
 @app.route("/")
+@login_required
 def dashboard():
     from datetime import datetime, timedelta
     
