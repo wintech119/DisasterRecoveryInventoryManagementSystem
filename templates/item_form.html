@@ -49,7 +49,30 @@
     </div>
     <div class="col-12">
       <label class="form-label">Storage Requirements</label>
-      <textarea class="form-control" name="storage_requirements" rows="2" placeholder="e.g., Keep refrigerated, Store in cool dry place, Avoid direct sunlight">{{ item.storage_requirements if item else "" }}</textarea>
+      <select class="form-select" name="storage_requirements">
+        <option value="">-- Select Storage Requirement --</option>
+        <option value="Store in a cool, dry place" {% if item and item.storage_requirements == "Store in a cool, dry place" %}selected{% endif %}>Store in a cool, dry place</option>
+        <option value="Keep away from direct sunlight" {% if item and item.storage_requirements == "Keep away from direct sunlight" %}selected{% endif %}>Keep away from direct sunlight</option>
+        <option value="Keep off the floor (use pallets or shelves)" {% if item and item.storage_requirements == "Keep off the floor (use pallets or shelves)" %}selected{% endif %}>Keep off the floor (use pallets or shelves)</option>
+        <option value="Keep sealed to prevent contamination" {% if item and item.storage_requirements == "Keep sealed to prevent contamination" %}selected{% endif %}>Keep sealed to prevent contamination</option>
+        <option value="Store separately from chemicals" {% if item and item.storage_requirements == "Store separately from chemicals" %}selected{% endif %}>Store separately from chemicals</option>
+        <option value="Use First-In, First-Out (FIFO) rotation" {% if item and item.storage_requirements == "Use First-In, First-Out (FIFO) rotation" %}selected{% endif %}>Use First-In, First-Out (FIFO) rotation</option>
+        <option value="Maintain temperature-controlled storage" {% if item and item.storage_requirements == "Maintain temperature-controlled storage" %}selected{% endif %}>Maintain temperature-controlled storage</option>
+        <option value="Keep in original packaging" {% if item and item.storage_requirements == "Keep in original packaging" %}selected{% endif %}>Keep in original packaging</option>
+        <option value="Store in pest-free area" {% if item and item.storage_requirements == "Store in pest-free area" %}selected{% endif %}>Store in pest-free area</option>
+        <option value="Separate by category (food, medical, hygiene, etc.)" {% if item and item.storage_requirements == "Separate by category (food, medical, hygiene, etc.)" %}selected{% endif %}>Separate by category (food, medical, hygiene, etc.)</option>
+        <option value="Limit access to authorized personnel" {% if item and item.storage_requirements == "Limit access to authorized personnel" %}selected{% endif %}>Limit access to authorized personnel</option>
+        <option value="Monitor expiry dates regularly" {% if item and item.storage_requirements == "Monitor expiry dates regularly" %}selected{% endif %}>Monitor expiry dates regularly</option>
+        <option value="Ensure proper ventilation in storage area" {% if item and item.storage_requirements == "Ensure proper ventilation in storage area" %}selected{% endif %}>Ensure proper ventilation in storage area</option>
+        <option value="No smoking or open flames near storage" {% if item and item.storage_requirements == "No smoking or open flames near storage" %}selected{% endif %}>No smoking or open flames near storage</option>
+        <option value="Store flammable items in designated safety area" {% if item and item.storage_requirements == "Store flammable items in designated safety area" %}selected{% endif %}>Store flammable items in designated safety area</option>
+        <option value="Label shelves and bins clearly" {% if item and item.storage_requirements == "Label shelves and bins clearly" %}selected{% endif %}>Label shelves and bins clearly</option>
+        <option value="Protect items from moisture" {% if item and item.storage_requirements == "Protect items from moisture" %}selected{% endif %}>Protect items from moisture</option>
+        <option value="Do not stack excessively to prevent damage" {% if item and item.storage_requirements == "Do not stack excessively to prevent damage" %}selected{% endif %}>Do not stack excessively to prevent damage</option>
+        <option value="Keep fragile items on upper racks" {% if item and item.storage_requirements == "Keep fragile items on upper racks" %}selected{% endif %}>Keep fragile items on upper racks</option>
+        <option value="Ensure easy access for audits and distribution" {% if item and item.storage_requirements == "Ensure easy access for audits and distribution" %}selected{% endif %}>Ensure easy access for audits and distribution</option>
+      </select>
+      <small class="text-muted">Select the primary storage requirement for this item</small>
     </div>
     <div class="col-12">
       <label class="form-label">Description</label>
