@@ -18,13 +18,14 @@ Preferred communication style: Simple, everyday language.
 **Solution**: SQLAlchemy ORM with relational database design
 **Database**: SQLite (development) with PostgreSQL support (production via DATABASE_URL environment variable)
 
-The data model consists of six core entities:
+The data model consists of seven core entities:
 - **Items**: Relief supplies with auto-generated SKU (format: ITM-XXXXXX), category, unit of measurement, minimum quantity thresholds, and description field
 - **Locations**: Physical sites (depots, shelters, parishes) where inventory is stored
 - **Donors**: Organizations or individuals providing donations
 - **Beneficiaries**: Recipients of relief supplies (households, individuals, shelters)
 - **Distributors**: Personnel who perform distributions (name, contact, organization)
-- **Transactions**: Double-entry-style records tracking all intake ("IN") and distribution ("OUT") movements
+- **DisasterEvents**: Named disaster events (e.g., Hurricane Matthew 2024) with event type (hurricane, flood, earthquake, etc.), start/end dates, description, and status (active/closed)
+- **Transactions**: Double-entry-style records tracking all intake ("IN") and distribution ("OUT") movements, optionally linked to disaster events
 
 **Design Decision**: The Transaction model uses a type field ("IN"/"OUT") rather than separate Donation/Distribution tables. This simplifies querying stock levels by summing transactions and provides a single audit trail. Stock quantities are calculated dynamically from transactions rather than stored denormalized, ensuring data consistency.
 
@@ -32,8 +33,16 @@ The data model consists of six core entities:
 
 **Distributor Tracking**: Distribution transactions (OUT) can be linked to a distributor who performed the distribution. This enables accountability tracking and helps organizations monitor which personnel are handling relief supply distributions.
 
+**Disaster Event Management**: The system tracks named disaster events (hurricanes, floods, earthquakes, etc.) with temporal boundaries and status tracking. Transactions can be optionally linked to specific disaster events, enabling:
+- Event-specific reporting and analysis
+- Historical tracking of relief responses
+- Resource allocation accountability per disaster
+- Temporal filtering of transactions by event
+
+This feature is particularly valuable for multi-disaster scenarios where relief operations may overlap or when analyzing historical response effectiveness.
+
 ### Frontend Architecture
-**Technology**: Server-side rendered HTML templates with Bootstrap 5
+**Technology**: Server-side rendered HTML templates with Bootstrap 5 and Bootstrap Icons
 **Rationale**: Traditional server-side rendering eliminates the complexity of a separate frontend build process and JavaScript framework. This approach prioritizes:
 - Quick deployment without build steps
 - Minimal client-side dependencies (works on low-bandwidth connections)
@@ -41,6 +50,15 @@ The data model consists of six core entities:
 - No API maintenance overhead
 
 Bootstrap provides responsive, mobile-friendly layouts essential for field workers using tablets or phones in emergency situations.
+
+**GOJ Branding**: The application features official Government of Jamaica theming with:
+- **Primary color**: GOJ Green (#009639) - used in navigation, headers, and action buttons
+- **Accent color**: GOJ Gold (#FDB913) - used for highlights and secondary elements
+- **Official logo**: Jamaican coat of arms displayed in the navigation bar with the national motto "Out of Many, One People"
+- **Typography**: Clean, professional presentation suitable for government operations
+- **Icons**: Bootstrap Icons throughout the interface for improved navigation and visual clarity
+
+This branding establishes official authenticity and professional credibility essential for government disaster response operations.
 
 ### Stock Calculation Strategy
 **Approach**: Dynamic aggregation from transactions
@@ -116,6 +134,7 @@ The dashboard provides at-a-glance visibility into the relief inventory system:
 
 ### Frontend Dependencies (CDN-delivered)
 - **Bootstrap 5.3.3**: CSS framework for responsive UI (loaded from CDN, no local installation)
+- **Bootstrap Icons 1.11.3**: Icon library for enhanced user interface (loaded from CDN, no local installation)
 
 ### Database Configuration
 The application supports multiple database backends via the DATABASE_URL environment variable:

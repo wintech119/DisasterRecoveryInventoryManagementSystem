@@ -65,11 +65,7 @@
 <nav class="navbar navbar-expand-lg navbar-dark navbar-goj mb-4">
   <div class="container-fluid">
     <a class="navbar-brand d-flex align-items-center" href="{{ url_for('dashboard') }}">
-      <svg width="40" height="40" viewBox="0 0 100 100" class="me-2">
-        <circle cx="50" cy="50" r="48" fill="#FDB913" stroke="#000" stroke-width="2"/>
-        <path d="M50 20 L60 40 L80 40 L65 55 L70 75 L50 60 L30 75 L35 55 L20 40 L40 40 Z" fill="#009639"/>
-        <text x="50" y="55" text-anchor="middle" font-size="20" font-weight="bold" fill="#000">GOJ</text>
-      </svg>
+      <img src="{{ url_for('static', filename='images/jamaica_coat_of_arms.png') }}" alt="Jamaica Coat of Arms" style="height: 40px; margin-right: 10px;">
       <span>Relief Inventory System</span>
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
