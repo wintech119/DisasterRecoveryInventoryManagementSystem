@@ -406,6 +406,51 @@ def location_inventory(location_id):
     
     return render_template("location_inventory.html", location=location, rows=rows)
 
+@app.route("/distributors")
+def distributors():
+    distrs = Distributor.query.order_by(Distributor.name.asc()).all()
+    # Get distribution count per distributor
+    dist_count = {}
+    for d in distrs:
+        count = Transaction.query.filter_by(distributor_id=d.id, ttype="OUT").count()
+        dist_count[d.id] = count
+    return render_template("distributors.html", distributors=distrs, dist_count=dist_count)
+
+@app.route("/distributors/new", methods=["GET", "POST"])
+def distributor_new():
+    if request.method == "POST":
+        name = request.form["name"].strip()
+        if not name:
+            flash("Distributor name is required.", "danger")
+            return redirect(url_for("distributor_new"))
+        
+        contact = request.form.get("contact", "").strip() or None
+        organization = request.form.get("organization", "").strip() or None
+        
+        distributor = Distributor(name=name, contact=contact, organization=organization)
+        db.session.add(distributor)
+        db.session.commit()
+        flash(f"Distributor '{name}' created successfully.", "success")
+        return redirect(url_for("distributors"))
+    return render_template("distributor_form.html", distributor=None)
+
+@app.route("/distributors/<int:distributor_id>/edit", methods=["GET", "POST"])
+def distributor_edit(distributor_id):
+    distributor = Distributor.query.get_or_404(distributor_id)
+    if request.method == "POST":
+        name = request.form["name"].strip()
+        if not name:
+            flash("Distributor name is required.", "danger")
+            return redirect(url_for("distributor_edit", distributor_id=distributor_id))
+        
+        distributor.name = name
+        distributor.contact = request.form.get("contact", "").strip() or None
+        distributor.organization = request.form.get("organization", "").strip() or None
+        db.session.commit()
+        flash(f"Distributor updated successfully.", "success")
+        return redirect(url_for("distributors"))
+    return render_template("distributor_form.html", distributor=distributor)
+
 # ---------- CLI for DB ----------
 @app.cli.command("init-db")
 def init_db():
