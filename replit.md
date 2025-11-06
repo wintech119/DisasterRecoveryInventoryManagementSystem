@@ -18,14 +18,19 @@ Preferred communication style: Simple, everyday language.
 **Solution**: SQLAlchemy ORM with relational database design
 **Database**: SQLite (development) with PostgreSQL support (production via DATABASE_URL environment variable)
 
-The data model consists of five core entities:
-- **Items**: Relief supplies with SKU, category, unit of measurement, and minimum quantity thresholds
+The data model consists of six core entities:
+- **Items**: Relief supplies with auto-generated SKU (format: ITM-XXXXXX), category, unit of measurement, minimum quantity thresholds, and description field
 - **Locations**: Physical sites (depots, shelters, parishes) where inventory is stored
 - **Donors**: Organizations or individuals providing donations
 - **Beneficiaries**: Recipients of relief supplies (households, individuals, shelters)
+- **Distributors**: Personnel who perform distributions (name, contact, organization)
 - **Transactions**: Double-entry-style records tracking all intake ("IN") and distribution ("OUT") movements
 
 **Design Decision**: The Transaction model uses a type field ("IN"/"OUT") rather than separate Donation/Distribution tables. This simplifies querying stock levels by summing transactions and provides a single audit trail. Stock quantities are calculated dynamically from transactions rather than stored denormalized, ensuring data consistency.
+
+**Item SKU System**: Items use auto-generated SKUs as primary keys instead of numeric IDs. SKUs are generated using cryptographically secure random tokens (format: ITM-XXXXXX) with collision detection to ensure uniqueness. This provides human-readable identifiers suitable for relief operations.
+
+**Distributor Tracking**: Distribution transactions (OUT) can be linked to a distributor who performed the distribution. This enables accountability tracking and helps organizations monitor which personnel are handling relief supply distributions.
 
 ### Frontend Architecture
 **Technology**: Server-side rendered HTML templates with Bootstrap 5
@@ -54,6 +59,25 @@ Stock levels are computed on-demand by summing transactions:
 - More complex aggregation queries
 
 **Alternatives Considered**: Storing current stock as a denormalized field on a separate Inventory table would improve read performance but introduces consistency risks and requires more complex transaction handling.
+
+### Dashboard Features
+The dashboard provides at-a-glance visibility into the relief inventory system:
+
+**Key Performance Indicators (KPIs)**:
+- Total unique items in the catalog
+- Total units in stock across all locations
+- Count of items below minimum stock threshold
+
+**Inventory by Category**: Displays aggregated inventory statistics grouped by item category (Food, Water, Hygiene, Medical, etc.), showing:
+- Number of unique items per category
+- Total units in stock per category
+- Sorted alphabetically for quick reference
+
+**Stock by Location**: Shows total inventory units at each depot/shelter with quick access to location-specific inventory details.
+
+**Low Stock Alerts**: Real-time monitoring of items below minimum quantity thresholds, broken down by location to enable targeted restocking.
+
+**Recent Transactions**: Displays the 10 most recent intake and distribution activities, including distributor information for distributions to track accountability.
 
 ### Authentication
 **Status**: Not implemented
