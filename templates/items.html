@@ -39,7 +39,14 @@
   {% for item in items %}
     <tr>
       <td><code>{{ item.sku }}</code></td>
-      <td>{{ item.name }}</td>
+      <td>
+        {{ item.name }}
+        {% if item.attachment_filename %}
+        <a href="{{ url_for('serve_upload', file_path=item.attachment_path) }}" class="text-decoration-none ms-2" title="{{ item.attachment_filename }}" target="_blank">
+          <i class="bi bi-paperclip text-primary"></i>
+        </a>
+        {% endif %}
+      </td>
       <td>{{ item.category or "—" }}</td>
       {% for loc in locations %}
       <td>{{ stock_map.get((item.sku, loc.id), 0) }}</td>
