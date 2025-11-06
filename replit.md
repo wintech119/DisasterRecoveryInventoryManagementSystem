@@ -73,7 +73,7 @@ The system is designed to support multiple user types with different responsibil
 
 **Key Features Used**: Transaction history with audit trail (created_by field), Disaster event reports, Distributor tracking, Comprehensive transaction logs, Export capabilities for external auditing
 
-**Authentication Status**: No authentication system is currently implemented. The application assumes deployment in a trusted environment or behind external authentication (VPN, reverse proxy). Future enhancement: Role-based access control (RBAC) should be implemented to enforce these user role distinctions with appropriate permissions for each role level.
+**Authentication Status**: ✅ **IMPLEMENTED** - The system now features complete user authentication and role-based access control (RBAC) using Flask-Login. Users must log in to access the system, and their access to features is restricted based on their assigned role. The system supports secure password hashing (Werkzeug), session management, and automatic audit logging of all transactions with the `created_by` field.
 
 ## System Architecture
 
@@ -93,7 +93,15 @@ Stock levels are dynamically aggregated on-demand from transaction records, summ
 The dashboard provides a comprehensive overview with KPIs (total items, total units, low stock items), inventory by category, stock by location, low stock alerts, recent transactions, expiring items alerts (with color-coded urgency), activity by disaster event, operations metrics, and transaction analytics.
 
 ### Authentication
-Authentication is currently not implemented, assuming deployment in a trusted environment or behind external authentication. Role-based access control is a planned future enhancement.
+The system implements Flask-Login-based authentication with role-based access control (RBAC). Key features include:
+- Secure password hashing using Werkzeug's generate_password_hash
+- Session-based login with "remember me" functionality
+- User model with six distinct roles: ADMIN, INVENTORY_MANAGER, WAREHOUSE_STAFF, FIELD_PERSONNEL, EXECUTIVE, AUDITOR
+- Role-aware navigation that shows/hides menu items based on user permissions
+- Automatic population of created_by audit field with current user's name
+- CLI commands (flask create-admin, flask create-user) for user management
+- Route protection using @login_required and @role_required decorators
+- Optional location assignment for warehouse staff users
 
 ### Data Import/Export
 The Pandas library is used for CSV import and export functionalities, facilitating bulk data entry, integration with spreadsheet workflows, data backup, and transfer.

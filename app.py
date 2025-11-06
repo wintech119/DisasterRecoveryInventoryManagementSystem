@@ -6,6 +6,7 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import func, case
 from functools import wraps
+from urllib.parse import urlparse, urljoin
 import pandas as pd
 import secrets
 
@@ -133,6 +134,14 @@ ALL_ROLES = [
 ]
 
 # ---------- Utility ----------
+def is_safe_url(target):
+    """Validate that a redirect URL is safe (internal to the application)"""
+    if not target:
+        return False
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
+
 def role_required(*allowed_roles):
     """Decorator to restrict access to specific roles"""
     def decorator(f):
@@ -216,8 +225,9 @@ def login():
             
             flash(f"Welcome back, {user.full_name}!", "success")
             
+            # Validate next parameter to prevent open redirect vulnerability
             next_page = request.args.get("next")
-            if next_page:
+            if next_page and is_safe_url(next_page):
                 return redirect(next_page)
             return redirect(url_for("dashboard"))
         else:
