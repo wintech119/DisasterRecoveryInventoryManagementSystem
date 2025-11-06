@@ -239,12 +239,15 @@ def intake():
 def distribute():
     items = Item.query.order_by(Item.name.asc()).all()
     locations = Location.query.order_by(Location.name.asc()).all()
+    distributors = Distributor.query.order_by(Distributor.name.asc()).all()
     if request.method == "POST":
         item_sku = request.form["item_sku"]
         qty = int(request.form["qty"])
         location_id = int(request.form["location_id"]) if request.form.get("location_id") else None
         beneficiary_name = request.form.get("beneficiary_name", "").strip() or None
         parish = request.form.get("parish", "").strip() or None
+        distributor_id = int(request.form["distributor_id"]) if request.form.get("distributor_id") else None
+        
         beneficiary = None
         if beneficiary_name:
             beneficiary = Beneficiary.query.filter_by(name=beneficiary_name).first()
@@ -267,12 +270,13 @@ def distribute():
             return redirect(url_for("distribute"))
 
         tx = Transaction(item_sku=item_sku, ttype="OUT", qty=qty, location_id=location_id,
-                         beneficiary_id=beneficiary.id if beneficiary else None, notes=notes)
+                         beneficiary_id=beneficiary.id if beneficiary else None, 
+                         distributor_id=distributor_id, notes=notes)
         db.session.add(tx)
         db.session.commit()
         flash("Distribution recorded.", "success")
         return redirect(url_for("dashboard"))
-    return render_template("distribute.html", items=items, locations=locations)
+    return render_template("distribute.html", items=items, locations=locations, distributors=distributors)
 
 @app.route("/transactions")
 def transactions():
