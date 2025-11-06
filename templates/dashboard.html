@@ -43,7 +43,7 @@
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <h6 class="text-muted mb-1">Low Stock Alerts</h6>
-            <h2 class="mb-0">{{ low_stock|length }}</h2>
+            <h2 class="mb-0">{{ low_stock_full|length }}</h2>
           </div>
           <div class="text-warning">
             <i class="bi bi-exclamation-triangle" style="font-size: 2.5rem;"></i>
@@ -99,7 +99,7 @@
     <div class="card">
       <div class="card-body">
         <h6 class="text-muted mb-1"><i class="bi bi-geo-alt me-2"></i>Locations</h6>
-        <h3 class="mb-0">{{ locations|length }}</h3>
+        <h3 class="mb-0">{{ locations_full|length }}</h3>
       </div>
     </div>
   </div>
@@ -107,34 +107,34 @@
 
 <!-- Transaction Activity -->
 <div class="row g-3 mb-4">
-  <div class="col-md-12">
+  <div class="col-12">
     <div class="card">
       <div class="card-header"><i class="bi bi-activity me-2"></i>Transaction Activity</div>
       <div class="card-body">
-        <div class="row text-center">
-          <div class="col-md-3">
-            <div class="border-end">
-              <h6 class="text-muted">Total Intakes</h6>
+        <div class="row text-center g-3">
+          <div class="col-6 col-md-3">
+            <div class="border-end border-md-end-0 border-md-end">
+              <h6 class="text-muted small">Total Intakes</h6>
               <h2 class="text-success">{{ "{:,}".format(total_intakes) }}</h2>
               <small class="text-muted">All time</small>
             </div>
           </div>
-          <div class="col-md-3">
-            <div class="border-end">
-              <h6 class="text-muted">Recent Intakes</h6>
+          <div class="col-6 col-md-3">
+            <div class="border-md-end">
+              <h6 class="text-muted small">Recent Intakes</h6>
               <h2 class="text-success">{{ "{:,}".format(recent_intakes) }}</h2>
               <small class="text-muted">Last 30 days</small>
             </div>
           </div>
-          <div class="col-md-3">
-            <div class="border-end">
-              <h6 class="text-muted">Total Distributions</h6>
+          <div class="col-6 col-md-3">
+            <div class="border-end border-md-end-0 border-md-end">
+              <h6 class="text-muted small">Total Distributions</h6>
               <h2 class="text-danger">{{ "{:,}".format(total_distributions) }}</h2>
               <small class="text-muted">All time</small>
             </div>
           </div>
-          <div class="col-md-3">
-            <h6 class="text-muted">Recent Distributions</h6>
+          <div class="col-6 col-md-3">
+            <h6 class="text-muted small">Recent Distributions</h6>
             <h2 class="text-danger">{{ "{:,}".format(recent_distributions) }}</h2>
             <small class="text-muted">Last 30 days</small>
           </div>
@@ -145,35 +145,58 @@
 </div>
 
 <!-- Activity by Event -->
-{% if event_stats %}
+{% if event_stats_preview or event_stats_full %}
 <div class="row g-3 mb-4">
-  <div class="col-md-12">
+  <div class="col-12">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-bar-chart me-2"></i>Activity by Disaster Event</span>
         <a class="btn btn-sm btn-outline-primary" href="{{ url_for('disaster_events') }}">View All Events</a>
       </div>
       <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>Event Name</th>
-              <th>Type</th>
-              <th class="text-end">Total Intake</th>
-              <th class="text-end">Total Distribution</th>
-            </tr>
-          </thead>
-          <tbody>
-          {% for event in event_stats %}
-            <tr>
-              <td><strong>{{ event.name }}</strong></td>
-              <td><span class="badge bg-secondary">{{ event.event_type }}</span></td>
-              <td class="text-end"><span class="text-success">{{ "{:,}".format(event.total_intake) }} units</span></td>
-              <td class="text-end"><span class="text-danger">{{ "{:,}".format(event.total_distribution) }} units</span></td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Event Name</th>
+                <th class="d-none d-md-table-cell">Type</th>
+                <th class="text-end">Intake</th>
+                <th class="text-end">Distribution</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for event in event_stats_preview %}
+              <tr>
+                <td><strong>{{ event.name }}</strong></td>
+                <td class="d-none d-md-table-cell"><span class="badge bg-secondary">{{ event.event_type }}</span></td>
+                <td class="text-end"><span class="text-success">{{ "{:,}".format(event.total_intake) }}<span class="d-none d-sm-inline"> units</span></span></td>
+                <td class="text-end"><span class="text-danger">{{ "{:,}".format(event.total_distribution) }}<span class="d-none d-sm-inline"> units</span></span></td>
+              </tr>
+            {% endfor %}
+            </tbody>
+            {% if event_stats_full|length > 5 %}
+            <tbody class="collapse" id="collapseEvents">
+            {% for event in event_stats_full[5:] %}
+              <tr>
+                <td><strong>{{ event.name }}</strong></td>
+                <td class="d-none d-md-table-cell"><span class="badge bg-secondary">{{ event.event_type }}</span></td>
+                <td class="text-end"><span class="text-success">{{ "{:,}".format(event.total_intake) }}<span class="d-none d-sm-inline"> units</span></span></td>
+                <td class="text-end"><span class="text-danger">{{ "{:,}".format(event.total_distribution) }}<span class="d-none d-sm-inline"> units</span></span></td>
+              </tr>
+            {% endfor %}
+            </tbody>
+            {% else %}
+            </tbody>
+            {% endif %}
+          </table>
+        </div>
+        {% if event_stats_full|length > 5 %}
+        <div class="text-center py-2 border-top">
+          <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseEvents" aria-expanded="false" aria-controls="collapseEvents" onclick="this.textContent = this.textContent.trim() === 'Show more' ? 'Show less' : 'Show more'">
+            Show more
+          </button>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -182,56 +205,110 @@
 
 <!-- Inventory and Stock Details -->
 <div class="row g-3 mb-4">
-  <div class="col-md-6">
+  <div class="col-12 col-lg-6">
     <div class="card">
       <div class="card-header"><i class="bi bi-list-ul me-2"></i>Inventory by Category</div>
       <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-          <thead class="table-light">
-            <tr><th>Category</th><th class="text-center">Items</th><th class="text-end">Total Units</th></tr>
-          </thead>
-          <tbody>
-          {% for category, stats in stock_by_category %}
-            <tr>
-              <td><strong>{{ category }}</strong></td>
-              <td class="text-center">{{ stats.items }}</td>
-              <td class="text-end">{{ "{:,}".format(stats.total_units) }}</td>
-            </tr>
-          {% else %}
-            <tr><td colspan="3" class="text-center py-3 text-muted">No inventory data available.</td></tr>
-          {% endfor %}
-          </tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Category</th>
+                <th class="text-center">Items</th>
+                <th class="text-end">Total Units</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for category, stats in stock_by_category_preview %}
+              <tr>
+                <td><strong>{{ category }}</strong></td>
+                <td class="text-center">{{ stats.items }}</td>
+                <td class="text-end">{{ "{:,}".format(stats.total_units) }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="3" class="text-center py-3 text-muted">No inventory data available.</td></tr>
+            {% endfor %}
+            </tbody>
+            {% if stock_by_category_full|length > 5 %}
+            <tbody class="collapse" id="collapseCategory">
+            {% for category, stats in stock_by_category_full[5:] %}
+              <tr>
+                <td><strong>{{ category }}</strong></td>
+                <td class="text-center">{{ stats.items }}</td>
+                <td class="text-end">{{ "{:,}".format(stats.total_units) }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+            {% else %}
+            </tbody>
+            {% endif %}
+          </table>
+        </div>
+        {% if stock_by_category_full|length > 5 %}
+        <div class="text-center py-2 border-top">
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCategory" aria-expanded="false" aria-controls="collapseCategory" onclick="this.textContent = this.textContent.trim() === 'Show more' ? 'Show less' : 'Show more'">
+            Show more
+          </button>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
-  <div class="col-md-6">
+  <div class="col-12 col-lg-6">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-geo-fill me-2"></i>Stock by Location</span>
-        <a class="btn btn-sm btn-primary" href="{{ url_for('locations') }}">Manage Locations</a>
+        <a class="btn btn-sm btn-primary d-none d-md-inline-block" href="{{ url_for('locations') }}">Manage Locations</a>
       </div>
       <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-          <thead class="table-light">
-            <tr><th>Location</th><th class="text-end">Total Units</th><th></th></tr>
-          </thead>
-          <tbody>
-          {% for loc in locations %}
-            <tr>
-              <td><strong>{{ loc.name }}</strong></td>
-              <td class="text-end">{{ "{:,}".format(stock_by_location.get(loc.id, 0)) }}</td>
-              <td class="text-end">
-                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('location_inventory', location_id=loc.id) }}">
-                  <i class="bi bi-eye me-1"></i>View
-                </a>
-              </td>
-            </tr>
-          {% else %}
-            <tr><td colspan="3" class="text-center py-3 text-muted">No locations found.</td></tr>
-          {% endfor %}
-          </tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Location</th>
+                <th class="text-end">Total Units</th>
+                <th class="text-end"></th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for loc in locations_preview %}
+              <tr>
+                <td><strong>{{ loc.name }}</strong></td>
+                <td class="text-end">{{ "{:,}".format(stock_by_location.get(loc.id, 0)) }}</td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('location_inventory', location_id=loc.id) }}">
+                    <i class="bi bi-eye me-1 d-none d-sm-inline"></i><span class="d-none d-sm-inline">View</span><i class="bi bi-eye d-sm-none"></i>
+                  </a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="3" class="text-center py-3 text-muted">No locations found.</td></tr>
+            {% endfor %}
+            </tbody>
+            {% if locations_full|length > 5 %}
+            <tbody class="collapse" id="collapseLocation">
+            {% for loc in locations_full[5:] %}
+              <tr>
+                <td><strong>{{ loc.name }}</strong></td>
+                <td class="text-end">{{ "{:,}".format(stock_by_location.get(loc.id, 0)) }}</td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('location_inventory', location_id=loc.id) }}">
+                    <i class="bi bi-eye me-1 d-none d-sm-inline"></i><span class="d-none d-sm-inline">View</span><i class="bi bi-eye d-sm-none"></i>
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+            {% endif %}
+          </table>
+        </div>
+        {% if locations_full|length > 5 %}
+        <div class="text-center py-2 border-top">
+          <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLocation" aria-expanded="false" aria-controls="collapseLocation" onclick="this.textContent = this.textContent.trim() === 'Show more' ? 'Show less' : 'Show more'">
+            Show more
+          </button>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -239,8 +316,8 @@
 
 <!-- Low Stock, Expiring Items, and Recent Transactions -->
 <div class="row g-3">
-  {% if expiring_items %}
-  <div class="col-md-12 mb-3">
+  {% if expiring_items_preview or expiring_items_full %}
+  <div class="col-12 mb-3">
     <div class="alert alert-danger border-danger border-2">
       <h5 class="alert-heading"><i class="bi bi-calendar-x me-2"></i>Expiring Items Alert</h5>
       <p class="mb-2">The following items will expire within the next 30 days:</p>
@@ -249,76 +326,132 @@
           <thead>
             <tr>
               <th>Item</th>
-              <th>SKU</th>
-              <th>Category</th>
+              <th class="d-none d-md-table-cell">SKU</th>
+              <th class="d-none d-lg-table-cell">Category</th>
               <th>Expiry Date</th>
-              <th>Days Remaining</th>
-              <th>Storage Requirements</th>
+              <th class="text-center">Days Left</th>
+              <th class="d-none d-xl-table-cell">Storage</th>
             </tr>
           </thead>
           <tbody>
-            {% for exp_item in expiring_items %}
+            {% for exp_item in expiring_items_preview %}
             <tr class="{% if exp_item.urgency == 'critical' %}table-danger{% elif exp_item.urgency == 'warning' %}table-warning{% endif %}">
               <td><strong>{{ exp_item.item.name }}</strong></td>
-              <td><small>{{ exp_item.item.sku }}</small></td>
-              <td>{{ exp_item.item.category or '—' }}</td>
+              <td class="d-none d-md-table-cell"><small>{{ exp_item.item.sku }}</small></td>
+              <td class="d-none d-lg-table-cell">{{ exp_item.item.category or '—' }}</td>
               <td>{{ exp_item.item.expiry_date.strftime("%Y-%m-%d") }}</td>
               <td class="text-center">
                 <strong class="{% if exp_item.urgency == 'critical' %}text-danger{% elif exp_item.urgency == 'warning' %}text-warning{% endif %}">
                   {{ exp_item.days_remaining }}
                 </strong>
               </td>
-              <td><small>{{ exp_item.item.storage_requirements or '—' }}</small></td>
+              <td class="d-none d-xl-table-cell"><small>{{ exp_item.item.storage_requirements or '—' }}</small></td>
             </tr>
             {% endfor %}
           </tbody>
+          {% if expiring_items_full|length > 5 %}
+          <tbody class="collapse" id="collapseExpiring">
+            {% for exp_item in expiring_items_full[5:] %}
+            <tr class="{% if exp_item.urgency == 'critical' %}table-danger{% elif exp_item.urgency == 'warning' %}table-warning{% endif %}">
+              <td><strong>{{ exp_item.item.name }}</strong></td>
+              <td class="d-none d-md-table-cell"><small>{{ exp_item.item.sku }}</small></td>
+              <td class="d-none d-lg-table-cell">{{ exp_item.item.category or '—' }}</td>
+              <td>{{ exp_item.item.expiry_date.strftime("%Y-%m-%d") }}</td>
+              <td class="text-center">
+                <strong class="{% if exp_item.urgency == 'critical' %}text-danger{% elif exp_item.urgency == 'warning' %}text-warning{% endif %}">
+                  {{ exp_item.days_remaining }}
+                </strong>
+              </td>
+              <td class="d-none d-xl-table-cell"><small>{{ exp_item.item.storage_requirements or '—' }}</small></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          {% endif %}
         </table>
       </div>
+      {% if expiring_items_full|length > 5 %}
+      <div class="text-center mt-2">
+        <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExpiring" aria-expanded="false" aria-controls="collapseExpiring" onclick="this.textContent = this.textContent.trim() === 'Show more' ? 'Show less' : 'Show more'">
+          Show more
+        </button>
+      </div>
+      {% endif %}
     </div>
   </div>
   {% endif %}
-  <div class="col-md-6">
+  <div class="col-12 col-lg-6">
     <div class="card">
       <div class="card-header bg-warning bg-opacity-10">
         <i class="bi bi-exclamation-circle text-warning me-2"></i>Low Stock Alerts
       </div>
       <div class="card-body p-0">
-        <table class="table table-hover mb-0">
-          <thead class="table-light">
-            <tr><th>Item</th><th>Location</th><th class="text-end">Stock</th><th class="text-end">Min Required</th></tr>
-          </thead>
-          <tbody>
-          {% for item, location, stock in low_stock %}
-            <tr>
-              <td><a href="{{ url_for('item_edit', item_sku=item.sku) }}">{{ item.name }}</a></td>
-              <td>{{ location.name }}</td>
-              <td class="text-end text-danger"><strong>{{ stock or 0 }} {{ item.unit }}</strong></td>
-              <td class="text-end">{{ item.min_qty }} {{ item.unit }}</td>
-            </tr>
-          {% else %}
-            <tr><td colspan="4" class="text-center py-3 text-muted">✓ No low stock items.</td></tr>
-          {% endfor %}
-          </tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Item</th>
+                <th class="d-none d-md-table-cell">Location</th>
+                <th class="text-end">Stock</th>
+                <th class="text-end d-none d-sm-table-cell">Min</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for item, location, stock in low_stock_preview %}
+              <tr>
+                <td><a href="{{ url_for('item_edit', item_sku=item.sku) }}">{{ item.name }}</a></td>
+                <td class="d-none d-md-table-cell">{{ location.name }}</td>
+                <td class="text-end text-danger"><strong>{{ stock or 0 }} {{ item.unit }}</strong></td>
+                <td class="text-end d-none d-sm-table-cell">{{ item.min_qty }} {{ item.unit }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="4" class="text-center py-3 text-muted">✓ No low stock items.</td></tr>
+            {% endfor %}
+            </tbody>
+            {% if low_stock_full|length > 5 %}
+            <tbody class="collapse" id="collapseLowStock">
+            {% for item, location, stock in low_stock_full[5:] %}
+              <tr>
+                <td><a href="{{ url_for('item_edit', item_sku=item.sku) }}">{{ item.name }}</a></td>
+                <td class="d-none d-md-table-cell">{{ location.name }}</td>
+                <td class="text-end text-danger"><strong>{{ stock or 0 }} {{ item.unit }}</strong></td>
+                <td class="text-end d-none d-sm-table-cell">{{ item.min_qty }} {{ item.unit }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+            {% endif %}
+          </table>
+        </div>
+        {% if low_stock_full|length > 5 %}
+        <div class="text-center py-2 border-top">
+          <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="collapse" data-bs-target="#collapseLowStock" aria-expanded="false" aria-controls="collapseLowStock" onclick="this.textContent = this.textContent.trim() === 'Show more' ? 'Show less' : 'Show more'">
+            Show more
+          </button>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
-  <div class="col-md-6">
+  <div class="col-12 col-lg-6">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-clock-history me-2"></i>Recent Transactions</span>
         <a class="btn btn-sm btn-outline-primary" href="{{ url_for('transactions') }}">View All</a>
       </div>
       <div class="card-body p-0">
-        <div style="max-height: 400px; overflow-y: auto;">
+        <div class="table-responsive">
           <table class="table table-hover table-sm mb-0">
-            <thead class="table-light sticky-top">
-              <tr><th>When</th><th>Type</th><th>Item</th><th class="text-end">Qty</th></tr>
+            <thead class="table-light">
+              <tr>
+                <th class="d-none d-md-table-cell">When</th>
+                <th>Type</th>
+                <th>Item</th>
+                <th class="text-end">Qty</th>
+              </tr>
             </thead>
             <tbody>
-            {% for t in recent %}
+            {% for t in recent_preview %}
               <tr>
-                <td><small>{{ t.created_at.strftime("%m/%d %H:%M") }}</small></td>
+                <td class="d-none d-md-table-cell"><small>{{ t.created_at.strftime("%m/%d %H:%M") }}</small></td>
                 <td>
                   <span class="badge bg-{% if t.ttype == 'IN' %}success{% else %}danger{% endif %} badge-sm">
                     {{ t.ttype }}
@@ -331,8 +464,31 @@
               <tr><td colspan="4" class="text-center py-3 text-muted">No transactions yet.</td></tr>
             {% endfor %}
             </tbody>
+            {% if recent_full|length > 5 %}
+            <tbody class="collapse" id="collapseRecent">
+            {% for t in recent_full[5:] %}
+              <tr>
+                <td class="d-none d-md-table-cell"><small>{{ t.created_at.strftime("%m/%d %H:%M") }}</small></td>
+                <td>
+                  <span class="badge bg-{% if t.ttype == 'IN' %}success{% else %}danger{% endif %} badge-sm">
+                    {{ t.ttype }}
+                  </span>
+                </td>
+                <td><small>{{ t.item.name[:30] }}{% if t.item.name|length > 30 %}...{% endif %}</small></td>
+                <td class="text-end"><small>{{ t.qty }} {{ t.item.unit }}</small></td>
+              </tr>
+            {% endfor %}
+            </tbody>
+            {% endif %}
           </table>
         </div>
+        {% if recent_full|length > 5 %}
+        <div class="text-center py-2 border-top">
+          <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseRecent" aria-expanded="false" aria-controls="collapseRecent" onclick="this.textContent = this.textContent.trim() === 'Show more' ? 'Show less' : 'Show more'">
+            Show more
+          </button>
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>

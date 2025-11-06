@@ -300,6 +300,11 @@ def dashboard():
                 low.append((item, loc, stock))
     
     low.sort(key=lambda x: x[2])  # Sort by stock level
+    
+    # Provide sliced and full data for low stock (for mobile responsiveness)
+    PREVIEW_LIMIT = 5
+    low_stock_preview = low[:PREVIEW_LIMIT]
+    low_stock_full = low
 
     # Inventory by category
     stock_by_category = {}
@@ -313,9 +318,15 @@ def dashboard():
     
     # Sort categories by name
     sorted_categories = sorted(stock_by_category.items())
+    stock_by_category_preview = sorted_categories[:PREVIEW_LIMIT]
+    stock_by_category_full = sorted_categories
     
-    # Activity by event
-    event_stats = db.session.query(
+    # Provide sliced data for locations (for mobile responsiveness)
+    locations_preview = locations[:PREVIEW_LIMIT]
+    locations_full = locations
+    
+    # Activity by event - get all events first
+    event_stats_all = db.session.query(
         DisasterEvent.name,
         DisasterEvent.event_type,
         func.sum(case((Transaction.ttype == "IN", Transaction.qty), else_=0)).label("total_intake"),
@@ -323,7 +334,10 @@ def dashboard():
     ).join(Transaction, DisasterEvent.id == Transaction.event_id, isouter=False)\
      .group_by(DisasterEvent.id, DisasterEvent.name, DisasterEvent.event_type)\
      .order_by(DisasterEvent.id.desc())\
-     .limit(5).all()
+     .all()
+    
+    event_stats_preview = event_stats_all[:PREVIEW_LIMIT]
+    event_stats_full = event_stats_all
     
     # Expiring items (within next 30 days)
     from datetime import date, timedelta
@@ -336,26 +350,35 @@ def dashboard():
     ).order_by(Item.expiry_date.asc()).all()
     
     # Calculate days remaining for each expiring item
-    expiring_items = []
+    expiring_items_all = []
     for item in expiring_items_query:
         days_remaining = (item.expiry_date - today).days
-        expiring_items.append({
+        expiring_items_all.append({
             'item': item,
             'days_remaining': days_remaining,
             'urgency': 'critical' if days_remaining <= 7 else 'warning' if days_remaining <= 14 else 'normal'
         })
     
+    expiring_items_preview = expiring_items_all[:PREVIEW_LIMIT]
+    expiring_items_full = expiring_items_all
+    
     # Recent transactions
-    recent = Transaction.query.order_by(Transaction.created_at.desc()).limit(15).all()
+    recent_all = Transaction.query.order_by(Transaction.created_at.desc()).limit(50).all()
+    recent_preview = recent_all[:PREVIEW_LIMIT]
+    recent_full = recent_all
     
     return render_template("dashboard.html",
                            total_items=total_items,
                            total_in_stock=total_in_stock,
-                           low_stock=low,
-                           recent=recent,
-                           locations=locations,
+                           low_stock_preview=low_stock_preview,
+                           low_stock_full=low_stock_full,
+                           recent_preview=recent_preview,
+                           recent_full=recent_full,
+                           locations_preview=locations_preview,
+                           locations_full=locations_full,
                            stock_by_location=stock_by_location,
-                           stock_by_category=sorted_categories,
+                           stock_by_category_preview=stock_by_category_preview,
+                           stock_by_category_full=stock_by_category_full,
                            total_donors=total_donors,
                            total_beneficiaries=total_beneficiaries,
                            total_distributors=total_distributors,
@@ -365,8 +388,10 @@ def dashboard():
                            total_distributions=total_distributions,
                            recent_intakes=recent_intakes,
                            recent_distributions=recent_distributions,
-                           event_stats=event_stats,
-                           expiring_items=expiring_items)
+                           event_stats_preview=event_stats_preview,
+                           event_stats_full=event_stats_full,
+                           expiring_items_preview=expiring_items_preview,
+                           expiring_items_full=expiring_items_full)
 
 @app.route("/items")
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF, ROLE_AUDITOR, ROLE_EXECUTIVE)
