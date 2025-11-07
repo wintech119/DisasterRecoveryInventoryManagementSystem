@@ -276,7 +276,7 @@
                 <td><strong>{{ loc.name }}</strong></td>
                 <td class="text-end">{{ "{:,}".format(stock_by_location.get(loc.id, 0)) }}</td>
                 <td class="text-end">
-                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('location_inventory', location_id=loc.id) }}">
+                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('depot_inventory', location_id=loc.id) }}">
                     <i class="bi bi-eye me-1 d-none d-sm-inline"></i><span class="d-none d-sm-inline">View</span><i class="bi bi-eye d-sm-none"></i>
                   </a>
                 </td>
@@ -292,7 +292,7 @@
                 <td><strong>{{ loc.name }}</strong></td>
                 <td class="text-end">{{ "{:,}".format(stock_by_location.get(loc.id, 0)) }}</td>
                 <td class="text-end">
-                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('location_inventory', location_id=loc.id) }}">
+                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('depot_inventory', location_id=loc.id) }}">
                     <i class="bi bi-eye me-1 d-none d-sm-inline"></i><span class="d-none d-sm-inline">View</span><i class="bi bi-eye d-sm-none"></i>
                   </a>
                 </td>
