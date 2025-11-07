@@ -1362,6 +1362,93 @@ def package_create():
                          locations=locations,
                          stock_map=stock_map)
 
+@app.route("/packages/<int:package_id>/fulfill", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+def package_fulfill(package_id):
+    """Fulfill distributor needs list by allocating stock from depots"""
+    package = DistributionPackage.query.get_or_404(package_id)
+    
+    if package.status != "Draft":
+        flash("Only draft packages can be fulfilled.", "warning")
+        return redirect(url_for("package_details", package_id=package_id))
+    
+    if request.method == "POST":
+        stock_map = get_stock_by_location()
+        locations = Depot.query.all()
+        
+        # Process depot allocations for each item
+        for pkg_item in package.items:
+            # Clear existing allocations first
+            PackageItemAllocation.query.filter_by(package_item_id=pkg_item.id).delete()
+            
+            depot_allocations = []
+            total_allocated = 0
+            
+            for loc in locations:
+                depot_field_name = f"depot_allocation_{pkg_item.id}_{loc.name.replace(' ', '_')}"
+                depot_qty_str = request.form.get(depot_field_name, "").strip()
+                
+                if depot_qty_str:
+                    depot_qty = int(depot_qty_str)
+                    
+                    if depot_qty > 0:
+                        # Validate against depot stock
+                        available_at_depot = stock_map.get((pkg_item.item_sku, loc.id), 0)
+                        
+                        if depot_qty > available_at_depot:
+                            flash(f"Item {pkg_item.item.name}: Cannot allocate {depot_qty} from {loc.name}. Only {available_at_depot} available.", "danger")
+                            return redirect(url_for("package_fulfill", package_id=package_id))
+                        
+                        depot_allocations.append({
+                            'depot_id': loc.id,
+                            'qty': depot_qty
+                        })
+                        total_allocated += depot_qty
+            
+            # Validate total allocation
+            if total_allocated > pkg_item.requested_qty:
+                flash(f"Item {pkg_item.item.name}: Total allocated ({total_allocated}) cannot exceed requested quantity ({pkg_item.requested_qty}).", "danger")
+                return redirect(url_for("package_fulfill", package_id=package_id))
+            
+            # Update allocated quantity
+            pkg_item.allocated_qty = total_allocated
+            
+            # Save depot allocations
+            for depot_allocation in depot_allocations:
+                allocation = PackageItemAllocation(
+                    package_item_id=pkg_item.id,
+                    depot_id=depot_allocation['depot_id'],
+                    allocated_qty=depot_allocation['qty']
+                )
+                db.session.add(allocation)
+        
+        # Check if package is partial
+        is_partial = any(item.allocated_qty < item.requested_qty for item in package.items)
+        package.is_partial = is_partial
+        package.updated_at = datetime.utcnow()
+        
+        # Record update in audit trail
+        record_package_status_change(package, "Draft", "Draft", current_user.full_name, 
+                                    "Depot allocations updated by inventory manager")
+        
+        db.session.commit()
+        
+        flash(f"Depot allocations saved for package {package.package_number}.", "success")
+        return redirect(url_for("package_details", package_id=package_id))
+    
+    # GET request - show fulfillment form
+    items = Item.query.order_by(Item.name).all()
+    locations = Depot.query.order_by(Depot.name).all()
+    stock_map = get_stock_by_location()
+    events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
+    
+    return render_template("package_fulfill.html", 
+                         package=package,
+                         items=items,
+                         locations=locations,
+                         stock_map=stock_map,
+                         events=events)
+
 @app.route("/packages/<int:package_id>")
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
 def package_details(package_id):

@@ -264,6 +264,16 @@
         <div class="card-body">
           {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER'] %}
             
+            <!-- Fulfill Needs List -->
+            {% if package.status == 'Draft' %}
+            <a href="{{ url_for('package_fulfill', package_id=package.id) }}" class="btn btn-primary w-100 mb-3">
+              <i class="bi bi-clipboard-check me-1"></i>Fulfill Needs List
+            </a>
+            <p class="small text-muted mb-3">
+              <i class="bi bi-info-circle"></i> Allocate stock from depots to fulfill this distributor's request.
+            </p>
+            {% endif %}
+            
             <!-- Submit for Review -->
             {% if package.status == 'Draft' %}
             <form method="POST" action="{{ url_for('package_submit_review', package_id=package.id) }}" class="mb-3">

@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}Fulfill Package {{ package.package_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-clipboard-check me-2"></i>Fulfill Package {{ package.package_number }}</h2>
+    <a href="{{ url_for('package_details', package_id=package.id) }}" class="btn btn-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Back to Package
+    </a>
+  </div>
+  
+  <div class="alert alert-info">
+    <div class="row">
+      <div class="col-md-4">
+        <strong><i class="bi bi-person me-1"></i>Distributor:</strong> {{ package.distributor.name }}
+      </div>
+      <div class="col-md-4">
+        <strong><i class="bi bi-calendar me-1"></i>Created:</strong> {{ package.created_at.strftime("%Y-%m-%d") }}
+      </div>
+      <div class="col-md-4">
+        <strong><i class="bi bi-box me-1"></i>Items:</strong> {{ package.items|length }}
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-9">
+      <form method="POST">
+        {% for pkg_item in package.items %}
+        <div class="card mb-3">
+          <div class="card-header bg-light">
+            <div class="row align-items-center">
+              <div class="col-md-6">
+                <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>{{ pkg_item.item.name }}</h5>
+                <small class="text-muted">SKU: {{ pkg_item.item_sku }}</small>
+              </div>
+              <div class="col-md-6 text-end">
+                <span class="badge bg-info fs-6">Requested: {{ pkg_item.requested_qty }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="card border-primary mb-3">
+              <div class="card-header bg-primary text-white">
+                <strong><i class="bi bi-geo-alt me-1"></i>Allocate from Depots</strong>
+                <div class="btn-group btn-group-sm float-end" role="group">
+                  <button type="button" class="btn btn-sm btn-light" onclick="autoFillItem('{{ pkg_item.id }}', {{ pkg_item.requested_qty }})" title="Auto-fill from depot with most stock">
+                    <i class="bi bi-lightning-fill"></i> Auto-fill
+                  </button>
+                  <button type="button" class="btn btn-sm btn-light" onclick="clearItemAllocations('{{ pkg_item.id }}')" title="Clear all allocations">
+                    <i class="bi bi-x-circle"></i> Clear
+                  </button>
+                </div>
+              </div>
+              <div class="card-body">
+                <p class="small text-muted mb-3">
+                  <i class="bi bi-info-circle"></i> Enter quantities to fulfill from each depot. Total must not exceed requested amount.
+                </p>
+                
+                {% for location in locations %}
+                {% set available = stock_map.get((pkg_item.item_sku, location.id), 0) %}
+                {% set allocated = 0 %}
+                {% for alloc in pkg_item.allocations %}
+                  {% if alloc.depot_id == location.id %}
+                    {% set allocated = alloc.allocated_qty %}
+                  {% endif %}
+                {% endfor %}
+                
+                <div class="card mb-2 {% if available > 0 %}border-success{% else %}border-secondary{% endif %}">
+                  <div class="card-body py-2 px-3">
+                    <div class="row align-items-center">
+                      <div class="col-md-5">
+                        <div class="d-flex align-items-center">
+                          <i class="bi {% if available > 0 %}bi-check-circle-fill text-success{% else %}bi-x-circle text-muted{% endif %} me-2"></i>
+                          <div>
+                            <strong>{{ location.name }}</strong>
+                            <div class="small {% if available > 0 %}text-success{% else %}text-muted{% endif %}">
+                              <i class="bi bi-box"></i> 
+                              <span class="current-stock-{{ pkg_item.id }}-{{ location.id }}">{{ available }}</span> in stock
+                              <span class="remaining-stock-{{ pkg_item.id }}-{{ location.id }}" style="display:none;"></span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-md-7">
+                        <div class="input-group">
+                          <span class="input-group-text">
+                            <i class="bi bi-box-arrow-right"></i>
+                          </span>
+                          <input type="number" 
+                                 name="depot_allocation_{{ pkg_item.id }}_{{ location.name.replace(' ', '_') }}" 
+                                 class="form-control depot-input-{{ pkg_item.id }}" 
+                                 data-item-id="{{ pkg_item.id }}" 
+                                 data-depot-id="{{ location.id }}"
+                                 data-max="{{ available }}"
+                                 placeholder="{% if available > 0 %}Enter quantity{% else %}Out of stock{% endif %}"
+                                 min="0" 
+                                 max="{{ available }}"
+                                 value="{{ allocated }}"
+                                 {% if available == 0 %}disabled{% endif %}
+                                 oninput="validateAndUpdate('{{ pkg_item.id }}', {{ pkg_item.requested_qty }})">
+                          <span class="input-group-text">/ {{ available }}</span>
+                          {% if available > 0 %}
+                          <button class="btn btn-outline-secondary" type="button" onclick="fillFromDepot('{{ pkg_item.id }}', '{{ location.id }}', {{ available }}, {{ pkg_item.requested_qty }})" title="Use max from this depot">
+                            <i class="bi bi-arrow-down-circle"></i>
+                          </button>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+                
+                <div class="mt-3 p-3 border rounded allocation-summary">
+                  <div class="row align-items-center">
+                    <div class="col-md-6">
+                      <strong>Total Allocated:</strong>
+                      <span class="total-allocated-{{ pkg_item.id }} badge bg-secondary fs-6 ms-2">{{ pkg_item.allocated_qty }}</span>
+                    </div>
+                    <div class="col-md-6">
+                      <strong>Requested:</strong>
+                      <span class="badge bg-info fs-6 ms-2">{{ pkg_item.requested_qty }}</span>
+                    </div>
+                  </div>
+                  <div class="progress mt-2" style="height: 25px;">
+                    <div class="progress-bar-{{ pkg_item.id }} progress-bar {% if pkg_item.allocated_qty == pkg_item.requested_qty %}bg-success{% elif pkg_item.allocated_qty > 0 %}bg-warning{% else %}bg-secondary{% endif %}" role="progressbar" style="width: {{ (pkg_item.allocated_qty / pkg_item.requested_qty * 100) if pkg_item.requested_qty > 0 else 0 }}%">
+                      {{ ((pkg_item.allocated_qty / pkg_item.requested_qty * 100)|int) if pkg_item.requested_qty > 0 else 0 }}%
+                    </div>
+                  </div>
+                  <div class="validation-message-{{ pkg_item.id }} mt-2 small" style="{% if pkg_item.allocated_qty == 0 %}display:none;{% endif %}">
+                    {% if pkg_item.allocated_qty == pkg_item.requested_qty %}
+                    <span class="text-success"><i class="bi bi-check-circle-fill"></i> <strong>Perfect!</strong> All requested quantity allocated.</span>
+                    {% elif pkg_item.allocated_qty > 0 %}
+                    <span class="text-warning"><i class="bi bi-info-circle-fill"></i> <strong>Partial:</strong> {{ pkg_item.requested_qty - pkg_item.allocated_qty }} units remaining to allocate.</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+
+        <div class="card">
+          <div class="card-body">
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-success btn-lg">
+                <i class="bi bi-check-circle me-1"></i>Save Allocations
+              </button>
+              <a href="{{ url_for('package_details', package_id=package.id) }}" class="btn btn-outline-secondary btn-lg">Cancel</a>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="col-lg-3">
+      <div class="card bg-light sticky-top" style="top: 20px;">
+        <div class="card-body">
+          <h5 class="card-title"><i class="bi bi-info-circle me-2"></i>Fulfillment Guide</h5>
+          <ol class="small">
+            <li><strong>Review Items:</strong> Each item shows requested quantity</li>
+            <li><strong>Check Stock:</strong> Green checkmarks show available depots</li>
+            <li><strong>Allocate:</strong> Use auto-fill or manually enter quantities</li>
+            <li><strong>Watch Live Updates:</strong> Remaining stock updates as you type</li>
+            <li><strong>Submit:</strong> Save allocations (partial fulfillment allowed)</li>
+          </ol>
+          <div class="alert alert-warning small mt-3">
+            <i class="bi bi-exclamation-triangle"></i> <strong>Live Stock:</strong> As you allocate, you'll see how much stock remains at each depot in real-time!
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Stock data from backend
+const itemStockData = {
+  {% for pkg_item in package.items %}
+  "{{ pkg_item.id }}": {
+    name: "{{ pkg_item.item.name }}",
+    sku: "{{ pkg_item.item_sku }}",
+    requested: {{ pkg_item.requested_qty }},
+    depots: {
+      {% for location in locations %}
+      "{{ location.id }}": {{ stock_map.get((pkg_item.item_sku, location.id), 0) }}{% if not loop.last %},{% endif %}
+      {% endfor %}
+    }
+  }{% if not loop.last %},{% endif %}
+  {% endfor %}
+};
+
+function validateAndUpdate(itemId, requestedQty) {
+  const inputs = document.querySelectorAll(`.depot-input-${itemId}`);
+  let total = 0;
+  
+  // Update each depot's remaining stock display
+  inputs.forEach(input => {
+    const value = parseInt(input.value) || 0;
+    const max = parseInt(input.dataset.max) || 0;
+    const depotId = input.dataset.depotId;
+    
+    // Prevent exceeding depot stock
+    if (value > max) {
+      input.value = max;
+    }
+    
+    // Prevent negative
+    if (value < 0) {
+      input.value = 0;
+    }
+    
+    total += parseInt(input.value) || 0;
+    
+    // Update remaining stock display (live update)
+    const currentStockSpan = document.querySelector(`.current-stock-${itemId}-${depotId}`);
+    const remainingStockSpan = document.querySelector(`.remaining-stock-${itemId}-${depotId}`);
+    const allocatedQty = parseInt(input.value) || 0;
+    const originalStock = itemStockData[itemId].depots[depotId];
+    const remaining = originalStock - allocatedQty;
+    
+    if (allocatedQty > 0) {
+      currentStockSpan.style.display = 'none';
+      remainingStockSpan.style.display = 'inline';
+      remainingStockSpan.innerHTML = `<strong>${remaining} remaining</strong> (${allocatedQty} allocated)`;
+      remainingStockSpan.className = remaining > 0 ? 'text-primary' : 'text-danger';
+    } else {
+      currentStockSpan.style.display = 'inline';
+      remainingStockSpan.style.display = 'none';
+    }
+  });
+  
+  updateProgressBar(itemId, total, requestedQty);
+}
+
+function updateProgressBar(itemId, total, requestedQty) {
+  const totalBadge = document.querySelector(`.total-allocated-${itemId}`);
+  const progressBar = document.querySelector(`.progress-bar-${itemId}`);
+  const validationMsg = document.querySelector(`.validation-message-${itemId}`);
+  
+  totalBadge.textContent = total;
+  
+  const percentage = requestedQty > 0 ? Math.min((total / requestedQty) * 100, 100) : 0;
+  progressBar.style.width = percentage + '%';
+  progressBar.textContent = Math.round(percentage) + '%';
+  
+  if (total === 0) {
+    totalBadge.className = 'total-allocated-' + itemId + ' badge bg-secondary fs-6 ms-2';
+    progressBar.className = 'progress-bar-' + itemId + ' progress-bar bg-secondary';
+    validationMsg.style.display = 'none';
+  } else if (total > requestedQty) {
+    totalBadge.className = 'total-allocated-' + itemId + ' badge bg-danger fs-6 ms-2';
+    progressBar.className = 'progress-bar-' + itemId + ' progress-bar bg-danger';
+    validationMsg.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-triangle-fill"></i> <strong>Error:</strong> Total allocated exceeds requested quantity!</span>';
+    validationMsg.style.display = 'block';
+  } else if (total === requestedQty) {
+    totalBadge.className = 'total-allocated-' + itemId + ' badge bg-success fs-6 ms-2';
+    progressBar.className = 'progress-bar-' + itemId + ' progress-bar bg-success';
+    validationMsg.innerHTML = '<span class="text-success"><i class="bi bi-check-circle-fill"></i> <strong>Perfect!</strong> All requested quantity allocated.</span>';
+    validationMsg.style.display = 'block';
+  } else {
+    totalBadge.className = 'total-allocated-' + itemId + ' badge bg-warning fs-6 ms-2';
+    progressBar.className = 'progress-bar-' + itemId + ' progress-bar bg-warning';
+    const remaining = requestedQty - total;
+    validationMsg.innerHTML = `<span class="text-warning"><i class="bi bi-info-circle-fill"></i> <strong>Partial:</strong> ${remaining} units remaining to allocate.</span>`;
+    validationMsg.style.display = 'block';
+  }
+}
+
+function fillFromDepot(itemId, depotId, maxQty, requestedQty) {
+  clearItemAllocations(itemId);
+  
+  const input = document.querySelector(`input[data-item-id="${itemId}"][data-depot-id="${depotId}"]`);
+  if (input) {
+    input.value = Math.min(requestedQty, maxQty);
+    validateAndUpdate(itemId, requestedQty);
+  }
+}
+
+function autoFillItem(itemId, requestedQty) {
+  const inputs = document.querySelectorAll(`.depot-input-${itemId}`);
+  
+  clearItemAllocations(itemId);
+  
+  let maxStock = 0;
+  let bestInput = null;
+  
+  inputs.forEach(input => {
+    const available = parseInt(input.dataset.max) || 0;
+    if (available > maxStock) {
+      maxStock = available;
+      bestInput = input;
+    }
+  });
+  
+  if (bestInput) {
+    bestInput.value = Math.min(requestedQty, maxStock);
+  }
+  
+  validateAndUpdate(itemId, requestedQty);
+}
+
+function clearItemAllocations(itemId) {
+  const inputs = document.querySelectorAll(`.depot-input-${itemId}`);
+  inputs.forEach(input => {
+    if (!input.disabled) {
+      input.value = 0;
+    }
+  });
+  const requestedQty = itemStockData[itemId].requested;
+  validateAndUpdate(itemId, requestedQty);
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  {% for pkg_item in package.items %}
+  validateAndUpdate('{{ pkg_item.id }}', {{ pkg_item.requested_qty }});
+  {% endfor %}
+});
+</script>
+{% endblock %}
