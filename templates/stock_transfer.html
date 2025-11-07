@@ -157,34 +157,38 @@
                 {% for item in items %}
                   {% for depot in depots %}
                     {% set transactions = item.transactions|selectattr('location_id', 'equalto', depot.id)|selectattr('notes', 'search', 'Stock transfer')|list %}
-                    {% for txn in transactions[:10] %}
-                      {% set _ = recent_transfers.append(txn) %}
+                    {% for txn in transactions %}
+                      {% if recent_transfers|length < 50 %}
+                        {% set _ = recent_transfers.append(txn) %}
+                      {% endif %}
                     {% endfor %}
                   {% endfor %}
                 {% endfor %}
                 
                 {% if recent_transfers %}
-                  {% for txn in recent_transfers|sort(attribute='created_at', reverse=true)[:10] %}
-                  <tr>
-                    <td><small>{{ txn.created_at.strftime("%Y-%m-%d %H:%M") }}</small></td>
-                    <td>{{ txn.item.name }}</td>
-                    <td>
-                      {% if txn.ttype == 'OUT' %}
-                        <span class="badge bg-danger">{{ txn.location.name }}</span>
-                      {% else %}
-                        <span class="text-muted">—</span>
-                      {% endif %}
-                    </td>
-                    <td>
-                      {% if txn.ttype == 'IN' %}
-                        <span class="badge bg-success">{{ txn.location.name }}</span>
-                      {% else %}
-                        <span class="text-muted">—</span>
-                      {% endif %}
-                    </td>
-                    <td class="text-end">{{ txn.qty }}</td>
-                    <td><small>{{ txn.created_by }}</small></td>
-                  </tr>
+                  {% for txn in recent_transfers|sort(attribute='created_at', reverse=true) %}
+                    {% if loop.index <= 10 %}
+                    <tr>
+                      <td><small>{{ txn.created_at.strftime("%Y-%m-%d %H:%M") }}</small></td>
+                      <td>{{ txn.item.name }}</td>
+                      <td>
+                        {% if txn.ttype == 'OUT' %}
+                          <span class="badge bg-danger">{{ txn.location.name }}</span>
+                        {% else %}
+                          <span class="text-muted">—</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if txn.ttype == 'IN' %}
+                          <span class="badge bg-success">{{ txn.location.name }}</span>
+                        {% else %}
+                          <span class="text-muted">—</span>
+                        {% endif %}
+                      </td>
+                      <td class="text-end">{{ txn.qty }}</td>
+                      <td><small>{{ txn.created_by }}</small></td>
+                    </tr>
+                    {% endif %}
                   {% endfor %}
                 {% else %}
                   <tr>
