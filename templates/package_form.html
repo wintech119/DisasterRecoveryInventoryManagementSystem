@@ -1,21 +1,36 @@
 {% extends "base.html" %}
 
-{% block title %}Create Distribution Package{% endblock %}
+{% block title %}{% if edit_mode %}Fulfill Package{% else %}Create Distribution Package{% endif %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2><i class="bi bi-box-seam me-2"></i>Create Distribution Package</h2>
-    <a href="{{ url_for('packages') }}" class="btn btn-secondary">
-      <i class="bi bi-arrow-left me-1"></i>Back to Packages
+    <h2><i class="bi bi-box-seam me-2"></i>{% if edit_mode %}Fulfill Package {{ package.package_number }}{% else %}Create Distribution Package{% endif %}</h2>
+    <a href="{% if edit_mode %}{{ url_for('package_details', package_id=package.id) }}{% else %}{{ url_for('packages') }}{% endif %}" class="btn btn-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Back
     </a>
   </div>
+
+  {% if edit_mode %}
+  <div class="alert alert-info mb-3">
+    <i class="bi bi-info-circle me-2"></i>
+    <strong>Fulfilling Needs List:</strong> Allocate stock from depots to fulfill {{ package.distributor.name }}'s request. Allocations are saved as draft and can be edited anytime before submission.
+  </div>
+  {% endif %}
 
   <div class="row">
     <div class="col-lg-8">
       <div class="card">
         <div class="card-body">
           <form method="POST">
+            {% if edit_mode %}
+            <!-- Display distributor info (read-only in edit mode) -->
+            <div class="mb-3">
+              <label class="form-label">Distributor</label>
+              <input type="text" class="form-control" value="{{ package.distributor.name }}{% if package.distributor.organization %} ({{ package.distributor.organization }}){% endif %}" disabled>
+              <small class="text-muted">Requested by this distributor</small>
+            </div>
+            {% else %}
             <!-- Distributor Selection -->
             <div class="mb-3">
               <label for="distributor_id" class="form-label">Distributor <span class="text-danger">*</span></label>
@@ -26,14 +41,15 @@
                 {% endfor %}
               </select>
             </div>
+            {% endif %}
 
             <!-- Disaster Event -->
             <div class="mb-3">
               <label for="event_id" class="form-label">Disaster Event (Optional)</label>
-              <select id="event_id" name="event_id" class="form-select">
+              <select id="event_id" name="event_id" class="form-select"{% if edit_mode %} disabled{% endif %}>
                 <option value="">Select Event</option>
                 {% for event in events %}
-                <option value="{{ event.id }}">{{ event.name }} ({{ event.start_date.strftime("%Y-%m-%d") }})</option>
+                <option value="{{ event.id }}"{% if edit_mode and package.event_id == event.id %} selected{% endif %}>{{ event.name }} ({{ event.start_date.strftime("%Y-%m-%d") }})</option>
                 {% endfor %}
               </select>
             </div>

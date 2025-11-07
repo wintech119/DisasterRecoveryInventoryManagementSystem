@@ -1471,52 +1471,73 @@ def package_fulfill(package_id):
     if request.method == "POST":
         stock_map = get_stock_by_location()
         locations = Depot.query.all()
+        depot_name_to_id = {loc.name: loc.id for loc in locations}
         
-        # Process depot allocations for each item
-        for pkg_item in package.items:
-            # Clear existing allocations first
-            PackageItemAllocation.query.filter_by(package_item_id=pkg_item.id).delete()
+        # Parse items from form (using index-based naming: item_sku_0, item_requested_0, depot_allocation_0_DEPOT)
+        item_index = 0
+        while True:
+            sku_key = f"item_sku_{item_index}"
+            requested_key = f"item_requested_{item_index}"
             
-            depot_allocations = []
-            total_allocated = 0
+            if sku_key not in request.form:
+                break
             
-            for loc in locations:
-                depot_field_name = f"depot_allocation_{pkg_item.id}_{loc.name.replace(' ', '_')}"
-                depot_qty_str = request.form.get(depot_field_name, "").strip()
+            sku = request.form[sku_key].strip()
+            requested_str = request.form.get(requested_key, "").strip()
+            
+            if sku and requested_str:
+                requested_qty = int(requested_str)
                 
-                if depot_qty_str:
-                    depot_qty = int(depot_qty_str)
+                # Find the corresponding package item
+                pkg_item = next((item for item in package.items if item.item_sku == sku), None)
+                
+                if pkg_item:
+                    # Clear existing allocations
+                    PackageItemAllocation.query.filter_by(package_item_id=pkg_item.id).delete()
                     
-                    if depot_qty > 0:
-                        # Validate against depot stock
-                        available_at_depot = stock_map.get((pkg_item.item_sku, loc.id), 0)
+                    # Parse per-depot allocations
+                    depot_allocations = []
+                    total_allocated = 0
+                    
+                    for loc in locations:
+                        depot_field_name = f"depot_allocation_{item_index}_{loc.name.replace(' ', '_')}"
+                        depot_qty_str = request.form.get(depot_field_name, "").strip()
                         
-                        if depot_qty > available_at_depot:
-                            flash(f"Item {pkg_item.item.name}: Cannot allocate {depot_qty} from {loc.name}. Only {available_at_depot} available.", "danger")
-                            return redirect(url_for("package_fulfill", package_id=package_id))
-                        
-                        depot_allocations.append({
-                            'depot_id': loc.id,
-                            'qty': depot_qty
-                        })
-                        total_allocated += depot_qty
+                        if depot_qty_str:
+                            depot_qty = int(depot_qty_str)
+                            
+                            if depot_qty > 0:
+                                # Validate against depot stock
+                                available_at_depot = stock_map.get((sku, loc.id), 0)
+                                
+                                if depot_qty > available_at_depot:
+                                    flash(f"Item {pkg_item.item.name}: Cannot allocate {depot_qty} from {loc.name}. Only {available_at_depot} available.", "danger")
+                                    return redirect(url_for("package_fulfill", package_id=package_id))
+                                
+                                depot_allocations.append({
+                                    'depot_id': loc.id,
+                                    'qty': depot_qty
+                                })
+                                total_allocated += depot_qty
+                    
+                    # Validate total allocation
+                    if total_allocated > pkg_item.requested_qty:
+                        flash(f"Item {pkg_item.item.name}: Total allocated ({total_allocated}) cannot exceed requested quantity ({pkg_item.requested_qty}).", "danger")
+                        return redirect(url_for("package_fulfill", package_id=package_id))
+                    
+                    # Update allocated quantity
+                    pkg_item.allocated_qty = total_allocated
+                    
+                    # Save depot allocations
+                    for depot_allocation in depot_allocations:
+                        allocation = PackageItemAllocation(
+                            package_item_id=pkg_item.id,
+                            depot_id=depot_allocation['depot_id'],
+                            allocated_qty=depot_allocation['qty']
+                        )
+                        db.session.add(allocation)
             
-            # Validate total allocation
-            if total_allocated > pkg_item.requested_qty:
-                flash(f"Item {pkg_item.item.name}: Total allocated ({total_allocated}) cannot exceed requested quantity ({pkg_item.requested_qty}).", "danger")
-                return redirect(url_for("package_fulfill", package_id=package_id))
-            
-            # Update allocated quantity
-            pkg_item.allocated_qty = total_allocated
-            
-            # Save depot allocations
-            for depot_allocation in depot_allocations:
-                allocation = PackageItemAllocation(
-                    package_item_id=pkg_item.id,
-                    depot_id=depot_allocation['depot_id'],
-                    allocated_qty=depot_allocation['qty']
-                )
-                db.session.add(allocation)
+            item_index += 1
         
         # Check if package is partial
         is_partial = any(item.allocated_qty < item.requested_qty for item in package.items)
@@ -1525,49 +1546,46 @@ def package_fulfill(package_id):
         
         # Record update in audit trail
         record_package_status_change(package, "Draft", "Draft", current_user.full_name, 
-                                    "Depot allocations updated by inventory manager")
+                                    "Depot allocations updated")
         
         db.session.commit()
         
-        flash(f"Draft saved! Allocations for package {package.package_number} have been saved. You can continue editing or submit for review from the package details page.", "success")
+        flash(f"Package {package.package_number} saved! You can continue editing or submit for review from the package details page.", "success")
         return redirect(url_for("package_details", package_id=package_id))
     
-    # GET request - show fulfillment form
+    # GET request - show fulfillment form using original package_form.html template
+    distributors = Distributor.query.order_by(Distributor.name).all()
+    events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
     items = Item.query.order_by(Item.name).all()
     locations = Depot.query.order_by(Depot.name).all()
     stock_map = get_stock_by_location()
-    events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
     
-    # Build filtered depot lists per package item (only show depots with stock > 0)
-    item_depot_options = {}
+    # Prepare existing package items with allocations for the form
+    existing_items = []
     for pkg_item in package.items:
-        available_depots = []
-        for loc in locations:
-            stock_qty = stock_map.get((pkg_item.item_sku, loc.id), 0)
-            # Find existing allocation for this depot
-            existing_allocation = next((alloc for alloc in pkg_item.allocations if alloc.depot_id == loc.id), None)
-            allocated_qty = existing_allocation.allocated_qty if existing_allocation else 0
-            
-            # Include depot if it has stock OR if there's an existing allocation (for editing)
-            if stock_qty > 0 or existing_allocation:
-                available_depots.append({
-                    'depot': loc,
-                    'depot_id': loc.id,
-                    'depot_name': loc.name,
-                    'available_qty': stock_qty,
-                    'allocated_qty': allocated_qty,
-                    'has_allocation': existing_allocation is not None
-                })
+        # Get existing allocations per depot
+        allocations_by_depot = {}
+        for alloc in pkg_item.allocations:
+            depot_name = alloc.depot.name
+            allocations_by_depot[depot_name] = alloc.allocated_qty
         
-        item_depot_options[pkg_item.id] = available_depots
+        existing_items.append({
+            'sku': pkg_item.item_sku,
+            'item': pkg_item.item,
+            'requested_qty': pkg_item.requested_qty,
+            'allocated_qty': pkg_item.allocated_qty,
+            'allocations': allocations_by_depot
+        })
     
-    return render_template("package_fulfill.html", 
-                         package=package,
+    return render_template("package_form.html", 
+                         distributors=distributors,
+                         events=events,
                          items=items,
                          locations=locations,
                          stock_map=stock_map,
-                         events=events,
-                         item_depot_options=item_depot_options)
+                         package=package,
+                         existing_items=existing_items,
+                         edit_mode=True)
 
 @app.route("/packages/<int:package_id>")
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
