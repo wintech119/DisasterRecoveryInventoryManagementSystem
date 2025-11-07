@@ -69,16 +69,42 @@
                         </div>
                       </div>
                       
-                      <div class="alert alert-primary py-2 mb-2">
-                        <strong><i class="bi bi-box-seam me-1"></i>Allocate from Depots:</strong>
-                        <p class="small mb-0 mt-1">Enter how much to fulfill from each depot (must total ≤ requested quantity)</p>
-                      </div>
-                      
-                      <div class="depot-allocations-0 depot-allocations"></div>
-                      
-                      <div class="mt-2 p-2 bg-light rounded">
-                        <strong>Total Allocated:</strong> <span class="total-allocated-0 total-allocated badge bg-secondary">0</span> / 
-                        <span class="requested-display-0">0</span> requested
+                      <div class="card border-primary mb-3">
+                        <div class="card-header bg-primary text-white">
+                          <strong><i class="bi bi-geo-alt me-1"></i>Allocate from Depots</strong>
+                          <div class="btn-group btn-group-sm float-end" role="group">
+                            <button type="button" class="btn btn-sm btn-light" onclick="autoFillMax(0)" title="Auto-fill from depot with most stock">
+                              <i class="bi bi-lightning-fill"></i> Auto-fill
+                            </button>
+                            <button type="button" class="btn btn-sm btn-light" onclick="clearAllocations(0)" title="Clear all allocations">
+                              <i class="bi bi-x-circle"></i> Clear
+                            </button>
+                          </div>
+                        </div>
+                        <div class="card-body">
+                          <p class="small text-muted mb-2">
+                            <i class="bi bi-info-circle"></i> Enter quantities to fulfill from each depot. Total must not exceed requested amount.
+                          </p>
+                          
+                          <div class="depot-allocations-0 depot-allocations"></div>
+                          
+                          <div class="mt-3 p-3 border rounded allocation-summary-0">
+                            <div class="row align-items-center">
+                              <div class="col-md-6">
+                                <strong>Total Allocated:</strong>
+                                <span class="total-allocated-0 total-allocated badge bg-secondary fs-6 ms-2">0</span>
+                              </div>
+                              <div class="col-md-6">
+                                <strong>Requested:</strong>
+                                <span class="requested-display-0 badge bg-info fs-6 ms-2">0</span>
+                              </div>
+                            </div>
+                            <div class="progress mt-2" style="height: 25px;">
+                              <div class="progress-bar-0 progress-bar" role="progressbar" style="width: 0%">0%</div>
+                            </div>
+                            <div class="validation-message-0 mt-2 small" style="display:none;"></div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -109,18 +135,26 @@
     <div class="col-lg-4">
       <div class="card bg-light">
         <div class="card-body">
-          <h5 class="card-title"><i class="bi bi-info-circle me-2"></i>Package Creation Info</h5>
+          <h5 class="card-title"><i class="bi bi-info-circle me-2"></i>Package Creation Guide</h5>
           <p class="card-text">
-            <strong>How it works:</strong>
+            <strong>Step-by-Step:</strong>
           </p>
           <ol class="small">
-            <li>Select the distributor who will receive this package</li>
-            <li>Add items from the needs list with quantities</li>
-            <li>View stock availability by depot for each item</li>
-            <li>Manually set the allocated quantity based on available stock</li>
-            <li>Partial packages require distributor acceptance before approval</li>
-            <li>Once approved, the package will be auto-assigned to the nearest warehouse</li>
+            <li><strong>Select Distributor:</strong> Choose who will receive this package</li>
+            <li><strong>Add Items:</strong> Select items and enter requested quantities</li>
+            <li><strong>Allocate Stock:</strong> View stock at each depot and allocate quantities:
+              <ul class="mt-1 mb-1">
+                <li><i class="bi bi-lightning-fill text-warning"></i> Click <strong>Auto-fill</strong> to use depot with most stock</li>
+                <li><i class="bi bi-arrow-down-circle text-primary"></i> Click depot button to fill from that location</li>
+                <li>Or manually enter quantities from multiple depots</li>
+              </ul>
+            </li>
+            <li><strong>Monitor Progress:</strong> Watch the progress bar - green means fully allocated</li>
+            <li><strong>Submit:</strong> Create the package (partial allocations allowed)</li>
           </ol>
+          <div class="alert alert-info small mt-3">
+            <i class="bi bi-lightbulb"></i> <strong>Tip:</strong> Total allocated cannot exceed requested quantity. System prevents over-allocation.
+          </div>
         </div>
       </div>
     </div>
@@ -159,34 +193,62 @@ function showStockInfo(selectElement, index) {
   if (itemData) {
     let html = '';
     let totalStock = 0;
+    const depots = Object.entries(itemData.depots);
     
-    for (const [depot, availableQty] of Object.entries(itemData.depots)) {
+    for (const [depot, availableQty] of depots) {
       totalStock += availableQty;
-      const badge = availableQty > 0 ? 'bg-success' : 'bg-secondary';
+      const stockColor = availableQty > 0 ? 'text-success' : 'text-muted';
+      const stockIcon = availableQty > 0 ? 'bi-check-circle-fill' : 'bi-x-circle';
+      const isDisabled = availableQty === 0 ? 'disabled' : '';
+      
       html += `
-        <div class="row mb-2 align-items-center">
-          <div class="col-md-5">
-            <span class="badge ${badge}">${depot}</span>
-            <small class="text-muted">(${availableQty} available)</small>
-          </div>
-          <div class="col-md-7">
-            <div class="input-group input-group-sm">
-              <input type="number" 
-                     name="depot_allocation_${index}_${depot.replace(/\s+/g, '_')}" 
-                     class="form-control depot-allocation-input" 
-                     data-index="${index}" 
-                     data-depot="${depot}" 
-                     data-max="${availableQty}"
-                     placeholder="Qty from ${depot}"
-                     min="0" 
-                     max="${availableQty}"
-                     value="0"
-                     onchange="updateTotalAllocated(${index})">
-              <span class="input-group-text">/ ${availableQty}</span>
+        <div class="card mb-2 ${availableQty > 0 ? 'border-success' : 'border-secondary'}">
+          <div class="card-body py-2 px-3">
+            <div class="row align-items-center">
+              <div class="col-md-5">
+                <div class="d-flex align-items-center">
+                  <i class="bi ${stockIcon} ${stockColor} me-2"></i>
+                  <div>
+                    <strong>${depot}</strong>
+                    <div class="small ${stockColor}">
+                      <i class="bi bi-box"></i> ${availableQty} in stock
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-7">
+                <div class="input-group">
+                  <span class="input-group-text">
+                    <i class="bi bi-box-arrow-right"></i>
+                  </span>
+                  <input type="number" 
+                         name="depot_allocation_${index}_${depot.replace(/\s+/g, '_')}" 
+                         class="form-control depot-allocation-input" 
+                         data-index="${index}" 
+                         data-depot="${depot}" 
+                         data-max="${availableQty}"
+                         placeholder="${availableQty > 0 ? 'Enter quantity' : 'Out of stock'}"
+                         min="0" 
+                         max="${availableQty}"
+                         value="0"
+                         ${isDisabled}
+                         oninput="validateDepotInput(this, ${index})">
+                  <span class="input-group-text">/ ${availableQty}</span>
+                  ${availableQty > 0 ? `
+                  <button class="btn btn-outline-secondary" type="button" onclick="fillFromDepot(${index}, '${depot.replace(/'/g, "\\'")}', ${availableQty})" title="Use max from this depot">
+                    <i class="bi bi-arrow-down-circle"></i>
+                  </button>
+                  ` : ''}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       `;
+    }
+    
+    if (totalStock === 0) {
+      html = `<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> No stock available at any depot for this item.</div>`;
     }
     
     depotAllocationsDiv.innerHTML = html;
@@ -195,41 +257,130 @@ function showStockInfo(selectElement, index) {
   }
 }
 
+function validateDepotInput(input, index) {
+  const value = parseInt(input.value) || 0;
+  const max = parseInt(input.dataset.max) || 0;
+  
+  // Prevent exceeding depot stock
+  if (value > max) {
+    input.value = max;
+  }
+  
+  // Prevent negative values
+  if (value < 0) {
+    input.value = 0;
+  }
+  
+  updateTotalAllocated(index);
+}
+
 function updateTotalAllocated(index) {
   const inputs = document.querySelectorAll(`.depot-allocation-input[data-index="${index}"]`);
   let total = 0;
   
   inputs.forEach(input => {
-    const value = parseInt(input.value) || 0;
-    const max = parseInt(input.dataset.max) || 0;
-    
-    // Validate doesn't exceed available
-    if (value > max) {
-      input.value = max;
-    }
-    
     total += parseInt(input.value) || 0;
   });
   
   const totalBadge = document.querySelector(`.total-allocated-${index}`);
   const requestedInput = document.querySelector(`input[name="item_requested_${index}"]`);
   const requestedDisplay = document.querySelector(`.requested-display-${index}`);
+  const progressBar = document.querySelector(`.progress-bar-${index}`);
+  const validationMsg = document.querySelector(`.validation-message-${index}`);
   
   const requestedQty = parseInt(requestedInput?.value) || 0;
   requestedDisplay.textContent = requestedQty;
-  
   totalBadge.textContent = total;
+  
+  // Calculate percentage
+  const percentage = requestedQty > 0 ? Math.min((total / requestedQty) * 100, 100) : 0;
+  progressBar.style.width = percentage + '%';
+  progressBar.textContent = Math.round(percentage) + '%';
   
   // Color code based on validation
   if (total === 0) {
-    totalBadge.className = 'total-allocated badge bg-secondary';
+    totalBadge.className = 'total-allocated badge bg-secondary fs-6 ms-2';
+    progressBar.className = 'progress-bar-' + index + ' progress-bar bg-secondary';
+    validationMsg.style.display = 'none';
   } else if (total > requestedQty) {
-    totalBadge.className = 'total-allocated badge bg-danger';
+    totalBadge.className = 'total-allocated badge bg-danger fs-6 ms-2';
+    progressBar.className = 'progress-bar-' + index + ' progress-bar bg-danger';
+    validationMsg.className = 'validation-message-' + index + ' mt-2 small text-danger';
+    validationMsg.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> <strong>Error:</strong> Total allocated exceeds requested quantity!';
+    validationMsg.style.display = 'block';
   } else if (total === requestedQty) {
-    totalBadge.className = 'total-allocated badge bg-success';
+    totalBadge.className = 'total-allocated badge bg-success fs-6 ms-2';
+    progressBar.className = 'progress-bar-' + index + ' progress-bar bg-success';
+    validationMsg.className = 'validation-message-' + index + ' mt-2 small text-success';
+    validationMsg.innerHTML = '<i class="bi bi-check-circle-fill"></i> <strong>Perfect!</strong> All requested quantity allocated.';
+    validationMsg.style.display = 'block';
   } else {
-    totalBadge.className = 'total-allocated badge bg-warning';
+    totalBadge.className = 'total-allocated badge bg-warning fs-6 ms-2';
+    progressBar.className = 'progress-bar-' + index + ' progress-bar bg-warning';
+    const remaining = requestedQty - total;
+    validationMsg.className = 'validation-message-' + index + ' mt-2 small text-warning';
+    validationMsg.innerHTML = `<i class="bi bi-info-circle-fill"></i> <strong>Partial:</strong> ${remaining} units remaining to allocate.`;
+    validationMsg.style.display = 'block';
   }
+}
+
+function fillFromDepot(index, depot, maxQty) {
+  const requestedInput = document.querySelector(`input[name="item_requested_${index}"]`);
+  const requestedQty = parseInt(requestedInput?.value) || 0;
+  
+  if (!requestedQty) {
+    alert('Please enter requested quantity first.');
+    return;
+  }
+  
+  // Clear all other depots
+  clearAllocations(index);
+  
+  // Fill from this depot up to min(requested, available)
+  const depotInput = document.querySelector(`input[name="depot_allocation_${index}_${depot.replace(/\s+/g, '_')}"]`);
+  if (depotInput) {
+    depotInput.value = Math.min(requestedQty, maxQty);
+    updateTotalAllocated(index);
+  }
+}
+
+function autoFillMax(index) {
+  const requestedInput = document.querySelector(`input[name="item_requested_${index}"]`);
+  const requestedQty = parseInt(requestedInput?.value) || 0;
+  
+  if (!requestedQty) {
+    alert('Please enter requested quantity first.');
+    return;
+  }
+  
+  const inputs = document.querySelectorAll(`.depot-allocation-input[data-index="${index}"]`);
+  
+  // Clear all first
+  inputs.forEach(input => input.value = 0);
+  
+  // Find depot with highest stock
+  let maxStock = 0;
+  let bestDepot = null;
+  
+  inputs.forEach(input => {
+    const available = parseInt(input.dataset.max) || 0;
+    if (available > maxStock) {
+      maxStock = available;
+      bestDepot = input;
+    }
+  });
+  
+  if (bestDepot) {
+    bestDepot.value = Math.min(requestedQty, maxStock);
+  }
+  
+  updateTotalAllocated(index);
+}
+
+function clearAllocations(index) {
+  const inputs = document.querySelectorAll(`.depot-allocation-input[data-index="${index}"]`);
+  inputs.forEach(input => input.value = 0);
+  updateTotalAllocated(index);
 }
 
 function addItem() {
@@ -263,16 +414,42 @@ function addItem() {
           </div>
         </div>
         
-        <div class="alert alert-primary py-2 mb-2">
-          <strong><i class="bi bi-box-seam me-1"></i>Allocate from Depots:</strong>
-          <p class="small mb-0 mt-1">Enter how much to fulfill from each depot (must total ≤ requested quantity)</p>
-        </div>
-        
-        <div class="depot-allocations-${itemIndex} depot-allocations"></div>
-        
-        <div class="mt-2 p-2 bg-light rounded">
-          <strong>Total Allocated:</strong> <span class="total-allocated-${itemIndex} total-allocated badge bg-secondary">0</span> / 
-          <span class="requested-display-${itemIndex}">0</span> requested
+        <div class="card border-primary mb-3">
+          <div class="card-header bg-primary text-white">
+            <strong><i class="bi bi-geo-alt me-1"></i>Allocate from Depots</strong>
+            <div class="btn-group btn-group-sm float-end" role="group">
+              <button type="button" class="btn btn-sm btn-light" onclick="autoFillMax(${itemIndex})" title="Auto-fill from depot with most stock">
+                <i class="bi bi-lightning-fill"></i> Auto-fill
+              </button>
+              <button type="button" class="btn btn-sm btn-light" onclick="clearAllocations(${itemIndex})" title="Clear all allocations">
+                <i class="bi bi-x-circle"></i> Clear
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="small text-muted mb-2">
+              <i class="bi bi-info-circle"></i> Enter quantities to fulfill from each depot. Total must not exceed requested amount.
+            </p>
+            
+            <div class="depot-allocations-${itemIndex} depot-allocations"></div>
+            
+            <div class="mt-3 p-3 border rounded allocation-summary-${itemIndex}">
+              <div class="row align-items-center">
+                <div class="col-md-6">
+                  <strong>Total Allocated:</strong>
+                  <span class="total-allocated-${itemIndex} total-allocated badge bg-secondary fs-6 ms-2">0</span>
+                </div>
+                <div class="col-md-6">
+                  <strong>Requested:</strong>
+                  <span class="requested-display-${itemIndex} badge bg-info fs-6 ms-2">0</span>
+                </div>
+              </div>
+              <div class="progress mt-2" style="height: 25px;">
+                <div class="progress-bar-${itemIndex} progress-bar" role="progressbar" style="width: 0%">0%</div>
+              </div>
+              <div class="validation-message-${itemIndex} mt-2 small" style="display:none;"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
