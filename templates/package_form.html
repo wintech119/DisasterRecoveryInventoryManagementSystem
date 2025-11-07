@@ -195,22 +195,22 @@ function showStockInfo(selectElement, index) {
     let totalStock = 0;
     const depots = Object.entries(itemData.depots);
     
-    for (const [depot, availableQty] of depots) {
+    // Filter to only show depots with stock > 0
+    const availableDepots = depots.filter(([depot, qty]) => qty > 0);
+    
+    for (const [depot, availableQty] of availableDepots) {
       totalStock += availableQty;
-      const stockColor = availableQty > 0 ? 'text-success' : 'text-muted';
-      const stockIcon = availableQty > 0 ? 'bi-check-circle-fill' : 'bi-x-circle';
-      const isDisabled = availableQty === 0 ? 'disabled' : '';
       
       html += `
-        <div class="card mb-2 ${availableQty > 0 ? 'border-success' : 'border-secondary'}">
+        <div class="card mb-2 border-success">
           <div class="card-body py-2 px-3">
             <div class="row align-items-center">
               <div class="col-md-5">
                 <div class="d-flex align-items-center">
-                  <i class="bi ${stockIcon} ${stockColor} me-2"></i>
+                  <i class="bi bi-check-circle-fill text-success me-2"></i>
                   <div>
                     <strong>${depot}</strong>
-                    <div class="small ${stockColor}">
+                    <div class="small text-success">
                       <i class="bi bi-box"></i> ${availableQty} in stock
                     </div>
                   </div>
@@ -227,18 +227,15 @@ function showStockInfo(selectElement, index) {
                          data-index="${index}" 
                          data-depot="${depot}" 
                          data-max="${availableQty}"
-                         placeholder="${availableQty > 0 ? 'Enter quantity' : 'Out of stock'}"
+                         placeholder="Enter quantity"
                          min="0" 
                          max="${availableQty}"
                          value="0"
-                         ${isDisabled}
                          oninput="validateDepotInput(this, ${index})">
                   <span class="input-group-text">/ ${availableQty}</span>
-                  ${availableQty > 0 ? `
                   <button class="btn btn-outline-secondary" type="button" onclick="fillFromDepot(${index}, '${depot.replace(/'/g, "\\'")}', ${availableQty})" title="Use max from this depot">
                     <i class="bi bi-arrow-down-circle"></i>
                   </button>
-                  ` : ''}
                 </div>
               </div>
             </div>
@@ -247,8 +244,8 @@ function showStockInfo(selectElement, index) {
       `;
     }
     
-    if (totalStock === 0) {
-      html = `<div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> No stock available at any depot for this item.</div>`;
+    if (availableDepots.length === 0) {
+      html = `<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i><strong>No depots have stock for this item.</strong> Please restock or select a different item.</div>`;
     }
     
     depotAllocationsDiv.innerHTML = html;

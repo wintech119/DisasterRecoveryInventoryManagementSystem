@@ -1534,12 +1534,33 @@ def package_fulfill(package_id):
     stock_map = get_stock_by_location()
     events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
     
+    # Build filtered depot lists per package item (only show depots with stock > 0)
+    item_depot_options = {}
+    for pkg_item in package.items:
+        available_depots = []
+        for loc in locations:
+            stock_qty = stock_map.get((pkg_item.item_sku, loc.id), 0)
+            # Include depot if it has stock OR if there's an existing allocation (for editing)
+            has_allocation = any(alloc.depot_id == loc.id for alloc in pkg_item.allocations)
+            
+            if stock_qty > 0 or has_allocation:
+                available_depots.append({
+                    'depot': loc,
+                    'depot_id': loc.id,
+                    'depot_name': loc.name,
+                    'available_qty': stock_qty,
+                    'has_allocation': has_allocation
+                })
+        
+        item_depot_options[pkg_item.id] = available_depots
+    
     return render_template("package_fulfill.html", 
                          package=package,
                          items=items,
                          locations=locations,
                          stock_map=stock_map,
-                         events=events)
+                         events=events,
+                         item_depot_options=item_depot_options)
 
 @app.route("/packages/<int:package_id>")
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)

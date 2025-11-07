@@ -56,63 +56,76 @@
               </div>
               <div class="card-body">
                 <p class="small text-muted mb-3">
-                  <i class="bi bi-info-circle"></i> Enter quantities to fulfill from each depot. Total must not exceed requested amount.
+                  <i class="bi bi-info-circle"></i> Enter quantities to fulfill from each depot. Only depots with available stock are shown.
                 </p>
                 
-                {% for location in locations %}
-                {% set available = stock_map.get((pkg_item.item_sku, location.id), 0) %}
-                {% set allocated = 0 %}
-                {% for alloc in pkg_item.allocations %}
-                  {% if alloc.depot_id == location.id %}
-                    {% set allocated = alloc.allocated_qty %}
-                  {% endif %}
-                {% endfor %}
-                
-                <div class="card mb-2 {% if available > 0 %}border-success{% else %}border-secondary{% endif %}">
-                  <div class="card-body py-2 px-3">
-                    <div class="row align-items-center">
-                      <div class="col-md-5">
-                        <div class="d-flex align-items-center">
-                          <i class="bi {% if available > 0 %}bi-check-circle-fill text-success{% else %}bi-x-circle text-muted{% endif %} me-2"></i>
-                          <div>
-                            <strong>{{ location.name }}</strong>
-                            <div class="small {% if available > 0 %}text-success{% else %}text-muted{% endif %}">
-                              <i class="bi bi-box"></i> 
-                              <span class="current-stock-{{ pkg_item.id }}-{{ location.id }}">{{ available }}</span> in stock
-                              <span class="remaining-stock-{{ pkg_item.id }}-{{ location.id }}" style="display:none;"></span>
+                {% if item_depot_options[pkg_item.id]|length > 0 %}
+                  {% for depot_option in item_depot_options[pkg_item.id] %}
+                  {% set location = depot_option['depot'] %}
+                  {% set available = depot_option['available_qty'] %}
+                  {% set has_allocation = depot_option['has_allocation'] %}
+                  {% set allocated = 0 %}
+                  {% for alloc in pkg_item.allocations %}
+                    {% if alloc.depot_id == location.id %}
+                      {% set allocated = alloc.allocated_qty %}
+                    {% endif %}
+                  {% endfor %}
+                  {% set html_max = allocated if (available == 0 and has_allocation) else available %}
+                  
+                  <div class="card mb-2 {% if available > 0 %}border-success{% else %}border-warning{% endif %}">
+                    <div class="card-body py-2 px-3">
+                      <div class="row align-items-center">
+                        <div class="col-md-5">
+                          <div class="d-flex align-items-center">
+                            <i class="bi {% if available > 0 %}bi-check-circle-fill text-success{% else %}bi-exclamation-triangle-fill text-warning{% endif %} me-2"></i>
+                            <div>
+                              <strong>{{ location.name }}</strong>
+                              <div class="small {% if available > 0 %}text-success{% else %}text-warning{% endif %}">
+                                <i class="bi bi-box"></i> 
+                                <span class="current-stock-{{ pkg_item.id }}-{{ location.id }}">{{ available }}</span> in stock
+                                <span class="remaining-stock-{{ pkg_item.id }}-{{ location.id }}" style="display:none;"></span>
+                                {% if has_allocation and available == 0 %}
+                                <div><small class="text-muted"><i class="bi bi-info-circle"></i> Previously allocated - edit or clear</small></div>
+                                {% endif %}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                      <div class="col-md-7">
-                        <div class="input-group">
-                          <span class="input-group-text">
-                            <i class="bi bi-box-arrow-right"></i>
-                          </span>
-                          <input type="number" 
-                                 name="depot_allocation_{{ pkg_item.id }}_{{ location.name.replace(' ', '_') }}" 
-                                 class="form-control depot-input-{{ pkg_item.id }}" 
-                                 data-item-id="{{ pkg_item.id }}" 
-                                 data-depot-id="{{ location.id }}"
-                                 data-max="{{ available }}"
-                                 placeholder="{% if available > 0 %}Enter quantity{% else %}Out of stock{% endif %}"
-                                 min="0" 
-                                 max="{{ available }}"
-                                 value="{{ allocated }}"
-                                 {% if available == 0 %}disabled{% endif %}
-                                 oninput="validateAndUpdate('{{ pkg_item.id }}', {{ pkg_item.requested_qty }})">
-                          <span class="input-group-text">/ {{ available }}</span>
-                          {% if available > 0 %}
-                          <button class="btn btn-outline-secondary" type="button" onclick="fillFromDepot('{{ pkg_item.id }}', '{{ location.id }}', {{ available }}, {{ pkg_item.requested_qty }})" title="Use max from this depot">
-                            <i class="bi bi-arrow-down-circle"></i>
-                          </button>
-                          {% endif %}
+                        <div class="col-md-7">
+                          <div class="input-group">
+                            <span class="input-group-text">
+                              <i class="bi bi-box-arrow-right"></i>
+                            </span>
+                            <input type="number" 
+                                   name="depot_allocation_{{ pkg_item.id }}_{{ location.name.replace(' ', '_') }}" 
+                                   class="form-control depot-input-{{ pkg_item.id }} {% if has_allocation and available == 0 %}bg-light{% endif %}" 
+                                   data-item-id="{{ pkg_item.id }}" 
+                                   data-depot-id="{{ location.id }}"
+                                   data-max="{{ html_max }}"
+                                   data-available="{{ available }}"
+                                   placeholder="{% if available > 0 %}Enter quantity{% elif has_allocation %}Edit allocation{% else %}Out of stock{% endif %}"
+                                   min="0" 
+                                   max="{{ html_max }}"
+                                   value="{{ allocated }}"
+                                   oninput="validateAndUpdate('{{ pkg_item.id }}', {{ pkg_item.requested_qty }})">
+                            <span class="input-group-text">/ {{ available }}</span>
+                            {% if available > 0 %}
+                            <button class="btn btn-outline-secondary" type="button" onclick="fillFromDepot('{{ pkg_item.id }}', '{{ location.id }}', {{ available }}, {{ pkg_item.requested_qty }})" title="Use max from this depot">
+                              <i class="bi bi-arrow-down-circle"></i>
+                            </button>
+                            {% endif %}
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-                {% endfor %}
+                  {% endfor %}
+                {% else %}
+                  <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>No depots have stock for this item.</strong> Please restock or cancel this item from the package.
+                  </div>
+                {% endif %}
                 
                 <div class="mt-3 p-3 border rounded allocation-summary">
                   <div class="row align-items-center">
@@ -178,7 +191,7 @@
 </div>
 
 <script>
-// Stock data from backend
+// Stock data from backend (only includes depots with available stock)
 const itemStockData = {
   {% for pkg_item in package.items %}
   "{{ pkg_item.id }}": {
@@ -186,8 +199,8 @@ const itemStockData = {
     sku: "{{ pkg_item.item_sku }}",
     requested: {{ pkg_item.requested_qty }},
     depots: {
-      {% for location in locations %}
-      "{{ location.id }}": {{ stock_map.get((pkg_item.item_sku, location.id), 0) }}{% if not loop.last %},{% endif %}
+      {% for depot_option in item_depot_options[pkg_item.id] %}
+      "{{ depot_option['depot_id'] }}": {{ depot_option['available_qty'] }}{% if not loop.last %},{% endif %}
       {% endfor %}
     }
   }{% if not loop.last %},{% endif %}
@@ -290,7 +303,8 @@ function autoFillItem(itemId, requestedQty) {
   let bestInput = null;
   
   inputs.forEach(input => {
-    const available = parseInt(input.dataset.max) || 0;
+    // Use data-available (actual stock) not data-max (which includes preserved allocations)
+    const available = parseInt(input.dataset.available) || 0;
     if (available > maxStock) {
       maxStock = available;
       bestInput = input;
