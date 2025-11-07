@@ -1653,6 +1653,20 @@ def package_dispatch(package_id):
     
     dispatch_notes = request.form.get("dispatch_notes", "").strip() or None
     
+    # CRITICAL: Validate stock availability at dispatch time to prevent negative stock
+    stock_map = get_stock_by_location()
+    for pkg_item in package.items:
+        for allocation in pkg_item.allocations:
+            if allocation.allocated_qty > 0:
+                # Check current stock at this depot
+                current_stock = stock_map.get((pkg_item.item_sku, allocation.depot_id), 0)
+                
+                if allocation.allocated_qty > current_stock:
+                    flash(f"Cannot dispatch: {pkg_item.item.name} has insufficient stock at {allocation.depot.name}. "
+                          f"Available: {current_stock}, Required: {allocation.allocated_qty}. "
+                          f"Stock may have changed since allocation.", "danger")
+                    return redirect(url_for("package_details", package_id=package_id))
+    
     # Generate OUT transactions per depot allocation (multi-depot support)
     for pkg_item in package.items:
         for allocation in pkg_item.allocations:
