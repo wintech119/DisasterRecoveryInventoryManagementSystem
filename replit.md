@@ -1,199 +1,75 @@
 # Disaster Relief Inventory Management System (DRIMS)
 
 ## Overview
-The Disaster Relief Inventory Management System (DRIMS) is an inventory management solution designed to track and manage disaster relief supplies. It supports multiple locations (shelters, depots, parishes), handles donations, and records distributions to beneficiaries. The system provides real-time stock monitoring, low-stock alerts, and comprehensive transaction tracking to enhance the efficiency of disaster response operations. Its core purpose is to ensure effective and accountable management of relief efforts.
+The Disaster Relief Inventory Management System (DRIMS) is an inventory management solution designed to track and manage disaster relief supplies across multiple locations (shelters, depots, parishes). It handles donations, records distributions to beneficiaries, provides real-time stock monitoring, and offers low-stock alerts and comprehensive transaction tracking. The system's core purpose is to enhance the efficiency and accountability of disaster response operations, ensuring effective management of relief efforts.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
-## User Roles and Access Levels
-
-The system is designed to support multiple user types with different responsibilities:
-
-### Warehouse Staff
-**Primary Responsibilities**: Day-to-day inventory operations
-- Record incoming relief supplies (intake transactions)
-- Process distributions to beneficiaries
-- Update item information including expiry dates and storage requirements
-- Monitor stock levels at their assigned location
-- Alert managers to low stock or expiring items
-
-**Key Features Used**: Intake forms, Distribution forms, Item management, Location-specific inventory views
-
-### Field Distribution Personnel
-**Primary Responsibilities**: On-site distribution of relief supplies
-- Execute distributions in the field using mobile devices
-- Record beneficiary information
-- Link distributions to disaster events for accountability
-- Track distributor assignments for audit purposes
-
-**Key Features Used**: Distribution forms, Mobile-friendly interface, Disaster event tracking
-
-### Inventory Managers
-**Primary Responsibilities**: Stock oversight and operational planning
-- Monitor stock levels across all locations
-- Manage low stock alerts and reorder decisions
-- Track item expiry dates and storage compliance
-- Coordinate transfers between locations
-- Oversee distributor assignments and performance
-- Manage disaster event operations
-
-**Key Features Used**: Dashboard analytics, Low stock alerts, Expiring items reports, Location management, Distributor management, Disaster event management
-
-### Executive Management
-**Primary Responsibilities**: Strategic oversight and decision-making
-- View high-level operational metrics and KPIs
-- Monitor disaster event response effectiveness
-- Track donor contributions and beneficiary reach
-- Assess resource allocation across locations
-- Review transaction volumes and trends
-- Make strategic decisions based on comprehensive data
-
-**Key Features Used**: Executive dashboard with KPIs, Activity by event reports, Transaction analytics, Inventory by category summaries
-
-### System Administrators
-**Primary Responsibilities**: System configuration and maintenance
-- Configure locations (depots, shelters, parishes)
-- Set up disaster events and manage event lifecycle
-- Manage user accounts and permissions (when authentication is implemented)
-- Maintain item catalog and categories
-- Configure system settings and integrations
-- Ensure data integrity and system availability
-
-**Key Features Used**: All administrative interfaces, Location management, Disaster event management, Item configuration, Database management tools
-
-### Auditors
-**Primary Responsibilities**: Compliance and accountability verification
-- Review complete transaction history with timestamps
-- Verify disaster event linkages for funding accountability
-- Track distributor assignments for all distributions
-- Audit donor contributions and beneficiary distributions
-- Generate compliance reports for government oversight
-- Investigate discrepancies in inventory records
-
-**Key Features Used**: Transaction history with audit trail (created_by field), Disaster event reports, Distributor tracking, Comprehensive transaction logs, Export capabilities for external auditing
-
-**Authentication Status**: ✅ **IMPLEMENTED** - The system now features complete user authentication and role-based access control (RBAC) using Flask-Login. Users must log in to access the system, and their access to features is restricted based on their assigned role. The system supports secure password hashing (Werkzeug), session management, and automatic audit logging of all transactions with the `created_by` field.
-
 ## System Architecture
 
 ### Application Framework
-The system is built using Flask (Python web framework) for its lightweight and flexible nature, enabling rapid development and deployment, especially in resource-constrained disaster environments.
+The system is built using Flask (Python web framework) for rapid development and deployment, suitable for resource-constrained disaster environments.
 
 ### Data Model
-The system utilizes SQLAlchemy ORM with a relational database design. SQLite is used for development, with PostgreSQL support for production environments via the `DATABASE_URL` environment variable. The data model includes core entities such as Items, Locations, Donors, Beneficiaries, Distributors, DisasterEvents, and Transactions. Transactions are designed as double-entry records ("IN"/"OUT") to simplify stock calculation and maintain a single audit trail. Items feature auto-generated SKUs (e.g., ITM-XXXXXX), standardized unit of measure selection from a predefined dropdown (15 options: pcs, set, box, pack, bag, kg, g, L, ml, tin, bottle, roll, tube, pkt, kit), expiry dates for perishable goods, and standardized storage requirements selection from a predefined dropdown (20 options including "Store in a cool, dry place", "Keep away from direct sunlight", "Keep off the floor (use pallets or shelves)", "Keep sealed to prevent contamination", "Store separately from chemicals", "Use First-In, First-Out (FIFO) rotation", "Maintain temperature-controlled storage", "Keep in original packaging", "Store in pest-free area", "Separate by category (food, medical, hygiene, etc.)", "Limit access to authorized personnel", "Monitor expiry dates regularly", "Ensure proper ventilation in storage area", "No smoking or open flames near storage", "Store flammable items in designated safety area", "Label shelves and bins clearly", "Protect items from moisture", "Do not stack excessively to prevent damage", "Keep fragile items on upper racks", "Ensure easy access for audits and distribution"). Distributors are tracked for accountability in distribution transactions. Disaster events are managed with types, dates, and statuses, allowing transaction linking for event-specific reporting. An audit trail (`created_by` field) is included in transactions for accountability.
+Utilizes SQLAlchemy ORM with a relational database design, supporting SQLite for development and PostgreSQL for production. The data model includes core entities like Items, Locations, Donors, Beneficiaries, Distributors, DisasterEvents, and Transactions. Transactions are designed as double-entry records ("IN"/"OUT") for consistent stock calculation and audit trails. Items feature auto-generated SKUs, standardized unit of measure selection, expiry dates, and standardized storage requirements. An audit trail (`created_by` field) is included in transactions for accountability.
+
+### Distribution Package Management
+The system implements a comprehensive distribution package workflow that enables inventory managers to create, review, and approve packages for distributors based on their needs lists. Key features include:
+
+**Workflow States**: Packages progress through five distinct states:
+- **Draft**: Initial creation with needs list entry
+- **Under Review**: Package submitted for stock availability checking and review
+- **Approved**: Package approved by authorized personnel, ready for dispatch
+- **Dispatched**: Package sent to distributor with inventory transactions generated
+- **Delivered**: Confirmed receipt by distributor
+
+**Stock Availability Checking**: The system automatically validates requested quantities against available stock across all locations. If sufficient stock is unavailable, the package is flagged as "Partial" and allocated quantities are calculated based on available inventory.
+
+**Partial Fulfillment Handling**: When stock is insufficient, the system creates in-app notifications for the distributor showing:
+- Items that cannot be fully fulfilled
+- Requested quantities vs allocated quantities
+- Option to accept partial fulfillment or request revision
+
+Distributors can review partial fulfillment notifications and either accept (allowing the package to proceed to approval) or reject (triggering a revision request). All distributor responses are tracked with timestamps and notes for audit purposes.
+
+**Automatic Warehouse Assignment**: Approved packages are automatically assigned to the nearest warehouse or outpost based on the distributor's parish or geographic coordinates, optimizing logistics and reducing delivery time.
+
+**Transaction Generation**: Upon approval, the system automatically generates OUT transactions for all package items, updating inventory levels at the assigned warehouse. This ensures inventory accuracy and maintains the complete audit trail.
+
+**Audit Trail**: Complete tracking of package lifecycle including:
+- Creation timestamp and creator
+- Status change history with timestamps and responsible staff
+- Distributor responses with timestamps and notes
+- Approval details (who, when, notes)
+- Dispatch details (who, when, location)
+- Delivery confirmation
+
+**Data Model Entities**:
+- **DistributionPackage**: Main package record with workflow status, distributor link, assigned location, and audit fields
+- **PackageItem**: Individual items in package with requested_qty and allocated_qty
+- **PackageStatusHistory**: Complete audit trail of all status transitions
+- **DistributorNotification**: In-app notification system for partial fulfillment alerts and status updates
+
+Future enhancements will include email/SMS notifications for distributors and warehouse staff when packages change status or require action.
 
 ### Frontend Architecture
-The frontend uses server-side rendered HTML templates with Bootstrap 5 and Bootstrap Icons. This approach prioritizes quick deployment, minimal client-side dependencies, accessibility, and mobile-friendliness for field workers. The application incorporates official Government of Jamaica branding, including GOJ Green and Gold colors, the Jamaican coat of arms, and clean typography.
+The frontend uses server-side rendered HTML templates with Bootstrap 5 and Bootstrap Icons. This approach prioritizes quick deployment, minimal client-side dependencies, accessibility, and mobile-friendliness. The application incorporates official Government of Jamaica branding, including GOJ Green and Gold colors and the Jamaican coat of arms.
 
 ### Stock Calculation Strategy
-Stock levels are dynamically aggregated on-demand from transaction records, summing "IN" and subtracting "OUT" transactions, filtered by location and item. This ensures data consistency and a complete audit trail.
+Stock levels are dynamically aggregated on-demand from transaction records, summing "IN" and subtracting "OUT" transactions, filtered by location and item, ensuring data consistency and a complete audit trail.
 
 ### Dashboard Features
-The dashboard provides a comprehensive overview with KPIs (total items, total units, low stock items), inventory by category, stock by location, low stock alerts, recent transactions, expiring items alerts (with color-coded urgency), activity by disaster event, operations metrics, and transaction analytics.
+The dashboard provides a comprehensive overview with KPIs (total items, total units, low stock items), inventory by category, stock by location, low stock alerts, recent transactions, expiring items alerts, activity by disaster event, operations metrics, and transaction analytics.
 
 ### Authentication
-The system implements Flask-Login-based authentication with role-based access control (RBAC). Key features include:
-- Secure password hashing using Werkzeug's generate_password_hash
-- Session-based login with "remember me" functionality
-- User model with six distinct roles: ADMIN, INVENTORY_MANAGER, WAREHOUSE_STAFF, FIELD_PERSONNEL, EXECUTIVE, AUDITOR
-- Role-aware navigation that shows/hides menu items based on user permissions
-- Automatic population of created_by audit field with current user's name
-- CLI commands (flask create-admin, flask create-user) for user management
-- Route protection using @login_required and @role_required decorators
-- Optional location assignment for warehouse staff users
-
-### Future Authentication: Keycloak & LDAP Compatibility
-
-The system is designed to support enterprise authentication via Keycloak and LDAP integration in the future. This section outlines the migration path and architectural considerations.
-
-**Current Implementation**: Flask-Login with database-backed user accounts
-- User credentials stored in PostgreSQL with hashed passwords
-- Role-based access control (RBAC) with six distinct roles
-- Session-based authentication with secure cookie management
-
-**Future Migration Path**: Keycloak with LDAP Federation
-
-**Architecture Overview**:
-1. **DRIMS ↔ Keycloak (OpenID Connect/OIDC)**: DRIMS authenticates users via Keycloak using OAuth2/OIDC
-2. **Keycloak ↔ LDAP (User Federation)**: Keycloak connects to existing LDAP/Active Directory
-3. **Result**: Users in LDAP/AD can authenticate through Keycloak to access DRIMS with modern SSO
-
-**Recommended Integration Library**: **Authlib** (avoid deprecated flask-oidc)
-- Active maintenance and Flask 3.x compatibility
-- Full OpenID Connect support
-- Token validation and refresh handling
-- Install: `pip install authlib`
-
-**Migration Steps** (when ready to implement):
-1. **Install Keycloak** (version 23+) in production environment
-2. **Configure LDAP User Federation** in Keycloak:
-   - User Federation → Add LDAP Provider
-   - Configure connection URL, bind credentials, users DN
-   - Enable periodic synchronization
-   - Map LDAP attributes (username, email, groups)
-3. **Create Keycloak Realm and Client** for DRIMS:
-   - Client Protocol: openid-connect
-   - Access Type: confidential
-   - Valid Redirect URIs: https://your-drims-domain.com/callback
-   - Configure role mappings from LDAP groups
-4. **Update DRIMS Authentication**:
-   - Replace Flask-Login with Authlib OAuth client
-   - Update login routes to redirect to Keycloak
-   - Implement callback route for token handling
-   - Validate JWT tokens for API requests
-5. **Map Keycloak Roles to DRIMS Roles**:
-   - Configure role mappers in Keycloak
-   - Map LDAP groups → Keycloak roles → DRIMS roles
-   - Maintain current six-role structure (ADMIN, INVENTORY_MANAGER, etc.)
-
-**Key Compatibility Considerations**:
-- Current user model fields (email, name, role) align with standard OIDC claims
-- Role-based access control logic (@role_required decorators) can remain unchanged
-- User session management can continue using Flask sessions with Authlib OAuth tokens stored in session
-- Alternatively, can implement pure JWT token-based authentication for API access
-- Audit trail (created_by field) will use OIDC userinfo claims from token
-- Flask-Login can be retained with user data populated from Keycloak tokens instead of database
-
-**Environment Variables** (for future implementation):
-```
-KEYCLOAK_URL=https://keycloak.example.com
-KEYCLOAK_REALM=drims
-KEYCLOAK_CLIENT_ID=drims-app
-KEYCLOAK_CLIENT_SECRET=<secret>
-```
-
-**Resources**:
-- Authlib Documentation: https://docs.authlib.org/en/latest/client/flask.html
-- Keycloak LDAP Federation: https://www.keycloak.org/docs/latest/server_admin/#_ldap
-- python-keycloak Library: https://pypi.org/project/python-keycloak/
+The system implements Flask-Login-based authentication with role-based access control (RBAC) supporting six distinct user roles: ADMIN, INVENTORY_MANAGER, WAREHOUSE_STAFF, FIELD_PERSONNEL, EXECUTIVE, and AUDITOR. Features include secure password hashing (Werkzeug), session management, role-aware navigation, automatic population of `created_by` audit fields, and CLI commands for user management. Route protection is enforced using `@login_required` and `@role_required` decorators. The architecture also includes a plan for future integration with Keycloak and LDAP for enterprise authentication using Authlib.
 
 ### File Storage and Attachments
-The system supports file attachments for inventory items (e.g., product photos, specification sheets, donor certificates). The file storage architecture is designed for future scalability:
-
-**Current Implementation**: Local file storage in `/uploads/items/` directory
-- Files are stored with UUID-based secure filenames to prevent collisions and security issues
-- Original filenames are preserved in the database for user reference
-- File uploads are validated for type (png, jpg, jpeg, gif, pdf, doc, docx) and size (10MB limit)
-- All file serving is protected by authentication (@login_required)
-- Uploads directory is excluded from version control (.gitignore)
-
-**Modular Architecture**: The `storage_service.py` module provides a `StorageBackend` abstraction layer:
-- `LocalFileStorage`: Current implementation for local filesystem storage
-- `S3Storage`: Placeholder for future AWS S3 integration
-- `NexusStorage`: Placeholder for future Replit Nexus bucket integration
-- Backend selection via `STORAGE_BACKEND` environment variable (defaults to "local")
-
-**Future Migration**: To migrate to cloud storage (S3 or Nexus):
-1. Set `STORAGE_BACKEND=s3` or `STORAGE_BACKEND=nexus` in environment variables
-2. Configure cloud credentials (AWS keys for S3, or Nexus bucket settings)
-3. Implement the respective backend class in `storage_service.py`
-4. No changes to application code required due to abstraction layer
-
-**User Interface**: Items with attachments display a paperclip icon (📎) in the item list, linking directly to the file for download/viewing.
+The system supports file attachments for inventory items (e.g., product photos, specifications). Currently, files are stored locally in `/uploads/items/` with UUID-based secure filenames. A modular `storage_service.py` with a `StorageBackend` abstraction layer is in place to facilitate future migration to cloud storage solutions like AWS S3 or Replit Nexus buckets without application code changes. File uploads are validated for type and size, and protected by authentication.
 
 ### Data Import/Export
-The Pandas library is used for CSV import and export functionalities, facilitating bulk data entry, integration with spreadsheet workflows, data backup, and transfer.
+The Pandas library is used for CSV import and export functionalities, enabling bulk data entry, integration with spreadsheet workflows, data backup, and transfer.
 
 ### Session Management
 Flask's built-in session handling is utilized, with a secret key loaded from an environment variable for security.
@@ -219,4 +95,4 @@ Flask's built-in session handling is utilized, with a secret key loaded from an 
 -   **Bootstrap**: 5.3.3
 -   **Bootstrap Icons**: 1.11.3
 
-The system supports database configuration via the `DATABASE_URL` environment variable. No external APIs or third-party services are currently integrated, ensuring independent operation crucial during disaster scenarios.
+The system supports database configuration via the `DATABASE_URL` environment variable. No external APIs or third-party services are currently integrated.

@@ -108,6 +108,71 @@ class User(UserMixin, db.Model):
         """Required by Flask-Login"""
         return str(self.id)
 
+class DistributionPackage(db.Model):
+    """Distribution packages created from distributor needs lists"""
+    id = db.Column(db.Integer, primary_key=True)
+    package_number = db.Column(db.String(64), unique=True, nullable=False, index=True)  # e.g., PKG-000001
+    distributor_id = db.Column(db.Integer, db.ForeignKey("distributor.id"), nullable=False)
+    assigned_location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)  # Warehouse/outpost
+    event_id = db.Column(db.Integer, db.ForeignKey("disaster_event.id"), nullable=True)
+    status = db.Column(db.String(50), nullable=False, default="Draft")  # Draft, Under Review, Approved, Dispatched, Delivered
+    is_partial = db.Column(db.Boolean, default=False, nullable=False)  # True if stock insufficient for full fulfillment
+    distributor_accepted_partial = db.Column(db.Boolean, nullable=True)  # None=pending, True=accepted, False=rejected
+    distributor_response_at = db.Column(db.DateTime, nullable=True)
+    distributor_response_notes = db.Column(db.Text, nullable=True)
+    created_by = db.Column(db.String(200), nullable=False)
+    approved_by = db.Column(db.String(200), nullable=True)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    dispatched_by = db.Column(db.String(200), nullable=True)
+    dispatched_at = db.Column(db.DateTime, nullable=True)
+    delivered_at = db.Column(db.DateTime, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    distributor = db.relationship("Distributor")
+    assigned_location = db.relationship("Location")
+    event = db.relationship("DisasterEvent")
+    items = db.relationship("PackageItem", back_populates="package", cascade="all, delete-orphan")
+    status_history = db.relationship("PackageStatusHistory", back_populates="package", cascade="all, delete-orphan")
+    notifications = db.relationship("DistributorNotification", back_populates="package", cascade="all, delete-orphan")
+
+class PackageItem(db.Model):
+    """Items in a distribution package"""
+    id = db.Column(db.Integer, primary_key=True)
+    package_id = db.Column(db.Integer, db.ForeignKey("distribution_package.id"), nullable=False)
+    item_sku = db.Column(db.String(64), db.ForeignKey("item.sku"), nullable=False)
+    requested_qty = db.Column(db.Integer, nullable=False)  # Quantity requested by distributor
+    allocated_qty = db.Column(db.Integer, nullable=False, default=0)  # Actual quantity allocated (may be less if stock insufficient)
+    
+    package = db.relationship("DistributionPackage", back_populates="items")
+    item = db.relationship("Item")
+
+class PackageStatusHistory(db.Model):
+    """Audit trail of package status changes"""
+    id = db.Column(db.Integer, primary_key=True)
+    package_id = db.Column(db.Integer, db.ForeignKey("distribution_package.id"), nullable=False)
+    old_status = db.Column(db.String(50), nullable=True)
+    new_status = db.Column(db.String(50), nullable=False)
+    changed_by = db.Column(db.String(200), nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    package = db.relationship("DistributionPackage", back_populates="status_history")
+
+class DistributorNotification(db.Model):
+    """In-app notifications for distributors (partial fulfillment alerts)"""
+    id = db.Column(db.Integer, primary_key=True)
+    package_id = db.Column(db.Integer, db.ForeignKey("distribution_package.id"), nullable=False)
+    distributor_id = db.Column(db.Integer, db.ForeignKey("distributor.id"), nullable=False)
+    notification_type = db.Column(db.String(50), nullable=False)  # partial_fulfillment, status_update, etc.
+    message = db.Column(db.Text, nullable=False)
+    is_read = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    package = db.relationship("DistributionPackage", back_populates="notifications")
+    distributor = db.relationship("Distributor")
+
 # ---------- Flask-Login Configuration ----------
 login_manager = LoginManager()
 login_manager.init_app(app)
