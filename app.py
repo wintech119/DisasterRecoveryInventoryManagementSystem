@@ -594,6 +594,12 @@ def dashboard():
     recent_preview = recent_all[:PREVIEW_LIMIT]
     recent_full = recent_all
     
+    # Pending needs lists (for inventory managers and admins)
+    pending_needs_lists = []
+    if current_user.role in [ROLE_ADMIN, ROLE_INVENTORY_MANAGER]:
+        pending_needs_lists = DistributionPackage.query.filter_by(status="Draft")\
+                                                       .order_by(DistributionPackage.created_at.asc()).all()
+    
     return render_template("dashboard.html",
                            total_items=total_items,
                            total_in_stock=total_in_stock,
@@ -618,7 +624,8 @@ def dashboard():
                            event_stats_preview=event_stats_preview,
                            event_stats_full=event_stats_full,
                            expiring_items_preview=expiring_items_preview,
-                           expiring_items_full=expiring_items_full)
+                           expiring_items_full=expiring_items_full,
+                           pending_needs_lists=pending_needs_lists)
 
 @app.route("/items")
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF, ROLE_AUDITOR, ROLE_EXECUTIVE)
@@ -1411,6 +1418,116 @@ def package_distributor_response(package_id):
     
     flash(flash_message, flash_type)
     return redirect(url_for("package_details", package_id=package_id))
+
+# ---------- Distributor Self-Service Routes ----------
+
+@app.route("/my-needs-lists")
+@role_required("DISTRIBUTOR")
+def distributor_needs_lists():
+    """Distributor view of their own needs lists (packages)"""
+    # Find distributor profile linked to current user
+    distributor = Distributor.query.filter_by(user_id=current_user.id).first()
+    
+    if not distributor:
+        flash("No distributor profile is linked to your account. Please contact administrator.", "warning")
+        return redirect(url_for("dashboard"))
+    
+    # Get packages for this distributor
+    packages = DistributionPackage.query.filter_by(distributor_id=distributor.id)\
+                                        .order_by(DistributionPackage.created_at.desc()).all()
+    
+    # Get unread notifications
+    unread_notifications = DistributorNotification.query.filter_by(
+        distributor_id=distributor.id,
+        is_read=False
+    ).order_by(DistributorNotification.created_at.desc()).all()
+    
+    return render_template("distributor_needs_lists.html", 
+                         packages=packages, 
+                         distributor=distributor,
+                         notifications=unread_notifications)
+
+@app.route("/my-needs-lists/create", methods=["GET", "POST"])
+@role_required("DISTRIBUTOR")
+def distributor_create_needs_list():
+    """Distributor creates their own needs list"""
+    # Find distributor profile linked to current user
+    distributor = Distributor.query.filter_by(user_id=current_user.id).first()
+    
+    if not distributor:
+        flash("No distributor profile is linked to your account. Please contact administrator.", "danger")
+        return redirect(url_for("dashboard"))
+    
+    if request.method == "POST":
+        event_id = request.form.get("event_id") or None
+        notes = request.form.get("notes", "").strip() or None
+        
+        # Parse items from form (dynamic fields: item_sku_N, item_qty_N)
+        items_requested = []
+        item_index = 0
+        while True:
+            sku_key = f"item_sku_{item_index}"
+            qty_key = f"item_qty_{item_index}"
+            
+            if sku_key not in request.form:
+                break
+            
+            sku = request.form[sku_key].strip()
+            qty_str = request.form[qty_key].strip()
+            
+            if sku and qty_str:
+                try:
+                    qty = int(qty_str)
+                    if qty > 0:
+                        items_requested.append((sku, qty))
+                except ValueError:
+                    pass
+            
+            item_index += 1
+        
+        if not items_requested:
+            flash("At least one item with quantity is required.", "danger")
+            return redirect(url_for("distributor_create_needs_list"))
+        
+        # Create package in Draft state
+        package = DistributionPackage(
+            package_number=generate_package_number(),
+            distributor_id=distributor.id,
+            event_id=int(event_id) if event_id else None,
+            status="Draft",
+            is_partial=False,  # Will be checked when submitted for review
+            created_by=f"{current_user.full_name} (Distributor)"
+        )
+        db.session.add(package)
+        db.session.flush()  # Get package ID
+        
+        # Add package items
+        for sku, qty in items_requested:
+            package_item = PackageItem(
+                package_id=package.id,
+                item_sku=sku,
+                requested_qty=qty,
+                allocated_qty=qty  # Initially same as requested, will be adjusted during review
+            )
+            db.session.add(package_item)
+        
+        # Record initial status in audit trail
+        record_package_status_change(package, None, "Draft", current_user.full_name, 
+                                    f"Needs list created by distributor. {notes or ''}")
+        
+        db.session.commit()
+        
+        flash(f"Needs list {package.package_number} created successfully! It will be reviewed by inventory managers.", "success")
+        return redirect(url_for("distributor_needs_lists"))
+    
+    # GET request - show form
+    items = Item.query.order_by(Item.category.asc(), Item.name.asc()).all()
+    events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
+    
+    return render_template("distributor_needs_list_form.html", 
+                         items=items, 
+                         events=events,
+                         distributor=distributor)
 
 @app.route("/disaster-events")
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
