@@ -857,8 +857,37 @@ def distribute():
 @app.route("/transactions")
 @login_required
 def transactions():
-    rows = Transaction.query.order_by(Transaction.created_at.desc()).limit(500).all()
-    return render_template("transactions.html", rows=rows)
+    # Get sorting parameters from query string
+    sort_by = request.args.get("sort_by", "created_at")
+    order = request.args.get("order", "desc")
+    
+    # Build the query
+    query = Transaction.query
+    
+    # Apply sorting based on parameters
+    if sort_by == "created_at":
+        sort_column = Transaction.created_at
+    elif sort_by == "type":
+        sort_column = Transaction.ttype
+    elif sort_by == "item":
+        query = query.join(Item, Transaction.item_sku == Item.sku)
+        sort_column = Item.name
+    elif sort_by == "qty":
+        sort_column = Transaction.qty
+    elif sort_by == "depot":
+        query = query.join(Depot, Transaction.location_id == Depot.id, isouter=True)
+        sort_column = Depot.name
+    else:
+        sort_column = Transaction.created_at
+    
+    # Apply order direction
+    if order == "asc":
+        query = query.order_by(sort_column.asc())
+    else:
+        query = query.order_by(sort_column.desc())
+    
+    rows = query.limit(500).all()
+    return render_template("transactions.html", rows=rows, sort_by=sort_by, order=order)
 
 @app.route("/reports/stock")
 @login_required
