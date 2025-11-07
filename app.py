@@ -266,6 +266,129 @@ def ensure_seed_data():
     # Seed categories via a sample item (not necessary, categories are free text)
     db.session.commit()
 
+# ---------- Distribution Package Helper Functions ----------
+
+def generate_package_number():
+    """Generate a unique package number in format PKG-NNNNNN"""
+    last_package = DistributionPackage.query.order_by(DistributionPackage.id.desc()).first()
+    if last_package:
+        last_num = int(last_package.package_number.split('-')[1])
+        new_num = last_num + 1
+    else:
+        new_num = 1
+    return f"PKG-{new_num:06d}"
+
+def check_stock_availability(items_requested):
+    """
+    Check stock availability for requested items and calculate allocated quantities.
+    
+    Args:
+        items_requested: List of tuples [(item_sku, requested_qty), ...]
+    
+    Returns:
+        dict: {
+            'is_partial': bool,
+            'items': [{'sku': str, 'requested_qty': int, 'allocated_qty': int, 'available_stock': int}, ...]
+        }
+    """
+    stock_map = get_stock_by_location()
+    locations = Location.query.all()
+    
+    result_items = []
+    is_partial = False
+    
+    for item_sku, requested_qty in items_requested:
+        # Calculate total available stock across all locations
+        available_stock = sum(stock_map.get((item_sku, loc.id), 0) for loc in locations)
+        
+        # Determine allocated quantity (can't exceed available stock)
+        allocated_qty = min(requested_qty, max(0, available_stock))
+        
+        if allocated_qty < requested_qty:
+            is_partial = True
+        
+        result_items.append({
+            'sku': item_sku,
+            'requested_qty': requested_qty,
+            'allocated_qty': allocated_qty,
+            'available_stock': available_stock
+        })
+    
+    return {
+        'is_partial': is_partial,
+        'items': result_items
+    }
+
+def assign_nearest_warehouse(distributor):
+    """
+    Assign package to nearest warehouse based on distributor's parish.
+    Currently uses simple matching; can be enhanced with coordinates in future.
+    
+    Returns:
+        Location object or None
+    """
+    # Simple parish matching logic (can be enhanced with geographic coordinates)
+    distributor_org = (distributor.organization or "").lower()
+    
+    # Try to match distributor organization/name with location parishes
+    locations = Location.query.all()
+    
+    # First, try exact parish match
+    for location in locations:
+        location_name_lower = location.name.lower()
+        if any(parish in location_name_lower for parish in ["kingston", "st. andrew"] if parish in distributor_org):
+            return location
+        if "st. catherine" in distributor_org and "st. catherine" in location_name_lower:
+            return location
+        if "st. james" in distributor_org and "st. james" in location_name_lower:
+            return location
+        if "clarendon" in distributor_org and "clarendon" in location_name_lower:
+            return location
+    
+    # Fallback: return first depot (can be enhanced)
+    return locations[0] if locations else None
+
+def create_package_notification(package, notification_type, message):
+    """
+    Create an in-app notification for the distributor.
+    
+    Args:
+        package: DistributionPackage object
+        notification_type: str (e.g., 'partial_fulfillment', 'status_update')
+        message: str - notification message
+    """
+    notification = DistributorNotification(
+        package_id=package.id,
+        distributor_id=package.distributor_id,
+        notification_type=notification_type,
+        message=message
+    )
+    db.session.add(notification)
+    db.session.commit()
+    return notification
+
+def record_package_status_change(package, old_status, new_status, changed_by, notes=None):
+    """
+    Record a package status change in the audit trail.
+    
+    Args:
+        package: DistributionPackage object
+        old_status: str - previous status
+        new_status: str - new status
+        changed_by: str - user who made the change
+        notes: str - optional notes about the change
+    """
+    history = PackageStatusHistory(
+        package_id=package.id,
+        old_status=old_status,
+        new_status=new_status,
+        changed_by=changed_by,
+        notes=notes
+    )
+    db.session.add(history)
+    db.session.commit()
+    return history
+
 # ---------- Authentication Routes ----------
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -862,6 +985,333 @@ def distributor_edit(distributor_id):
         flash(f"Distributor updated successfully.", "success")
         return redirect(url_for("distributors"))
     return render_template("distributor_form.html", distributor=distributor)
+
+# ---------- Distribution Package Routes ----------
+
+@app.route("/packages")
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+def packages():
+    """List all distribution packages with filters"""
+    status_filter = request.args.get("status")
+    distributor_filter = request.args.get("distributor_id")
+    
+    query = DistributionPackage.query
+    
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+    if distributor_filter:
+        query = query.filter_by(distributor_id=int(distributor_filter))
+    
+    packages_list = query.order_by(DistributionPackage.created_at.desc()).all()
+    distributors = Distributor.query.order_by(Distributor.name).all()
+    
+    # Define status options for filter
+    status_options = ["Draft", "Under Review", "Approved", "Dispatched", "Delivered"]
+    
+    return render_template("packages.html", 
+                         packages=packages_list, 
+                         distributors=distributors,
+                         status_filter=status_filter,
+                         distributor_filter=distributor_filter,
+                         status_options=status_options)
+
+@app.route("/packages/create", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+def package_create():
+    """Create a new distribution package from needs list"""
+    if request.method == "POST":
+        distributor_id = request.form.get("distributor_id")
+        event_id = request.form.get("event_id") or None
+        notes = request.form.get("notes", "").strip() or None
+        
+        if not distributor_id:
+            flash("Distributor is required.", "danger")
+            return redirect(url_for("package_create"))
+        
+        # Parse items from form (dynamic fields: item_sku_N, item_qty_N)
+        items_requested = []
+        item_index = 0
+        while True:
+            sku_key = f"item_sku_{item_index}"
+            qty_key = f"item_qty_{item_index}"
+            
+            if sku_key not in request.form:
+                break
+            
+            sku = request.form[sku_key].strip()
+            qty_str = request.form[qty_key].strip()
+            
+            if sku and qty_str:
+                try:
+                    qty = int(qty_str)
+                    if qty > 0:
+                        items_requested.append((sku, qty))
+                except ValueError:
+                    pass
+            
+            item_index += 1
+        
+        if not items_requested:
+            flash("At least one item with quantity is required.", "danger")
+            return redirect(url_for("package_create"))
+        
+        # Check stock availability
+        availability_result = check_stock_availability(items_requested)
+        
+        # Create package
+        package = DistributionPackage(
+            package_number=generate_package_number(),
+            distributor_id=int(distributor_id),
+            event_id=int(event_id) if event_id else None,
+            status="Draft",
+            is_partial=availability_result['is_partial'],
+            created_by=current_user.full_name,
+            notes=notes
+        )
+        db.session.add(package)
+        db.session.flush()  # Get package.id
+        
+        # Add package items
+        for item_data in availability_result['items']:
+            package_item = PackageItem(
+                package_id=package.id,
+                item_sku=item_data['sku'],
+                requested_qty=item_data['requested_qty'],
+                allocated_qty=item_data['allocated_qty']
+            )
+            db.session.add(package_item)
+        
+        # Record initial status
+        record_package_status_change(package, None, "Draft", current_user.full_name, "Package created")
+        
+        db.session.commit()
+        
+        flash(f"Package {package.package_number} created successfully.", "success")
+        return redirect(url_for("package_details", package_id=package.id))
+    
+    # GET request
+    distributors = Distributor.query.order_by(Distributor.name).all()
+    events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
+    items = Item.query.order_by(Item.name).all()
+    
+    return render_template("package_form.html", 
+                         distributors=distributors, 
+                         events=events,
+                         items=items)
+
+@app.route("/packages/<int:package_id>")
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+def package_details(package_id):
+    """View package details with full audit trail"""
+    package = DistributionPackage.query.get_or_404(package_id)
+    
+    # Get stock availability for display
+    stock_map = get_stock_by_location()
+    locations = Location.query.all()
+    
+    # Calculate current stock for each item
+    for pkg_item in package.items:
+        pkg_item.current_stock = sum(stock_map.get((pkg_item.item_sku, loc.id), 0) for loc in locations)
+    
+    return render_template("package_details.html", package=package)
+
+@app.route("/packages/<int:package_id>/submit_review", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+def package_submit_review(package_id):
+    """Submit package for review (Draft → Under Review)"""
+    package = DistributionPackage.query.get_or_404(package_id)
+    
+    if package.status != "Draft":
+        flash("Only draft packages can be submitted for review.", "warning")
+        return redirect(url_for("package_details", package_id=package_id))
+    
+    old_status = package.status
+    package.status = "Under Review"
+    package.updated_at = datetime.utcnow()
+    
+    record_package_status_change(package, old_status, "Under Review", current_user.full_name, 
+                                "Package submitted for review")
+    
+    # If package is partial, create notification for distributor
+    if package.is_partial:
+        message = f"Package {package.package_number} has partial fulfillment. Some items are not available in requested quantities. Please review and accept or reject."
+        create_package_notification(package, "partial_fulfillment", message)
+    
+    db.session.commit()
+    
+    flash(f"Package {package.package_number} submitted for review.", "success")
+    return redirect(url_for("package_details", package_id=package_id))
+
+@app.route("/packages/<int:package_id>/approve", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+def package_approve(package_id):
+    """Approve package (Under Review → Approved)"""
+    package = DistributionPackage.query.get_or_404(package_id)
+    
+    if package.status != "Under Review":
+        flash("Only packages under review can be approved.", "warning")
+        return redirect(url_for("package_details", package_id=package_id))
+    
+    # Check if partial and distributor hasn't accepted
+    if package.is_partial and package.distributor_accepted_partial is None:
+        flash("Waiting for distributor to accept partial fulfillment.", "warning")
+        return redirect(url_for("package_details", package_id=package_id))
+    
+    if package.is_partial and package.distributor_accepted_partial is False:
+        flash("Distributor rejected partial fulfillment. Package requires revision.", "warning")
+        return redirect(url_for("package_details", package_id=package_id))
+    
+    approval_notes = request.form.get("approval_notes", "").strip() or None
+    
+    old_status = package.status
+    package.status = "Approved"
+    package.approved_by = current_user.full_name
+    package.approved_at = datetime.utcnow()
+    package.updated_at = datetime.utcnow()
+    
+    # Auto-assign to nearest warehouse
+    assigned_location = assign_nearest_warehouse(package.distributor)
+    if assigned_location:
+        package.assigned_location_id = assigned_location.id
+    
+    record_package_status_change(package, old_status, "Approved", current_user.full_name, approval_notes)
+    
+    # Create status update notification
+    message = f"Package {package.package_number} has been approved and assigned to {assigned_location.name if assigned_location else 'warehouse'}."
+    create_package_notification(package, "status_update", message)
+    
+    db.session.commit()
+    
+    flash(f"Package {package.package_number} approved and assigned to {assigned_location.name if assigned_location else 'warehouse'}.", "success")
+    return redirect(url_for("package_details", package_id=package_id))
+
+@app.route("/packages/<int:package_id>/dispatch", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+def package_dispatch(package_id):
+    """Dispatch package (Approved → Dispatched) and generate OUT transactions"""
+    package = DistributionPackage.query.get_or_404(package_id)
+    
+    if package.status != "Approved":
+        flash("Only approved packages can be dispatched.", "warning")
+        return redirect(url_for("package_details", package_id=package_id))
+    
+    if not package.assigned_location_id:
+        flash("Package must be assigned to a warehouse before dispatch.", "warning")
+        return redirect(url_for("package_details", package_id=package_id))
+    
+    dispatch_notes = request.form.get("dispatch_notes", "").strip() or None
+    
+    # Generate OUT transactions for each item
+    for pkg_item in package.items:
+        if pkg_item.allocated_qty > 0:
+            transaction = Transaction(
+                item_sku=pkg_item.item_sku,
+                ttype="OUT",
+                qty=pkg_item.allocated_qty,
+                location_id=package.assigned_location_id,
+                distributor_id=package.distributor_id,
+                event_id=package.event_id,
+                notes=f"Dispatched via package {package.package_number}",
+                created_by=current_user.full_name
+            )
+            db.session.add(transaction)
+    
+    old_status = package.status
+    package.status = "Dispatched"
+    package.dispatched_by = current_user.full_name
+    package.dispatched_at = datetime.utcnow()
+    package.updated_at = datetime.utcnow()
+    
+    record_package_status_change(package, old_status, "Dispatched", current_user.full_name, dispatch_notes)
+    
+    # Create dispatch notification
+    message = f"Package {package.package_number} has been dispatched from {package.assigned_location.name}."
+    create_package_notification(package, "status_update", message)
+    
+    db.session.commit()
+    
+    flash(f"Package {package.package_number} dispatched successfully. Inventory updated.", "success")
+    return redirect(url_for("package_details", package_id=package_id))
+
+@app.route("/packages/<int:package_id>/deliver", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+def package_deliver(package_id):
+    """Mark package as delivered (Dispatched → Delivered)"""
+    package = DistributionPackage.query.get_or_404(package_id)
+    
+    if package.status != "Dispatched":
+        flash("Only dispatched packages can be marked as delivered.", "warning")
+        return redirect(url_for("package_details", package_id=package_id))
+    
+    delivery_notes = request.form.get("delivery_notes", "").strip() or None
+    
+    old_status = package.status
+    package.status = "Delivered"
+    package.delivered_at = datetime.utcnow()
+    package.updated_at = datetime.utcnow()
+    
+    record_package_status_change(package, old_status, "Delivered", current_user.full_name, delivery_notes)
+    
+    # Create delivery confirmation notification
+    message = f"Package {package.package_number} has been marked as delivered."
+    create_package_notification(package, "status_update", message)
+    
+    db.session.commit()
+    
+    flash(f"Package {package.package_number} marked as delivered.", "success")
+    return redirect(url_for("package_details", package_id=package_id))
+
+@app.route("/packages/<int:package_id>/distributor_response", methods=["POST"])
+@login_required
+def package_distributor_response(package_id):
+    """Distributor accepts or rejects partial fulfillment"""
+    package = DistributionPackage.query.get_or_404(package_id)
+    
+    # Verify user has access to this distributor's packages
+    # For now, allow any logged-in user (in future, add distributor-user linking)
+    
+    if package.status != "Under Review":
+        flash("Package is not awaiting distributor response.", "warning")
+        return redirect(url_for("package_details", package_id=package_id))
+    
+    if not package.is_partial:
+        flash("This package has full fulfillment, no response needed.", "warning")
+        return redirect(url_for("package_details", package_id=package_id))
+    
+    response = request.form.get("response")  # 'accept' or 'reject'
+    response_notes = request.form.get("response_notes", "").strip() or None
+    
+    if response == "accept":
+        package.distributor_accepted_partial = True
+        flash_message = "You have accepted the partial fulfillment. Package will proceed to approval."
+        flash_type = "success"
+    elif response == "reject":
+        package.distributor_accepted_partial = False
+        flash_message = "You have requested revision. Inventory manager will be notified."
+        flash_type = "info"
+    else:
+        flash("Invalid response.", "danger")
+        return redirect(url_for("package_details", package_id=package_id))
+    
+    package.distributor_response_at = datetime.utcnow()
+    package.distributor_response_notes = response_notes
+    package.updated_at = datetime.utcnow()
+    
+    # Mark notification as read
+    for notification in package.notifications:
+        if notification.notification_type == "partial_fulfillment" and not notification.is_read:
+            notification.is_read = True
+    
+    # Create response record in audit trail
+    response_text = "Accepted partial fulfillment" if response == "accept" else "Rejected partial fulfillment - requested revision"
+    record_package_status_change(package, package.status, package.status, 
+                                package.distributor.name, 
+                                f"{response_text}. {response_notes or ''}")
+    
+    db.session.commit()
+    
+    flash(flash_message, flash_type)
+    return redirect(url_for("package_details", package_id=package_id))
 
 @app.route("/disaster-events")
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)

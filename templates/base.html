@@ -89,6 +89,11 @@
             <li class="nav-item"><a class="nav-link" href="{{ url_for('distributors') }}"><i class="bi bi-people me-1"></i>Distributors</a></li>
           {% endif %}
           
+          {# Distribution Packages - visible to managers and warehouse staff #}
+          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF'] %}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('packages') }}"><i class="bi bi-box-seam-fill me-1"></i>Packages</a></li>
+          {% endif %}
+          
           {# Events - visible to managers #}
           {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER'] %}
             <li class="nav-item"><a class="nav-link" href="{{ url_for('disaster_events') }}"><i class="bi bi-exclamation-triangle me-1"></i>Events</a></li>

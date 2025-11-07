@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Create Distribution Package{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-box-seam me-2"></i>Create Distribution Package</h2>
+    <a href="{{ url_for('packages') }}" class="btn btn-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Back to Packages
+    </a>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-body">
+          <form method="POST">
+            <!-- Distributor Selection -->
+            <div class="mb-3">
+              <label for="distributor_id" class="form-label">Distributor <span class="text-danger">*</span></label>
+              <select id="distributor_id" name="distributor_id" class="form-select" required>
+                <option value="">Select Distributor</option>
+                {% for dist in distributors %}
+                <option value="{{ dist.id }}">{{ dist.name }}{% if dist.organization %} ({{ dist.organization }}){% endif %}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Disaster Event -->
+            <div class="mb-3">
+              <label for="event_id" class="form-label">Disaster Event (Optional)</label>
+              <select id="event_id" name="event_id" class="form-select">
+                <option value="">Select Event</option>
+                {% for event in events %}
+                <option value="{{ event.id }}">{{ event.name }} ({{ event.start_date.strftime("%Y-%m-%d") }})</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Items / Needs List -->
+            <div class="mb-3">
+              <label class="form-label">Items / Needs List <span class="text-danger">*</span></label>
+              <div id="items-container">
+                <div class="row mb-2 item-row">
+                  <div class="col-md-8">
+                    <select name="item_sku_0" class="form-select item-select" required>
+                      <option value="">Select Item</option>
+                      {% for item in items %}
+                      <option value="{{ item.sku }}">{{ item.name }} (SKU: {{ item.sku }})</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <input type="number" name="item_qty_0" class="form-control" placeholder="Quantity" min="1" required>
+                  </div>
+                  <div class="col-md-1">
+                    <button type="button" class="btn btn-outline-danger remove-item-btn" onclick="removeItem(this)" disabled>
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-primary" onclick="addItem()">
+                <i class="bi bi-plus-circle me-1"></i>Add Another Item
+              </button>
+            </div>
+
+            <!-- Notes -->
+            <div class="mb-3">
+              <label for="notes" class="form-label">Notes</label>
+              <textarea id="notes" name="notes" class="form-control" rows="3" placeholder="Optional notes about this package"></textarea>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-success">
+                <i class="bi bi-check-circle me-1"></i>Create Package
+              </button>
+              <a href="{{ url_for('packages') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card bg-light">
+        <div class="card-body">
+          <h5 class="card-title"><i class="bi bi-info-circle me-2"></i>Package Creation Info</h5>
+          <p class="card-text">
+            <strong>How it works:</strong>
+          </p>
+          <ol class="small">
+            <li>Select the distributor who will receive this package</li>
+            <li>Add items from the needs list with quantities</li>
+            <li>The system will automatically check stock availability</li>
+            <li>If stock is insufficient, the package will be marked as "Partial"</li>
+            <li>Partial packages require distributor acceptance before approval</li>
+            <li>Once approved, the package will be auto-assigned to the nearest warehouse</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let itemIndex = 1;
+
+function addItem() {
+  const container = document.getElementById('items-container');
+  const newRow = document.createElement('div');
+  newRow.className = 'row mb-2 item-row';
+  newRow.innerHTML = `
+    <div class="col-md-8">
+      <select name="item_sku_${itemIndex}" class="form-select item-select" required>
+        <option value="">Select Item</option>
+        {% for item in items %}
+        <option value="{{ item.sku }}">{{ item.name }} (SKU: {{ item.sku }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <input type="number" name="item_qty_${itemIndex}" class="form-control" placeholder="Quantity" min="1" required>
+    </div>
+    <div class="col-md-1">
+      <button type="button" class="btn btn-outline-danger remove-item-btn" onclick="removeItem(this)">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>
+  `;
+  container.appendChild(newRow);
+  itemIndex++;
+  updateRemoveButtons();
+}
+
+function removeItem(button) {
+  const row = button.closest('.item-row');
+  row.remove();
+  updateRemoveButtons();
+}
+
+function updateRemoveButtons() {
+  const rows = document.querySelectorAll('.item-row');
+  rows.forEach((row, index) => {
+    const removeBtn = row.querySelector('.remove-item-btn');
+    if (rows.length === 1) {
+      removeBtn.disabled = true;
+    } else {
+      removeBtn.disabled = false;
+    }
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+
+{% block title %}Package {{ package.package_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-box-seam me-2"></i>Package {{ package.package_number }}</h2>
+    <a href="{{ url_for('packages') }}" class="btn btn-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Back to Packages
+    </a>
+  </div>
+
+  <div class="row">
+    <!-- Package Details -->
+    <div class="col-lg-8">
+      <!-- Status and Info Card -->
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-info-circle me-2"></i>Package Information</span>
+          <div>
+            {% if package.status == 'Draft' %}
+              <span class="badge bg-secondary">{{ package.status }}</span>
+            {% elif package.status == 'Under Review' %}
+              <span class="badge bg-info">{{ package.status }}</span>
+            {% elif package.status == 'Approved' %}
+              <span class="badge bg-success">{{ package.status }}</span>
+            {% elif package.status == 'Dispatched' %}
+              <span class="badge bg-primary">{{ package.status }}</span>
+            {% elif package.status == 'Delivered' %}
+              <span class="badge bg-dark">{{ package.status }}</span>
+            {% endif %}
+            
+            {% if package.is_partial %}
+              <span class="badge bg-warning text-dark ms-2">Partial Fulfillment</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <p class="mb-2"><strong>Distributor:</strong> {{ package.distributor.name }}</p>
+              <p class="mb-2"><strong>Organization:</strong> {{ package.distributor.organization or '—' }}</p>
+              <p class="mb-2"><strong>Contact:</strong> {{ package.distributor.contact or '—' }}</p>
+            </div>
+            <div class="col-md-6">
+              <p class="mb-2"><strong>Created By:</strong> {{ package.created_by }}</p>
+              <p class="mb-2"><strong>Created At:</strong> {{ package.created_at.strftime("%Y-%m-%d %H:%M") }}</p>
+              <p class="mb-2"><strong>Assigned Location:</strong> {{ package.assigned_location.name if package.assigned_location else '—' }}</p>
+              <p class="mb-2"><strong>Disaster Event:</strong> {{ package.event.name if package.event else '—' }}</p>
+            </div>
+          </div>
+          {% if package.notes %}
+          <div class="mt-3">
+            <strong>Notes:</strong>
+            <p class="mb-0">{{ package.notes }}</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Package Items -->
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-box me-2"></i>Package Items</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Item</th>
+                  <th>SKU</th>
+                  <th class="text-end">Requested</th>
+                  <th class="text-end">Allocated</th>
+                  <th class="text-end">Available Stock</th>
+                  <th class="text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for pkg_item in package.items %}
+                <tr {% if pkg_item.allocated_qty < pkg_item.requested_qty %}class="table-warning"{% endif %}>
+                  <td><strong>{{ pkg_item.item.name }}</strong></td>
+                  <td><small>{{ pkg_item.item_sku }}</small></td>
+                  <td class="text-end">{{ pkg_item.requested_qty }}</td>
+                  <td class="text-end"><strong>{{ pkg_item.allocated_qty }}</strong></td>
+                  <td class="text-end">{{ pkg_item.current_stock }}</td>
+                  <td class="text-center">
+                    {% if pkg_item.allocated_qty >= pkg_item.requested_qty %}
+                      <span class="badge bg-success">Full</span>
+                    {% else %}
+                      <span class="badge bg-warning text-dark">Partial</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Partial Fulfillment Notification (for distributors) -->
+      {% if package.is_partial and package.status == 'Under Review' and package.distributor_accepted_partial is none %}
+      <div class="card mb-3 border-warning">
+        <div class="card-header bg-warning text-dark">
+          <i class="bi bi-exclamation-triangle me-2"></i>Partial Fulfillment Notice
+        </div>
+        <div class="card-body">
+          <p><strong>Some items cannot be fully fulfilled due to insufficient stock.</strong></p>
+          <p>Please review the allocated quantities above and decide whether to:</p>
+          <ul>
+            <li><strong>Accept:</strong> Proceed with the allocated quantities</li>
+            <li><strong>Request Revision:</strong> Ask the inventory manager to revise the package</li>
+          </ul>
+          <form method="POST" action="{{ url_for('package_distributor_response', package_id=package.id) }}">
+            <div class="mb-3">
+              <label class="form-label">Response Notes (Optional)</label>
+              <textarea name="response_notes" class="form-control" rows="2" placeholder="Add any notes or comments"></textarea>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="submit" name="response" value="accept" class="btn btn-success">
+                <i class="bi bi-check-circle me-1"></i>Accept Partial Fulfillment
+              </button>
+              <button type="submit" name="response" value="reject" class="btn btn-outline-warning">
+                <i class="bi bi-x-circle me-1"></i>Request Revision
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Distributor Response Display -->
+      {% if package.distributor_accepted_partial is not none %}
+      <div class="card mb-3 {% if package.distributor_accepted_partial %}border-success{% else %}border-danger{% endif %}">
+        <div class="card-header {% if package.distributor_accepted_partial %}bg-success text-white{% else %}bg-danger text-white{% endif %}">
+          <i class="bi bi-chat-left-text me-2"></i>Distributor Response
+        </div>
+        <div class="card-body">
+          <p><strong>Response:</strong> 
+            {% if package.distributor_accepted_partial %}
+              <span class="text-success">Accepted Partial Fulfillment</span>
+            {% else %}
+              <span class="text-danger">Requested Revision</span>
+            {% endif %}
+          </p>
+          <p><strong>Responded At:</strong> {{ package.distributor_response_at.strftime("%Y-%m-%d %H:%M") }}</p>
+          {% if package.distributor_response_notes %}
+          <p><strong>Notes:</strong> {{ package.distributor_response_notes }}</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Audit Trail -->
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-clock-history me-2"></i>Status History (Audit Trail)</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Date/Time</th>
+                  <th>From Status</th>
+                  <th>To Status</th>
+                  <th>Changed By</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for history in package.status_history|reverse %}
+                <tr>
+                  <td><small>{{ history.created_at.strftime("%Y-%m-%d %H:%M") }}</small></td>
+                  <td>{{ history.old_status or '—' }}</td>
+                  <td><strong>{{ history.new_status }}</strong></td>
+                  <td>{{ history.changed_by }}</td>
+                  <td><small>{{ history.notes or '—' }}</small></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions Sidebar -->
+    <div class="col-lg-4">
+      <div class="card sticky-top" style="top: 1rem;">
+        <div class="card-header"><i class="bi bi-gear me-2"></i>Workflow Actions</div>
+        <div class="card-body">
+          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER'] %}
+            
+            <!-- Submit for Review -->
+            {% if package.status == 'Draft' %}
+            <form method="POST" action="{{ url_for('package_submit_review', package_id=package.id) }}" class="mb-3">
+              <button type="submit" class="btn btn-info w-100">
+                <i class="bi bi-send me-1"></i>Submit for Review
+              </button>
+              <small class="text-muted d-block mt-2">
+                This will check stock availability and notify the distributor if partial.
+              </small>
+            </form>
+            {% endif %}
+
+            <!-- Approve Package -->
+            {% if package.status == 'Under Review' %}
+            <form method="POST" action="{{ url_for('package_approve', package_id=package.id) }}" class="mb-3">
+              <div class="mb-2">
+                <label class="form-label">Approval Notes (Optional)</label>
+                <textarea name="approval_notes" class="form-control form-control-sm" rows="2"></textarea>
+              </div>
+              <button type="submit" class="btn btn-success w-100">
+                <i class="bi bi-check-circle me-1"></i>Approve Package
+              </button>
+              <small class="text-muted d-block mt-2">
+                {% if package.is_partial %}
+                  {% if package.distributor_accepted_partial is none %}
+                    ⚠️ Waiting for distributor to accept partial fulfillment
+                  {% elif package.distributor_accepted_partial %}
+                    ✓ Distributor accepted partial fulfillment
+                  {% else %}
+                    ✗ Distributor rejected partial fulfillment
+                  {% endif %}
+                {% else %}
+                  This package has full stock availability.
+                {% endif %}
+              </small>
+            </form>
+            {% endif %}
+
+          {% endif %}
+
+          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF'] %}
+            
+            <!-- Dispatch Package -->
+            {% if package.status == 'Approved' %}
+            <form method="POST" action="{{ url_for('package_dispatch', package_id=package.id) }}" class="mb-3">
+              <div class="mb-2">
+                <label class="form-label">Dispatch Notes (Optional)</label>
+                <textarea name="dispatch_notes" class="form-control form-control-sm" rows="2"></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-truck me-1"></i>Dispatch Package
+              </button>
+              <small class="text-muted d-block mt-2">
+                This will generate OUT transactions and update inventory at {{ package.assigned_location.name if package.assigned_location else 'assigned location' }}.
+              </small>
+            </form>
+            {% endif %}
+
+            <!-- Mark as Delivered -->
+            {% if package.status == 'Dispatched' %}
+            <form method="POST" action="{{ url_for('package_deliver', package_id=package.id) }}" class="mb-3">
+              <div class="mb-2">
+                <label class="form-label">Delivery Notes (Optional)</label>
+                <textarea name="delivery_notes" class="form-control form-control-sm" rows="2"></textarea>
+              </div>
+              <button type="submit" class="btn btn-dark w-100">
+                <i class="bi bi-check2-all me-1"></i>Mark as Delivered
+              </button>
+            </form>
+            {% endif %}
+
+          {% endif %}
+
+          {% if package.status == 'Delivered' %}
+          <div class="alert alert-success mb-0">
+            <i class="bi bi-check-circle-fill me-2"></i>
+            <strong>Package Delivered</strong>
+            <p class="mb-0 mt-2 small">
+              Delivered at: {{ package.delivered_at.strftime("%Y-%m-%d %H:%M") if package.delivered_at else '—' }}
+            </p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Quick Stats Card -->
+      <div class="card mt-3">
+        <div class="card-header">Package Timeline</div>
+        <div class="card-body">
+          <ul class="list-unstyled small mb-0">
+            <li class="mb-2">
+              <i class="bi bi-check-circle text-success me-2"></i>
+              <strong>Created:</strong> {{ package.created_at.strftime("%Y-%m-%d %H:%M") }}
+            </li>
+            {% if package.approved_at %}
+            <li class="mb-2">
+              <i class="bi bi-check-circle text-success me-2"></i>
+              <strong>Approved:</strong> {{ package.approved_at.strftime("%Y-%m-%d %H:%M") }}<br>
+              <small class="text-muted ms-4">By {{ package.approved_by }}</small>
+            </li>
+            {% endif %}
+            {% if package.dispatched_at %}
+            <li class="mb-2">
+              <i class="bi bi-check-circle text-success me-2"></i>
+              <strong>Dispatched:</strong> {{ package.dispatched_at.strftime("%Y-%m-%d %H:%M") }}<br>
+              <small class="text-muted ms-4">By {{ package.dispatched_by }}</small>
+            </li>
+            {% endif %}
+            {% if package.delivered_at %}
+            <li class="mb-2">
+              <i class="bi bi-check-circle text-success me-2"></i>
+              <strong>Delivered:</strong> {{ package.delivered_at.strftime("%Y-%m-%d %H:%M") }}
+            </li>
+            {% endif %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
