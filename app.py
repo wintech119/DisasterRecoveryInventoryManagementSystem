@@ -554,8 +554,12 @@ def dashboard():
         category = item.category or "Uncategorized"
         total_stock = sum(stock_map.get((item.sku, loc.id), 0) for loc in locations)
         if category not in stock_by_category:
-            stock_by_category[category] = {"items": 0, "total_units": 0}
-        stock_by_category[category]["items"] += 1
+            stock_by_category[category] = {"items": [], "total_units": 0}
+        stock_by_category[category]["items"].append({
+            "name": item.name,
+            "stock": total_stock,
+            "unit": item.unit
+        })
         stock_by_category[category]["total_units"] += total_stock
     
     # Sort categories by name
