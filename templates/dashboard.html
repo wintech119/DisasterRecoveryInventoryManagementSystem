@@ -314,8 +314,8 @@
   </div>
 </div>
 
-<!-- Pending Needs Lists (for Inventory Managers) -->
-{% if pending_needs_lists and current_user.role in ['ADMIN', 'INVENTORY_MANAGER'] %}
+<!-- Pending Needs Lists (for Logistics Staff) -->
+{% if pending_needs_lists and current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER'] %}
 <div class="row mb-3">
   <div class="col-12">
     <div class="alert alert-info border-info border-2">

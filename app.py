@@ -97,7 +97,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(200), unique=True, nullable=False, index=True)
     full_name = db.Column(db.String(200), nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    role = db.Column(db.String(50), nullable=False)  # WAREHOUSE_STAFF, FIELD_PERSONNEL, INVENTORY_MANAGER, EXECUTIVE, ADMIN, AUDITOR, DISTRIBUTOR
+    role = db.Column(db.String(50), nullable=False)  # WAREHOUSE_STAFF, FIELD_PERSONNEL, LOGISTICS_OFFICER, LOGISTICS_MANAGER, EXECUTIVE, ADMIN, AUDITOR, DISTRIBUTOR
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     assigned_location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)  # For warehouse staff
     last_login_at = db.Column(db.DateTime, nullable=True)
@@ -226,7 +226,8 @@ def inject_notification_count():
 # ---------- Role Constants ----------
 ROLE_WAREHOUSE_STAFF = "WAREHOUSE_STAFF"
 ROLE_FIELD_PERSONNEL = "FIELD_PERSONNEL"
-ROLE_INVENTORY_MANAGER = "INVENTORY_MANAGER"
+ROLE_LOGISTICS_OFFICER = "LOGISTICS_OFFICER"
+ROLE_LOGISTICS_MANAGER = "LOGISTICS_MANAGER"
 ROLE_EXECUTIVE = "EXECUTIVE"
 ROLE_ADMIN = "ADMIN"
 ROLE_AUDITOR = "AUDITOR"
@@ -234,7 +235,8 @@ ROLE_AUDITOR = "AUDITOR"
 ALL_ROLES = [
     ROLE_WAREHOUSE_STAFF,
     ROLE_FIELD_PERSONNEL,
-    ROLE_INVENTORY_MANAGER,
+    ROLE_LOGISTICS_OFFICER,
+    ROLE_LOGISTICS_MANAGER,
     ROLE_EXECUTIVE,
     ROLE_ADMIN,
     ROLE_AUDITOR
@@ -632,9 +634,9 @@ def dashboard():
     recent_preview = recent_all[:PREVIEW_LIMIT]
     recent_full = recent_all
     
-    # Pending needs lists (for inventory managers and admins)
+    # Pending needs lists (for logistics staff and admins)
     pending_needs_lists = []
-    if current_user.role in [ROLE_ADMIN, ROLE_INVENTORY_MANAGER]:
+    if current_user.role in [ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER]:
         pending_needs_lists = DistributionPackage.query.filter_by(status="Draft")\
                                                        .order_by(DistributionPackage.created_at.asc()).all()
     
@@ -666,7 +668,7 @@ def dashboard():
                            pending_needs_lists=pending_needs_lists)
 
 @app.route("/items")
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF, ROLE_AUDITOR, ROLE_EXECUTIVE)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF, ROLE_AUDITOR, ROLE_EXECUTIVE)
 def items():
     q = request.args.get("q", "").strip()
     cat = request.args.get("category", "").strip()
@@ -689,7 +691,7 @@ def items():
                           locations=locations, stock_map=stock_map)
 
 @app.route("/items/new", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
 def item_new():
     if request.method == "POST":
         from datetime import datetime as dt
@@ -744,7 +746,7 @@ def item_new():
     return render_template("item_form.html", item=None)
 
 @app.route("/items/<item_sku>/edit", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
 def item_edit(item_sku):
     from datetime import datetime as dt
     item = Item.query.get_or_404(item_sku)
@@ -793,7 +795,7 @@ def item_edit(item_sku):
     return render_template("item_form.html", item=item)
 
 @app.route("/intake", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
 def intake():
     items = Item.query.order_by(Item.name.asc()).all()
     locations = Depot.query.order_by(Depot.name.asc()).all()
@@ -867,7 +869,7 @@ def barcode_lookup():
         return jsonify({"success": False, "message": f"No item found with barcode: {barcode}"}), 404
 
 @app.route("/distribute", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF, ROLE_FIELD_PERSONNEL)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF, ROLE_FIELD_PERSONNEL)
 def distribute():
     items = Item.query.order_by(Item.name.asc()).all()
     locations = Depot.query.order_by(Depot.name.asc()).all()
@@ -958,7 +960,7 @@ def report_stock():
     return render_template("report_stock.html", items=items, locations=locations, stock_map=stock_map)
 
 @app.route("/export/items.csv")
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER)
 def export_items():
     items = Item.query.all()
     df = pd.DataFrame([{
@@ -974,7 +976,7 @@ def export_items():
     return send_file(csv_path, as_attachment=True, download_name="items.csv", mimetype="text/csv")
 
 @app.route("/import/items", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER)
 def import_items():
     if request.method == "POST":
         f = request.files.get("file")
@@ -1008,7 +1010,7 @@ def import_items():
     return render_template("import_items.html")
 
 @app.route("/depots")
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
 def depots():
     locs = Depot.query.order_by(Depot.name.asc()).all()
     # Get stock counts per location
@@ -1021,7 +1023,7 @@ def depots():
     return render_template("depots.html", locations=locs, stock_by_loc=stock_by_loc)
 
 @app.route("/locations/new", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def depot_new():
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -1043,7 +1045,7 @@ def depot_new():
     return render_template("depot_form.html", location=None)
 
 @app.route("/locations/<int:location_id>/edit", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def depot_edit(location_id):
     location = Depot.query.get_or_404(location_id)
     if request.method == "POST":
@@ -1065,7 +1067,7 @@ def depot_edit(location_id):
     return render_template("depot_form.html", location=location)
 
 @app.route("/locations/<int:location_id>/inventory")
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
 def depot_inventory(location_id):
     location = Depot.query.get_or_404(location_id)
     
@@ -1083,7 +1085,7 @@ def depot_inventory(location_id):
     return render_template("depot_inventory.html", depot=location, rows=rows)
 
 @app.route("/distributors")
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def distributors():
     distrs = Distributor.query.order_by(Distributor.name.asc()).all()
     # Get distribution count per distributor
@@ -1094,7 +1096,7 @@ def distributors():
     return render_template("distributors.html", distributors=distrs, dist_count=dist_count)
 
 @app.route("/distributors/new", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def distributor_new():
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -1144,7 +1146,7 @@ def distributor_new():
     return render_template("distributor_form.html", distributor=None, parishes=parishes)
 
 @app.route("/distributors/<int:distributor_id>/edit", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def distributor_edit(distributor_id):
     distributor = Distributor.query.get_or_404(distributor_id)
     if request.method == "POST":
@@ -1193,7 +1195,7 @@ def distributor_edit(distributor_id):
 # ---------- Distribution Package Routes ----------
 
 @app.route("/packages")
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
 def packages():
     """List all distribution packages with filters"""
     status_filter = request.args.get("status")
@@ -1220,7 +1222,7 @@ def packages():
                          status_options=status_options)
 
 @app.route("/packages/create", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def package_create():
     """Create a new distribution package from needs list"""
     if request.method == "POST":
@@ -1363,7 +1365,7 @@ def package_create():
                          stock_map=stock_map)
 
 @app.route("/stock-transfer", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
 def stock_transfer():
     """Transfer stock between depots"""
     if request.method == "POST":
@@ -1455,7 +1457,7 @@ def stock_transfer():
                          stock_map=stock_map)
 
 @app.route("/packages/<int:package_id>/fulfill", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def package_fulfill(package_id):
     """Fulfill distributor needs list by allocating stock from depots"""
     package = DistributionPackage.query.get_or_404(package_id)
@@ -1566,7 +1568,7 @@ def package_fulfill(package_id):
                          item_depot_options=item_depot_options)
 
 @app.route("/packages/<int:package_id>")
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
 def package_details(package_id):
     """View package details with full audit trail"""
     package = DistributionPackage.query.get_or_404(package_id)
@@ -1592,7 +1594,7 @@ def package_details(package_id):
     return render_template("package_details.html", package=package)
 
 @app.route("/packages/<int:package_id>/submit_review", methods=["POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def package_submit_review(package_id):
     """Submit package for review (Draft → Under Review)"""
     package = DistributionPackage.query.get_or_404(package_id)
@@ -1619,7 +1621,7 @@ def package_submit_review(package_id):
     return redirect(url_for("package_details", package_id=package_id))
 
 @app.route("/packages/<int:package_id>/approve", methods=["POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER)
 def package_approve(package_id):
     """Approve package (Under Review → Approved)"""
     package = DistributionPackage.query.get_or_404(package_id)
@@ -1662,7 +1664,7 @@ def package_approve(package_id):
     return redirect(url_for("package_details", package_id=package_id))
 
 @app.route("/packages/<int:package_id>/dispatch", methods=["POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_WAREHOUSE_STAFF)
 def package_dispatch(package_id):
     """Dispatch package (Approved → Dispatched) and generate OUT transactions"""
     package = DistributionPackage.query.get_or_404(package_id)
@@ -1725,7 +1727,7 @@ def package_dispatch(package_id):
     return redirect(url_for("package_details", package_id=package_id))
 
 @app.route("/packages/<int:package_id>/deliver", methods=["POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_WAREHOUSE_STAFF)
 def package_deliver(package_id):
     """Mark package as delivered (Dispatched → Delivered)"""
     package = DistributionPackage.query.get_or_404(package_id)
@@ -1955,7 +1957,7 @@ def mark_all_notifications_read():
     return redirect(url_for("distributor_needs_lists"))
 
 @app.route("/disaster-events")
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def disaster_events():
     events = DisasterEvent.query.order_by(DisasterEvent.start_date.desc()).all()
     # Get transaction counts per event
@@ -1966,7 +1968,7 @@ def disaster_events():
     return render_template("disaster_events.html", events=events, event_txn_count=event_txn_count)
 
 @app.route("/disaster-events/new", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def disaster_event_new():
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -1997,7 +1999,7 @@ def disaster_event_new():
     return render_template("disaster_event_form.html", event=None)
 
 @app.route("/disaster-events/<int:event_id>/edit", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def disaster_event_edit(event_id):
     event = DisasterEvent.query.get_or_404(event_id)
     if request.method == "POST":
@@ -2122,7 +2124,7 @@ def create_user():
     role_map = {
         "1": ROLE_WAREHOUSE_STAFF,
         "2": ROLE_FIELD_PERSONNEL,
-        "3": ROLE_INVENTORY_MANAGER,
+        "3": ROLE_LOGISTICS_MANAGER,
         "4": ROLE_EXECUTIVE,
         "5": ROLE_ADMIN,
         "6": ROLE_AUDITOR

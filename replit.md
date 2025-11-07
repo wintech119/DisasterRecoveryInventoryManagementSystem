@@ -22,7 +22,7 @@ Implements a comprehensive workflow for creating, reviewing, and approving distr
 - **Stock Availability**: Validates requested quantities against available stock across all locations, handling partial fulfillment.
 - **Distributor Location Tracking & Automatic Assignment**: Distributors include location data for assigning approved packages to the nearest warehouse, optimizing logistics.
 - **Distributor Self-Service Portal**: Distributors can create needs lists, view package statuses, respond to partial fulfillment notifications, and receive in-app alerts for status changes.
-- **Multi-Depot Fulfillment**: Inventory managers can manually allocate package items from multiple depots, with real-time stock updates, smart auto-fill functions, and per-depot validation. This generates separate OUT transactions for each depot allocation upon dispatch.
+- **Multi-Depot Fulfillment**: Logistics staff (Logistics Officer and Logistics Manager) can manually allocate package items from multiple depots, with real-time stock updates, smart auto-fill functions, and per-depot validation. Logistics Officers create draft allocations, which are submitted for review and approved by Logistics Managers. This generates separate OUT transactions for each depot allocation upon dispatch.
 - **Smart Depot Filtering**: Package creation and fulfillment forms display only depots with available stock (quantity > 0) for each item, streamlining the allocation process. Depots with existing allocations are preserved in the fulfillment interface even when stock drops to zero, allowing managers to edit or clear those allocations. The system uses separate data attributes (`data-max` for validation limits, `data-available` for auto-fill) to ensure the auto-fill function only selects depots with actual stock while still permitting manual edits to preserved allocations. Zero-stock depots with allocations are visually distinguished with warning icons, light backgrounds, and clear messaging.
 - **Audit Trail**: Complete tracking of package lifecycle, including creation, status changes, distributor responses, approvals, dispatch, and delivery.
 
@@ -36,13 +36,19 @@ Stock levels are dynamically aggregated on-demand from transaction records (summ
 Comprehensive validation prevents stock levels from falling below zero during distributions, transfers, and package dispatches/fulfillments. Error messages indicate item, depot, available, and requested quantities.
 
 ### Stock Transfer Between Depots
-Enables inventory managers to transfer stock between depots with real-time stock visibility, live transfer previews, automatic validation, and linked IN/OUT transactions for an audit trail.
+Enables logistics staff to transfer stock between depots with real-time stock visibility, live transfer previews, automatic validation, and linked IN/OUT transactions for an audit trail.
 
 ### Dashboard Features
 Provides a comprehensive overview with KPIs, inventory by category, stock by location, low stock alerts, recent transactions, expiring item alerts, activity by disaster event, and transaction analytics.
 
 ### Authentication
-Implements Flask-Login with role-based access control (RBAC) for seven user roles: ADMIN, INVENTORY_MANAGER, WAREHOUSE_STAFF, FIELD_PERSONNEL, EXECUTIVE, AUDITOR, and DISTRIBUTOR. Features include secure password hashing, session management, role-aware navigation, and route protection. Distributors have access to self-service features, while inventory managers manage packages and distributors.
+Implements Flask-Login with role-based access control (RBAC) for eight user roles: ADMIN, LOGISTICS_MANAGER, LOGISTICS_OFFICER, WAREHOUSE_STAFF, FIELD_PERSONNEL, EXECUTIVE, AUDITOR, and DISTRIBUTOR. Features include secure password hashing, session management, role-aware navigation, and route protection.
+
+**Role Hierarchy and Responsibilities:**
+- **LOGISTICS_MANAGER**: Supervises logistics operations, allocates items, approves packages, and reviews work done by Logistics Officers. Part of ODPEM (Office of Disaster Preparedness and Emergency Management).
+- **LOGISTICS_OFFICER**: Creates draft allocations for needs lists, manages inventory data, and submits work for approval by Logistics Manager. Part of ODPEM.
+- **WAREHOUSE_STAFF, FIELD_PERSONNEL, EXECUTIVE, AUDITOR**: Operational and oversight roles.
+- **DISTRIBUTOR**: Self-service access to create needs lists, view package status, and respond to partial fulfillment notifications.
 
 ### File Storage and Attachments
 Supports file attachments (e.g., product photos) stored locally in `/uploads/items/` with UUID-based filenames. A modular `storage_service.py` allows future migration to cloud storage.

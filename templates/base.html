@@ -75,27 +75,27 @@
       <ul class="navbar-nav ms-auto">
         {% if current_user.is_authenticated %}
           {# Items - visible to most roles #}
-          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF', 'AUDITOR', 'EXECUTIVE'] %}
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF', 'AUDITOR', 'EXECUTIVE'] %}
             <li class="nav-item"><a class="nav-link" href="{{ url_for('items') }}"><i class="bi bi-box-seam me-1"></i>Items</a></li>
           {% endif %}
           
-          {# Depots - visible to managers and warehouse staff #}
-          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF'] %}
+          {# Depots - visible to logistics staff and warehouse staff #}
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
             <li class="nav-item"><a class="nav-link" href="{{ url_for('depots') }}"><i class="bi bi-geo-alt me-1"></i>Depots</a></li>
           {% endif %}
           
-          {# Distributors - visible to managers #}
-          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER'] %}
+          {# Distributors - visible to logistics staff #}
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER'] %}
             <li class="nav-item"><a class="nav-link" href="{{ url_for('distributors') }}"><i class="bi bi-people me-1"></i>Distributors</a></li>
           {% endif %}
           
-          {# Distribution Packages - visible to managers and warehouse staff #}
-          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF'] %}
+          {# Distribution Packages - visible to logistics staff and warehouse staff #}
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
             <li class="nav-item"><a class="nav-link" href="{{ url_for('packages') }}"><i class="bi bi-box-seam-fill me-1"></i>Packages</a></li>
           {% endif %}
           
-          {# Stock Transfer - visible to managers and warehouse staff #}
-          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF'] %}
+          {# Stock Transfer - visible to logistics staff and warehouse staff #}
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
             <li class="nav-item"><a class="nav-link" href="{{ url_for('stock_transfer') }}"><i class="bi bi-arrow-left-right me-1"></i>Transfer</a></li>
           {% endif %}
           
@@ -111,18 +111,18 @@
             </li>
           {% endif %}
           
-          {# Events - visible to managers #}
-          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER'] %}
+          {# Events - visible to logistics staff #}
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER'] %}
             <li class="nav-item"><a class="nav-link" href="{{ url_for('disaster_events') }}"><i class="bi bi-exclamation-triangle me-1"></i>Events</a></li>
           {% endif %}
           
-          {# Intake - visible to warehouse staff and managers #}
-          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF'] %}
+          {# Intake - visible to warehouse staff and logistics staff #}
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
             <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('intake') }}"><i class="bi bi-arrow-down-circle me-1"></i>Intake</a></li>
           {% endif %}
           
-          {# Distribute - visible to warehouse staff, field personnel, and managers #}
-          {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF', 'FIELD_PERSONNEL'] %}
+          {# Distribute - visible to warehouse staff, field personnel, and logistics staff #}
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF', 'FIELD_PERSONNEL'] %}
             <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('distribute') }}"><i class="bi bi-arrow-up-circle me-1"></i>Distribute</a></li>
           {% endif %}
           
