@@ -213,37 +213,49 @@ function validateAndUpdate(itemId, requestedQty) {
   
   // Update each depot's remaining stock display
   inputs.forEach(input => {
-    const value = parseInt(input.value) || 0;
+    let value = parseInt(input.value) || 0;
     const max = parseInt(input.dataset.max) || 0;
     const depotId = input.dataset.depotId;
     
     // Prevent exceeding depot stock
     if (value > max) {
+      value = max;
       input.value = max;
     }
     
     // Prevent negative
     if (value < 0) {
+      value = 0;
       input.value = 0;
     }
     
-    total += parseInt(input.value) || 0;
+    total += value;
     
     // Update remaining stock display (live update)
     const currentStockSpan = document.querySelector(`.current-stock-${itemId}-${depotId}`);
     const remainingStockSpan = document.querySelector(`.remaining-stock-${itemId}-${depotId}`);
-    const allocatedQty = parseInt(input.value) || 0;
-    const originalStock = itemStockData[itemId].depots[depotId];
+    const allocatedQty = value;
+    
+    // Safely get original stock (fallback to data-available if not in itemStockData)
+    let originalStock = 0;
+    if (itemStockData[itemId] && itemStockData[itemId].depots && itemStockData[itemId].depots[depotId] !== undefined) {
+      originalStock = itemStockData[itemId].depots[depotId];
+    } else {
+      originalStock = parseInt(input.dataset.available) || 0;
+    }
+    
     const remaining = originalStock - allocatedQty;
     
-    if (allocatedQty > 0) {
-      currentStockSpan.style.display = 'none';
-      remainingStockSpan.style.display = 'inline';
-      remainingStockSpan.innerHTML = `<strong>${remaining} remaining</strong> (${allocatedQty} allocated)`;
-      remainingStockSpan.className = remaining > 0 ? 'text-primary' : 'text-danger';
-    } else {
-      currentStockSpan.style.display = 'inline';
-      remainingStockSpan.style.display = 'none';
+    if (currentStockSpan && remainingStockSpan) {
+      if (allocatedQty > 0) {
+        currentStockSpan.style.display = 'none';
+        remainingStockSpan.style.display = 'inline';
+        remainingStockSpan.innerHTML = `<strong>${remaining} remaining</strong> (${allocatedQty} allocated)`;
+        remainingStockSpan.className = remaining >= 0 ? 'text-primary' : 'text-danger';
+      } else {
+        currentStockSpan.style.display = 'inline';
+        remainingStockSpan.style.display = 'none';
+      }
     }
   });
   
@@ -255,12 +267,21 @@ function updateProgressBar(itemId, total, requestedQty) {
   const progressBar = document.querySelector(`.progress-bar-${itemId}`);
   const validationMsg = document.querySelector(`.validation-message-${itemId}`);
   
+  // Safety check - ensure elements exist
+  if (!totalBadge || !progressBar || !validationMsg) {
+    console.warn(`Missing UI elements for item ${itemId}`);
+    return;
+  }
+  
+  // Update total badge
   totalBadge.textContent = total;
   
+  // Calculate and update progress bar
   const percentage = requestedQty > 0 ? Math.min((total / requestedQty) * 100, 100) : 0;
   progressBar.style.width = percentage + '%';
   progressBar.textContent = Math.round(percentage) + '%';
   
+  // Update styling based on allocation status
   if (total === 0) {
     totalBadge.className = 'total-allocated-' + itemId + ' badge bg-secondary fs-6 ms-2';
     progressBar.className = 'progress-bar-' + itemId + ' progress-bar bg-secondary';
@@ -325,15 +346,19 @@ function clearItemAllocations(itemId) {
       input.value = 0;
     }
   });
-  const requestedQty = itemStockData[itemId].requested;
+  
+  // Get requested qty from itemStockData or fallback to 0
+  const requestedQty = (itemStockData[itemId] && itemStockData[itemId].requested) || 0;
   validateAndUpdate(itemId, requestedQty);
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
+  console.log('Initializing package fulfillment form with live updates');
   {% for pkg_item in package.items %}
   validateAndUpdate('{{ pkg_item.id }}', {{ pkg_item.requested_qty }});
   {% endfor %}
+  console.log('Package fulfillment form initialized successfully');
 });
 </script>
 {% endblock %}
