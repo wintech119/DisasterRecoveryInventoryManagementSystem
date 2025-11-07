@@ -2,7 +2,7 @@
 {% block content %}
 <h3>Transactions</h3>
 <table class="table table-striped">
-  <thead><tr><th>When</th><th>Type</th><th>Item</th><th>Qty</th><th>Unit</th><th>Location</th><th>Donor</th><th>Beneficiary</th><th>Distributor</th><th>Notes</th></tr></thead>
+  <thead><tr><th>When</th><th>Type</th><th>Item</th><th>Qty</th><th>Unit</th><th>Depot</th><th>Donor</th><th>Beneficiary</th><th>Distributor</th><th>Notes</th></tr></thead>
   <tbody>
   {% for t in rows %}
     <tr>
@@ -13,7 +13,7 @@
       <td>{{ t.item.name }}</td>
       <td>{{ t.qty }}</td>
       <td>{{ t.item.unit }}</td>
-      <td>{{ t.location.name if t.location else "—" }}</td>
+      <td>{{ t.depot.name if t.depot else "—" }}</td>
       <td>{{ t.donor.name if t.donor else "—" }}</td>
       <td>{{ t.beneficiary.name if t.beneficiary else "—" }}</td>
       <td>{{ t.distributor.name if t.distributor else "—" }}</td>

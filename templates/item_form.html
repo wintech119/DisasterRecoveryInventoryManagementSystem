@@ -41,12 +41,11 @@
     <div class="col-md-3">
       <label class="form-label">Min Qty</label>
       <input class="form-control" type="number" name="min_qty" value="{{ item.min_qty if item else 0 }}">
+      <small class="text-muted">Low stock threshold</small>
     </div>
-    <div class="col-md-3">
-      <label class="form-label">Expiry Date</label>
-      <input class="form-control" type="date" name="expiry_date" value="{{ item.expiry_date.isoformat() if item and item.expiry_date else "" }}">
-      <small class="text-muted">For perishable items</small>
-    </div>
+  </div>
+  
+  <div class="row g-3 mb-3">
     <div class="col-12">
       <label class="form-label">Storage Requirements</label>
       <select class="form-select" name="storage_requirements">

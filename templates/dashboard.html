@@ -257,7 +257,7 @@
   <div class="col-12 col-lg-6">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-geo-fill me-2"></i>Stock by Location</span>
+        <span><i class="bi bi-geo-fill me-2"></i>Stock by Depot</span>
         <a class="btn btn-sm btn-primary d-none d-md-inline-block" href="{{ url_for('locations') }}">Manage Locations</a>
       </div>
       <div class="card-body p-0">
@@ -265,7 +265,7 @@
           <table class="table table-hover mb-0">
             <thead class="table-light">
               <tr>
-                <th>Location</th>
+                <th>Depot</th>
                 <th class="text-end">Total Units</th>
                 <th class="text-end"></th>
               </tr>
@@ -379,7 +379,7 @@
               <td><strong>{{ exp_item.item.name }}</strong></td>
               <td class="d-none d-md-table-cell"><small>{{ exp_item.item.sku }}</small></td>
               <td class="d-none d-lg-table-cell">{{ exp_item.item.category or '—' }}</td>
-              <td>{{ exp_item.item.expiry_date.strftime("%Y-%m-%d") }}</td>
+              <td>{{ exp_item.transaction.expiry_date.strftime("%Y-%m-%d") }}</td>
               <td class="text-center">
                 <strong class="{% if exp_item.urgency == 'critical' %}text-danger{% elif exp_item.urgency == 'warning' %}text-warning{% endif %}">
                   {{ exp_item.days_remaining }}
@@ -396,7 +396,7 @@
               <td><strong>{{ exp_item.item.name }}</strong></td>
               <td class="d-none d-md-table-cell"><small>{{ exp_item.item.sku }}</small></td>
               <td class="d-none d-lg-table-cell">{{ exp_item.item.category or '—' }}</td>
-              <td>{{ exp_item.item.expiry_date.strftime("%Y-%m-%d") }}</td>
+              <td>{{ exp_item.transaction.expiry_date.strftime("%Y-%m-%d") }}</td>
               <td class="text-center">
                 <strong class="{% if exp_item.urgency == 'critical' %}text-danger{% elif exp_item.urgency == 'warning' %}text-warning{% endif %}">
                   {{ exp_item.days_remaining }}
@@ -430,16 +430,16 @@
             <thead class="table-light">
               <tr>
                 <th>Item</th>
-                <th class="d-none d-md-table-cell">Location</th>
+                <th class="d-none d-md-table-cell">Depot</th>
                 <th class="text-end">Stock</th>
                 <th class="text-end d-none d-sm-table-cell">Min</th>
               </tr>
             </thead>
             <tbody>
-            {% for item, location, stock in low_stock_preview %}
+            {% for item, depot, stock in low_stock_preview %}
               <tr>
                 <td><a href="{{ url_for('item_edit', item_sku=item.sku) }}">{{ item.name }}</a></td>
-                <td class="d-none d-md-table-cell">{{ location.name }}</td>
+                <td class="d-none d-md-table-cell">{{ depot.name }}</td>
                 <td class="text-end text-danger"><strong>{{ stock or 0 }} {{ item.unit }}</strong></td>
                 <td class="text-end d-none d-sm-table-cell">{{ item.min_qty }} {{ item.unit }}</td>
               </tr>
@@ -449,10 +449,10 @@
             </tbody>
             {% if low_stock_full|length > 5 %}
             <tbody class="collapse" id="collapseLowStock">
-            {% for item, location, stock in low_stock_full[5:] %}
+            {% for item, depot, stock in low_stock_full[5:] %}
               <tr>
                 <td><a href="{{ url_for('item_edit', item_sku=item.sku) }}">{{ item.name }}</a></td>
-                <td class="d-none d-md-table-cell">{{ location.name }}</td>
+                <td class="d-none d-md-table-cell">{{ depot.name }}</td>
                 <td class="text-end text-danger"><strong>{{ stock or 0 }} {{ item.unit }}</strong></td>
                 <td class="text-end d-none d-sm-table-cell">{{ item.min_qty }} {{ item.unit }}</td>
               </tr>

@@ -79,9 +79,9 @@
             <li class="nav-item"><a class="nav-link" href="{{ url_for('items') }}"><i class="bi bi-box-seam me-1"></i>Items</a></li>
           {% endif %}
           
-          {# Locations - visible to managers and warehouse staff #}
+          {# Depots - visible to managers and warehouse staff #}
           {% if current_user.role in ['ADMIN', 'INVENTORY_MANAGER', 'WAREHOUSE_STAFF'] %}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('locations') }}"><i class="bi bi-geo-alt me-1"></i>Locations</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('depots') }}"><i class="bi bi-geo-alt me-1"></i>Depots</a></li>
           {% endif %}
           
           {# Distributors - visible to managers #}

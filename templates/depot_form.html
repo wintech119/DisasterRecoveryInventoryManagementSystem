@@ -2,19 +2,19 @@
 {% block content %}
 <div class="row">
   <div class="col-md-6">
-    <h3>{% if location %}Edit Location{% else %}New Location{% endif %}</h3>
+    <h3>{% if depot %}Edit Depot{% else %}New Depot{% endif %}</h3>
     
     <form method="post">
       <div class="mb-3">
-        <label class="form-label">Location Name *</label>
+        <label class="form-label">Depot Name *</label>
         <input class="form-control" type="text" name="name" 
-               value="{{ location.name if location else '' }}" 
+               value="{{ depot.name if depot else '' }}" 
                placeholder="e.g., St. Andrew Depot" required>
       </div>
       
       <div class="d-flex gap-2">
         <button class="btn btn-primary" type="submit">
-          {% if location %}Update{% else %}Create{% endif %}
+          {% if depot %}Update{% else %}Create{% endif %}
         </button>
         <a class="btn btn-outline-secondary" href="{{ url_for('locations') }}">Cancel</a>
       </div>

@@ -21,13 +21,18 @@
       <input class="form-control" type="number" name="qty" required min="1">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Location *</label>
+      <label class="form-label">Depot *</label>
       <select class="form-select" name="location_id" required>
-        <option value="">Select location...</option>
+        <option value="">Select depot...</option>
         {% for loc in locations %}
           <option value="{{ loc.id }}">{{ loc.name }}</option>
         {% endfor %}
       </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Expiry Date</label>
+      <input class="form-control" type="date" name="expiry_date">
+      <small class="text-muted">For perishable items</small>
     </div>
     <div class="col-md-6">
       <label class="form-label">Donor (name/org)</label>

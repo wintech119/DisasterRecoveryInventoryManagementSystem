@@ -19,7 +19,8 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 # ---------- Models ----------
-class Location(db.Model):
+class Depot(db.Model):
+    __tablename__ = 'location'  # Keep existing table name for backward compatibility
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), unique=True, nullable=False)  # e.g., Parish depot / shelter
 
@@ -30,7 +31,6 @@ class Item(db.Model):
     unit = db.Column(db.String(32), nullable=False, default="unit")        # Unit of measure: e.g., pcs, kg, L, boxes
     min_qty = db.Column(db.Integer, nullable=False, default=0)             # threshold for "low stock"
     description = db.Column(db.Text, nullable=True)
-    expiry_date = db.Column(db.Date, nullable=True)                        # Expiry date for perishable items
     storage_requirements = db.Column(db.Text, nullable=True)               # e.g., "Keep refrigerated", "Store in cool dry place"
     attachment_filename = db.Column(db.String(255), nullable=True)         # Original filename of uploaded document/image
     attachment_path = db.Column(db.String(500), nullable=True)             # Storage path (local or S3/Nexus URL in future)
@@ -79,12 +79,13 @@ class Transaction(db.Model):
     beneficiary_id = db.Column(db.Integer, db.ForeignKey("beneficiary.id"), nullable=True)
     distributor_id = db.Column(db.Integer, db.ForeignKey("distributor.id"), nullable=True)
     event_id = db.Column(db.Integer, db.ForeignKey("disaster_event.id"), nullable=True)
+    expiry_date = db.Column(db.Date, nullable=True)  # Expiry date for this batch of items
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(200), nullable=True)  # User who created the transaction (for audit)
 
     item = db.relationship("Item")
-    location = db.relationship("Location")
+    location = db.relationship("Depot")
     donor = db.relationship("Donor")
     beneficiary = db.relationship("Beneficiary")
     distributor = db.relationship("Distributor")
@@ -101,7 +102,7 @@ class User(UserMixin, db.Model):
     last_login_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     
-    assigned_location = db.relationship("Location")
+    assigned_location = db.relationship("Depot")
     
     def set_password(self, password):
         """Hash and set the user's password"""
@@ -138,7 +139,7 @@ class DistributionPackage(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     distributor = db.relationship("Distributor")
-    assigned_location = db.relationship("Location")
+    assigned_location = db.relationship("Depot")
     event = db.relationship("DisasterEvent")
     items = db.relationship("PackageItem", back_populates="package", cascade="all, delete-orphan")
     status_history = db.relationship("PackageStatusHistory", back_populates="package", cascade="all, delete-orphan")
@@ -267,9 +268,9 @@ def get_stock_by_location():
 
 def ensure_seed_data():
     # Seed locations
-    if Location.query.count() == 0:
+    if Depot.query.count() == 0:
         for name in ["Kingston & St. Andrew Depot", "St. Catherine Depot", "St. James Depot", "Clarendon Depot"]:
-            db.session.add(Location(name=name))
+            db.session.add(Depot(name=name))
     # Seed categories via a sample item (not necessary, categories are free text)
     db.session.commit()
 
@@ -299,7 +300,7 @@ def check_stock_availability(items_requested):
         }
     """
     stock_map = get_stock_by_location()
-    locations = Location.query.all()
+    locations = Depot.query.all()
     
     result_items = []
     is_partial = False
@@ -352,14 +353,14 @@ def assign_nearest_warehouse(distributor):
     Uses GPS coordinates if available, otherwise falls back to parish matching.
     
     Returns:
-        Location object or None
+        Depot object or None
     """
-    locations = Location.query.all()
+    locations = Depot.query.all()
     if not locations:
         return None
     
     # Method 1: Use GPS coordinates if both distributor and locations have them
-    # (Future enhancement: add latitude/longitude to Location model for precise matching)
+    # (Future enhancement: add latitude/longitude to Depot model for precise matching)
     # For now, we'll use parish-based matching
     
     # Method 2: Parish matching (if distributor has parish field)
@@ -481,7 +482,7 @@ def dashboard():
     
     # KPIs - Inventory
     total_items = Item.query.count()
-    locations = Location.query.order_by(Location.name.asc()).all()
+    locations = Depot.query.order_by(Depot.name.asc()).all()
     
     # KPIs - Operations
     total_donors = Donor.query.count()
@@ -566,22 +567,24 @@ def dashboard():
     event_stats_preview = event_stats_all[:PREVIEW_LIMIT]
     event_stats_full = event_stats_all
     
-    # Expiring items (within next 30 days)
+    # Expiring items (from transactions with expiry dates within next 30 days)
     from datetime import date, timedelta
     today = date.today()
     thirty_days = today + timedelta(days=30)
-    expiring_items_query = Item.query.filter(
-        Item.expiry_date.isnot(None),
-        Item.expiry_date <= thirty_days,
-        Item.expiry_date >= today
-    ).order_by(Item.expiry_date.asc()).all()
+    expiring_transactions_query = Transaction.query.filter(
+        Transaction.ttype == "IN",
+        Transaction.expiry_date.isnot(None),
+        Transaction.expiry_date <= thirty_days,
+        Transaction.expiry_date >= today
+    ).order_by(Transaction.expiry_date.asc()).all()
     
-    # Calculate days remaining for each expiring item
+    # Calculate days remaining for each expiring batch
     expiring_items_all = []
-    for item in expiring_items_query:
-        days_remaining = (item.expiry_date - today).days
+    for tx in expiring_transactions_query:
+        days_remaining = (tx.expiry_date - today).days
         expiring_items_all.append({
-            'item': item,
+            'item': tx.item,
+            'transaction': tx,
             'days_remaining': days_remaining,
             'urgency': 'critical' if days_remaining <= 7 else 'warning' if days_remaining <= 14 else 'normal'
         })
@@ -645,7 +648,7 @@ def items():
     
     # Get stock by location for all items
     stock_map = get_stock_by_location()
-    locations = Location.query.order_by(Location.name.asc()).all()
+    locations = Depot.query.order_by(Depot.name.asc()).all()
     
     return render_template("items.html", items=all_items, q=q, cat=cat, 
                           locations=locations, stock_map=stock_map)
@@ -661,15 +664,6 @@ def item_new():
         min_qty = int(request.form.get("min_qty", "0") or 0)
         description = request.form.get("description", "").strip() or None
         storage_requirements = request.form.get("storage_requirements", "").strip() or None
-        
-        # Parse expiry date
-        expiry_date = None
-        expiry_str = request.form.get("expiry_date", "").strip()
-        if expiry_str:
-            try:
-                expiry_date = dt.strptime(expiry_str, "%Y-%m-%d").date()
-            except:
-                pass
 
         # Duplicate suggestion by normalized name+category+unit
         norm = normalize_name(name)
@@ -681,7 +675,7 @@ def item_new():
         # Generate SKU
         sku = generate_sku()
         item = Item(sku=sku, name=name, category=category, unit=unit, min_qty=min_qty, 
-                   description=description, expiry_date=expiry_date, storage_requirements=storage_requirements)
+                   description=description, storage_requirements=storage_requirements)
         
         # Handle file upload
         if "attachment" in request.files:
@@ -719,16 +713,6 @@ def item_edit(item_sku):
         item.description = request.form.get("description", "").strip() or None
         item.storage_requirements = request.form.get("storage_requirements", "").strip() or None
         
-        # Parse expiry date
-        expiry_str = request.form.get("expiry_date", "").strip()
-        if expiry_str:
-            try:
-                item.expiry_date = dt.strptime(expiry_str, "%Y-%m-%d").date()
-            except:
-                item.expiry_date = None
-        else:
-            item.expiry_date = None
-        
         # Handle file upload
         if "attachment" in request.files:
             file = request.files["attachment"]
@@ -759,20 +743,21 @@ def item_edit(item_sku):
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
 def intake():
     items = Item.query.order_by(Item.name.asc()).all()
-    locations = Location.query.order_by(Location.name.asc()).all()
+    locations = Depot.query.order_by(Depot.name.asc()).all()
     events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
     if request.method == "POST":
         item_sku = request.form["item_sku"]
         qty = int(request.form["qty"])
         location_id = int(request.form["location_id"]) if request.form.get("location_id") else None
         
-        # Location is required for inventory tracking
+        # Depot is required for inventory tracking
         if not location_id:
             flash("Please select a location for intake.", "danger")
             return redirect(url_for("intake"))
         
         donor_name = request.form.get("donor_name", "").strip() or None
         event_id = int(request.form["event_id"]) if request.form.get("event_id") else None
+        expiry_date_str = request.form.get("expiry_date", "").strip() or None
         
         # Disaster event is required for all intake operations
         if not event_id:
@@ -787,9 +772,16 @@ def intake():
                 db.session.add(donor)
                 db.session.flush()
         notes = request.form.get("notes", "").strip() or None
+        
+        # Parse expiry date
+        expiry_date = None
+        if expiry_date_str:
+            from datetime import datetime as dt
+            expiry_date = dt.strptime(expiry_date_str, "%Y-%m-%d").date()
 
         tx = Transaction(item_sku=item_sku, ttype="IN", qty=qty, location_id=location_id,
-                         donor_id=donor.id if donor else None, event_id=event_id, notes=notes,
+                         donor_id=donor.id if donor else None, event_id=event_id, 
+                         expiry_date=expiry_date, notes=notes,
                          created_by=current_user.full_name)
         db.session.add(tx)
         db.session.commit()
@@ -801,7 +793,7 @@ def intake():
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF, ROLE_FIELD_PERSONNEL)
 def distribute():
     items = Item.query.order_by(Item.name.asc()).all()
-    locations = Location.query.order_by(Location.name.asc()).all()
+    locations = Depot.query.order_by(Depot.name.asc()).all()
     distributors = Distributor.query.order_by(Distributor.name.asc()).all()
     events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
     if request.method == "POST":
@@ -827,7 +819,7 @@ def distribute():
             stock_map = get_stock_by_location()
             location_stock = stock_map.get((item_sku, location_id), 0)
             if location_stock < qty:
-                loc_name = Location.query.get(location_id).name
+                loc_name = Depot.query.get(location_id).name
                 flash(f"Insufficient stock at {loc_name}. Available: {location_stock}, Requested: {qty}", "danger")
                 return redirect(url_for("distribute"))
         else:
@@ -853,7 +845,7 @@ def transactions():
 @app.route("/reports/stock")
 @login_required
 def report_stock():
-    locations = Location.query.order_by(Location.name.asc()).all()
+    locations = Depot.query.order_by(Depot.name.asc()).all()
     items = Item.query.order_by(Item.category.asc(), Item.name.asc()).all()
     stock_map = get_stock_by_location()
     
@@ -909,10 +901,10 @@ def import_items():
         return redirect(url_for("items"))
     return render_template("import_items.html")
 
-@app.route("/locations")
+@app.route("/depots")
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
-def locations():
-    locs = Location.query.order_by(Location.name.asc()).all()
+def depots():
+    locs = Depot.query.order_by(Depot.name.asc()).all()
     # Get stock counts per location
     stock_by_loc = {}
     for loc in locs:
@@ -920,56 +912,56 @@ def locations():
             func.sum(case((Transaction.ttype == "IN", Transaction.qty), else_=-Transaction.qty))
         ).filter(Transaction.location_id == loc.id).scalar()
         stock_by_loc[loc.id] = stock_rows or 0
-    return render_template("locations.html", locations=locs, stock_by_loc=stock_by_loc)
+    return render_template("depots.html", locations=locs, stock_by_loc=stock_by_loc)
 
 @app.route("/locations/new", methods=["GET", "POST"])
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
-def location_new():
+def depot_new():
     if request.method == "POST":
         name = request.form["name"].strip()
         if not name:
-            flash("Location name is required.", "danger")
-            return redirect(url_for("location_new"))
+            flash("Depot name is required.", "danger")
+            return redirect(url_for("depot_new"))
         
         # Check for duplicates
-        existing = Location.query.filter_by(name=name).first()
+        existing = Depot.query.filter_by(name=name).first()
         if existing:
-            flash(f"Location '{name}' already exists.", "warning")
-            return redirect(url_for("locations"))
+            flash(f"Depot '{name}' already exists.", "warning")
+            return redirect(url_for("depots"))
         
-        location = Location(name=name)
+        location = Depot(name=name)
         db.session.add(location)
         db.session.commit()
-        flash(f"Location '{name}' created successfully.", "success")
-        return redirect(url_for("locations"))
-    return render_template("location_form.html", location=None)
+        flash(f"Depot '{name}' created successfully.", "success")
+        return redirect(url_for("depots"))
+    return render_template("depot_form.html", location=None)
 
 @app.route("/locations/<int:location_id>/edit", methods=["GET", "POST"])
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
-def location_edit(location_id):
-    location = Location.query.get_or_404(location_id)
+def depot_edit(location_id):
+    location = Depot.query.get_or_404(location_id)
     if request.method == "POST":
         name = request.form["name"].strip()
         if not name:
-            flash("Location name is required.", "danger")
-            return redirect(url_for("location_edit", location_id=location_id))
+            flash("Depot name is required.", "danger")
+            return redirect(url_for("depot_edit", location_id=location_id))
         
         # Check for duplicates (excluding current location)
-        existing = Location.query.filter(Location.name == name, Location.id != location_id).first()
+        existing = Depot.query.filter(Depot.name == name, Depot.id != location_id).first()
         if existing:
-            flash(f"Location '{name}' already exists.", "warning")
-            return redirect(url_for("location_edit", location_id=location_id))
+            flash(f"Depot '{name}' already exists.", "warning")
+            return redirect(url_for("depot_edit", location_id=location_id))
         
         location.name = name
         db.session.commit()
-        flash(f"Location updated successfully.", "success")
-        return redirect(url_for("locations"))
-    return render_template("location_form.html", location=location)
+        flash(f"Depot updated successfully.", "success")
+        return redirect(url_for("depots"))
+    return render_template("depot_form.html", location=location)
 
 @app.route("/locations/<int:location_id>/inventory")
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER, ROLE_WAREHOUSE_STAFF)
-def location_inventory(location_id):
-    location = Location.query.get_or_404(location_id)
+def depot_inventory(location_id):
+    location = Depot.query.get_or_404(location_id)
     
     # Get all items with stock at this location
     stock_expr = func.sum(
@@ -982,7 +974,7 @@ def location_inventory(location_id):
         Transaction.location_id == location_id
     ).group_by(Item.sku).order_by(Item.category.asc(), Item.name.asc()).all()
     
-    return render_template("location_inventory.html", location=location, rows=rows)
+    return render_template("depot_inventory.html", location=location, rows=rows)
 
 @app.route("/distributors")
 @role_required(ROLE_ADMIN, ROLE_INVENTORY_MANAGER)
@@ -1213,7 +1205,7 @@ def package_details(package_id):
     
     # Get stock availability for display
     stock_map = get_stock_by_location()
-    locations = Location.query.all()
+    locations = Depot.query.all()
     
     # Calculate current stock for each item
     for pkg_item in package.items:
@@ -1712,7 +1704,7 @@ def create_user():
     # Optional: assign location for warehouse staff
     assigned_location_id = None
     if role == ROLE_WAREHOUSE_STAFF:
-        locations = Location.query.all()
+        locations = Depot.query.all()
         if locations:
             print("\nAvailable locations:")
             for idx, loc in enumerate(locations, 1):
