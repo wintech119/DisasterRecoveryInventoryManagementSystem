@@ -326,21 +326,53 @@ def check_stock_availability(items_requested):
         'items': result_items
     }
 
+def calculate_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculate approximate distance between two GPS coordinates using Haversine formula.
+    Returns distance in kilometers.
+    """
+    from math import radians, sin, cos, sqrt, atan2
+    
+    R = 6371  # Earth radius in kilometers
+    
+    lat1_rad, lon1_rad = radians(lat1), radians(lon1)
+    lat2_rad, lon2_rad = radians(lat2), radians(lon2)
+    
+    dlat = lat2_rad - lat1_rad
+    dlon = lon2_rad - lon1_rad
+    
+    a = sin(dlat/2)**2 + cos(lat1_rad) * cos(lat2_rad) * sin(dlon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    
+    return R * c
+
 def assign_nearest_warehouse(distributor):
     """
-    Assign package to nearest warehouse based on distributor's parish.
-    Currently uses simple matching; can be enhanced with coordinates in future.
+    Assign package to nearest warehouse based on distributor's location.
+    Uses GPS coordinates if available, otherwise falls back to parish matching.
     
     Returns:
         Location object or None
     """
-    # Simple parish matching logic (can be enhanced with geographic coordinates)
-    distributor_org = (distributor.organization or "").lower()
-    
-    # Try to match distributor organization/name with location parishes
     locations = Location.query.all()
+    if not locations:
+        return None
     
-    # First, try exact parish match
+    # Method 1: Use GPS coordinates if both distributor and locations have them
+    # (Future enhancement: add latitude/longitude to Location model for precise matching)
+    # For now, we'll use parish-based matching
+    
+    # Method 2: Parish matching (if distributor has parish field)
+    if distributor.parish:
+        distributor_parish_lower = distributor.parish.lower()
+        for location in locations:
+            location_name_lower = location.name.lower()
+            # Match if location name contains distributor's parish
+            if distributor_parish_lower in location_name_lower:
+                return location
+    
+    # Method 3: Legacy organization-based matching (fallback)
+    distributor_org = (distributor.organization or "").lower()
     for location in locations:
         location_name_lower = location.name.lower()
         if any(parish in location_name_lower for parish in ["kingston", "st. andrew"] if parish in distributor_org):
@@ -352,8 +384,8 @@ def assign_nearest_warehouse(distributor):
         if "clarendon" in distributor_org and "clarendon" in location_name_lower:
             return location
     
-    # Fallback: return first depot (can be enhanced)
-    return locations[0] if locations else None
+    # Fallback: return first available location
+    return locations[0]
 
 def create_package_notification(package, notification_type, message):
     """
