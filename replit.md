@@ -33,7 +33,21 @@ The system implements a comprehensive distribution package workflow that enables
 
 Distributors can review partial fulfillment notifications and either accept (allowing the package to proceed to approval) or reject (triggering a revision request). All distributor responses are tracked with timestamps and notes for audit purposes.
 
-**Automatic Warehouse Assignment**: Approved packages are automatically assigned to the nearest warehouse or outpost based on the distributor's parish or geographic coordinates, optimizing logistics and reducing delivery time.
+**Distributor Location Tracking**: Distributors now include location information (parish, address, GPS coordinates) to enable accurate warehouse assignment. This data is captured during distributor profile creation or updates.
+
+**Automatic Warehouse Assignment**: Approved packages are automatically assigned to the nearest warehouse or outpost based on the distributor's parish or geographic coordinates, optimizing logistics and reducing delivery time. The system uses a priority-based matching system:
+1. Parish matching (primary method) - matches distributor parish with location name
+2. Legacy organization-based matching (fallback for existing data)
+3. GPS-based distance calculation (future enhancement when locations have coordinates)
+
+**Distributor Self-Service Portal**: Distributors with login accounts can now create their own needs lists through a dedicated self-service interface. Key features include:
+- **My Needs Lists** dashboard showing all submitted requests and their status
+- Ability to create needs lists directly without inventory manager intermediary
+- In-app notifications for partial fulfillment alerts
+- Response interface to accept or reject partial fulfillment
+- Complete visibility into package status throughout the workflow
+
+This self-service capability significantly reduces manual data entry for inventory managers while maintaining complete audit trails and approval workflows.
 
 **Transaction Generation**: Upon approval, the system automatically generates OUT transactions for all package items, updating inventory levels at the assigned warehouse. This ensures inventory accuracy and maintains the complete audit trail.
 
@@ -63,7 +77,15 @@ Stock levels are dynamically aggregated on-demand from transaction records, summ
 The dashboard provides a comprehensive overview with KPIs (total items, total units, low stock items), inventory by category, stock by location, low stock alerts, recent transactions, expiring items alerts, activity by disaster event, operations metrics, and transaction analytics.
 
 ### Authentication
-The system implements Flask-Login-based authentication with role-based access control (RBAC) supporting six distinct user roles: ADMIN, INVENTORY_MANAGER, WAREHOUSE_STAFF, FIELD_PERSONNEL, EXECUTIVE, and AUDITOR. Features include secure password hashing (Werkzeug), session management, role-aware navigation, automatic population of `created_by` audit fields, and CLI commands for user management. Route protection is enforced using `@login_required` and `@role_required` decorators. The architecture also includes a plan for future integration with Keycloak and LDAP for enterprise authentication using Authlib.
+The system implements Flask-Login-based authentication with role-based access control (RBAC) supporting seven distinct user roles: ADMIN, INVENTORY_MANAGER, WAREHOUSE_STAFF, FIELD_PERSONNEL, EXECUTIVE, AUDITOR, and DISTRIBUTOR. Features include secure password hashing (Werkzeug), session management, role-aware navigation, automatic population of `created_by` audit fields, and CLI commands for user management. Route protection is enforced using `@login_required` and `@role_required` decorators.
+
+**Role-Specific Capabilities**:
+- **DISTRIBUTOR**: Access to self-service needs list creation, package tracking, and partial fulfillment response interface. Linked to distributor profile via `user_id`.
+- **INVENTORY_MANAGER**: Full access to package management, distributor management, and approval workflows. Dashboard shows pending needs lists submitted by distributors.
+- **WAREHOUSE_STAFF**: Can dispatch and deliver packages, manage stock at assigned locations.
+- **ADMIN**: Full system access including user management and all administrative functions.
+
+The architecture also includes a plan for future integration with Keycloak and LDAP for enterprise authentication using Authlib.
 
 ### File Storage and Attachments
 The system supports file attachments for inventory items (e.g., product photos, specifications). Currently, files are stored locally in `/uploads/items/` with UUID-based secure filenames. A modular `storage_service.py` with a `StorageBackend` abstraction layer is in place to facilitate future migration to cloud storage solutions like AWS S3 or Replit Nexus buckets without application code changes. File uploads are validated for type and size, and protected by authentication.
