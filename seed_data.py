@@ -42,10 +42,16 @@ def seed_users():
             role="ADMIN"
         ),
         User(
-            email="manager@gov.jm",
+            email="logistics.manager@gov.jm",
             full_name="Jane Thompson",
-            password_hash=generate_password_hash("manager123"),
-            role="INVENTORY_MANAGER"
+            password_hash=generate_password_hash("logmanager123"),
+            role="LOGISTICS_MANAGER"
+        ),
+        User(
+            email="logistics.officer@gov.jm",
+            full_name="Mark Davis",
+            password_hash=generate_password_hash("logofficer123"),
+            role="LOGISTICS_OFFICER"
         ),
         User(
             email="warehouse@gov.jm",
@@ -71,6 +77,12 @@ def seed_users():
             full_name="Patricia Davis",
             password_hash=generate_password_hash("audit123"),
             role="AUDITOR"
+        ),
+        User(
+            email="distributor@gov.jm",
+            full_name="Carlos Martinez",
+            password_hash=generate_password_hash("distributor123"),
+            role="DISTRIBUTOR"
         ),
     ]
     
@@ -409,12 +421,14 @@ def main():
     print("=" * 60)
     print("\nDemo Login Credentials:")
     print("-" * 60)
-    print("Administrator:      admin@gov.jm / admin123")
-    print("Inventory Manager:  manager@gov.jm / manager123")
-    print("Warehouse Staff:    warehouse@gov.jm / warehouse123")
-    print("Field Personnel:    field@gov.jm / field123")
-    print("Executive:          executive@gov.jm / exec123")
-    print("Auditor:            auditor@gov.jm / audit123")
+    print("Administrator:       admin@gov.jm / admin123")
+    print("Logistics Manager:   logistics.manager@gov.jm / logmanager123")
+    print("Logistics Officer:   logistics.officer@gov.jm / logofficer123")
+    print("Warehouse Staff:     warehouse@gov.jm / warehouse123")
+    print("Field Personnel:     field@gov.jm / field123")
+    print("Executive:           executive@gov.jm / exec123")
+    print("Auditor:             auditor@gov.jm / audit123")
+    print("Distributor:         distributor@gov.jm / distributor123")
     print("=" * 60)
 
 if __name__ == "__main__":

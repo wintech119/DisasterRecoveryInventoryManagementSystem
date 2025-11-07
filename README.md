@@ -149,11 +149,14 @@ For testing purposes, the following accounts are available:
 
 | Email | Password | Role |
 |-------|----------|------|
-| admin@gov.jm | Admin123! | Administrator |
-| manager@gov.jm | Manager123! | Inventory Manager |
-| warehouse@gov.jm | Warehouse123! | Warehouse Staff |
-| executive@gov.jm | Executive123! | Executive |
-| field@gov.jm | Field123! | Field Personnel |
+| admin@gov.jm | admin123 | Administrator |
+| logistics.manager@gov.jm | logmanager123 | Logistics Manager |
+| logistics.officer@gov.jm | logofficer123 | Logistics Officer |
+| warehouse@gov.jm | warehouse123 | Warehouse Staff |
+| field@gov.jm | field123 | Field Personnel |
+| executive@gov.jm | exec123 | Executive |
+| auditor@gov.jm | audit123 | Auditor |
+| distributor@gov.jm | distributor123 | Distributor |
 
 **⚠️ IMPORTANT**: Delete or change these passwords before production deployment!
 
