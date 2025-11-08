@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Needs Lists for Review{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-12">
+      <h2 class="mb-4"><i class="bi bi-clipboard-check me-2"></i>Needs Lists for Review</h2>
+
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>{{ user_depot.name }}</strong> - Review needs lists submitted by AGENCY hubs.
+      </div>
+
+      <ul class="nav nav-tabs mb-3" id="needsListTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
+            <i class="bi bi-hourglass-split me-1"></i>Pending Review
+            {% if pending_lists %}
+              <span class="badge bg-primary">{{ pending_lists|length }}</span>
+            {% endif %}
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="reviewed-tab" data-bs-toggle="tab" data-bs-target="#reviewed" type="button" role="tab">
+            <i class="bi bi-check-circle me-1"></i>Reviewed
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content" id="needsListTabContent">
+        <div class="tab-pane fade show active" id="pending" role="tabpanel">
+          {% if pending_lists %}
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>List Number</th>
+                      <th>Agency Hub</th>
+                      <th>Priority</th>
+                      <th>Items</th>
+                      <th>Submitted</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for needs_list in pending_lists %}
+                    <tr>
+                      <td>
+                        <a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}" class="text-decoration-none">
+                          <strong>{{ needs_list.list_number }}</strong>
+                        </a>
+                      </td>
+                      <td>{{ needs_list.agency_hub.name }}</td>
+                      <td>
+                        {% if needs_list.priority == 'Urgent' %}
+                          <span class="badge bg-danger">Urgent</span>
+                        {% elif needs_list.priority == 'High' %}
+                          <span class="badge bg-warning text-dark">High</span>
+                        {% elif needs_list.priority == 'Medium' %}
+                          <span class="badge bg-info text-dark">Medium</span>
+                        {% else %}
+                          <span class="badge bg-secondary">Low</span>
+                        {% endif %}
+                      </td>
+                      <td>{{ needs_list.items|length }} items</td>
+                      <td>{{ needs_list.submitted_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                      <td>
+                        <a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}" class="btn btn-sm btn-outline-primary">
+                          <i class="bi bi-eye me-1"></i>Review
+                        </a>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {% else %}
+            <div class="alert alert-secondary text-center">
+              <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+              <p class="mb-0">No pending needs lists to review.</p>
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="reviewed" role="tabpanel">
+          {% if reviewed_lists %}
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>List Number</th>
+                      <th>Agency Hub</th>
+                      <th>Priority</th>
+                      <th>Status</th>
+                      <th>Reviewed By</th>
+                      <th>Reviewed</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for needs_list in reviewed_lists %}
+                    <tr>
+                      <td>
+                        <a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}" class="text-decoration-none">
+                          <strong>{{ needs_list.list_number }}</strong>
+                        </a>
+                      </td>
+                      <td>{{ needs_list.agency_hub.name }}</td>
+                      <td>
+                        {% if needs_list.priority == 'Urgent' %}
+                          <span class="badge bg-danger">Urgent</span>
+                        {% elif needs_list.priority == 'High' %}
+                          <span class="badge bg-warning text-dark">High</span>
+                        {% elif needs_list.priority == 'Medium' %}
+                          <span class="badge bg-info text-dark">Medium</span>
+                        {% else %}
+                          <span class="badge bg-secondary">Low</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if needs_list.status == 'Under Review' %}
+                          <span class="badge bg-warning text-dark">Under Review</span>
+                        {% elif needs_list.status == 'Approved' %}
+                          <span class="badge bg-success">Approved</span>
+                        {% elif needs_list.status == 'Rejected' %}
+                          <span class="badge bg-danger">Rejected</span>
+                        {% endif %}
+                      </td>
+                      <td>{{ needs_list.reviewed_by }}</td>
+                      <td>{{ needs_list.reviewed_at.strftime('%Y-%m-%d %H:%M') if needs_list.reviewed_at else '-' }}</td>
+                      <td>
+                        <a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}" class="btn btn-sm btn-outline-primary">
+                          <i class="bi bi-eye me-1"></i>View
+                        </a>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          {% else %}
+            <div class="alert alert-secondary text-center">
+              <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+              <p class="mb-0">No reviewed needs lists.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

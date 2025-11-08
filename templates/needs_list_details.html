@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Needs List {{ needs_list.list_number }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-clipboard-check me-2"></i>Needs List {{ needs_list.list_number }}</h2>
+        <a href="{{ url_for('needs_lists') }}" class="btn btn-secondary">
+          <i class="bi bi-arrow-left me-1"></i>Back to Needs Lists
+        </a>
+      </div>
+
+      <div class="row">
+        <div class="col-md-8">
+          <div class="card shadow-sm mb-4">
+            <div class="card-header">
+              <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Needs List Information</h5>
+            </div>
+            <div class="card-body">
+              <table class="table table-sm">
+                <tr>
+                  <th width="200">List Number:</th>
+                  <td><strong>{{ needs_list.list_number }}</strong></td>
+                </tr>
+                <tr>
+                  <th>Agency Hub:</th>
+                  <td>{{ needs_list.agency_hub.name }}</td>
+                </tr>
+                <tr>
+                  <th>Status:</th>
+                  <td>
+                    {% if needs_list.status == 'Draft' %}
+                      <span class="badge bg-secondary">Draft</span>
+                    {% elif needs_list.status == 'Submitted' %}
+                      <span class="badge bg-primary">Submitted</span>
+                    {% elif needs_list.status == 'Under Review' %}
+                      <span class="badge bg-warning text-dark">Under Review</span>
+                    {% elif needs_list.status == 'Approved' %}
+                      <span class="badge bg-success">Approved</span>
+                    {% elif needs_list.status == 'Rejected' %}
+                      <span class="badge bg-danger">Rejected</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr>
+                  <th>Priority:</th>
+                  <td>
+                    {% if needs_list.priority == 'Urgent' %}
+                      <span class="badge bg-danger">Urgent</span>
+                    {% elif needs_list.priority == 'High' %}
+                      <span class="badge bg-warning text-dark">High</span>
+                    {% elif needs_list.priority == 'Medium' %}
+                      <span class="badge bg-info text-dark">Medium</span>
+                    {% else %}
+                      <span class="badge bg-secondary">Low</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% if needs_list.event %}
+                <tr>
+                  <th>Disaster Event:</th>
+                  <td>{{ needs_list.event.name }}</td>
+                </tr>
+                {% endif %}
+                {% if needs_list.main_hub %}
+                <tr>
+                  <th>Submitted To:</th>
+                  <td>{{ needs_list.main_hub.name }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                  <th>Created By:</th>
+                  <td>{{ needs_list.created_by }}</td>
+                </tr>
+                <tr>
+                  <th>Created At:</th>
+                  <td>{{ needs_list.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                {% if needs_list.submitted_at %}
+                <tr>
+                  <th>Submitted At:</th>
+                  <td>{{ needs_list.submitted_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                {% endif %}
+                {% if needs_list.reviewed_by %}
+                <tr>
+                  <th>Reviewed By:</th>
+                  <td>{{ needs_list.reviewed_by }}</td>
+                </tr>
+                <tr>
+                  <th>Reviewed At:</th>
+                  <td>{{ needs_list.reviewed_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                {% endif %}
+                {% if needs_list.notes %}
+                <tr>
+                  <th>Notes:</th>
+                  <td>{{ needs_list.notes }}</td>
+                </tr>
+                {% endif %}
+                {% if needs_list.review_notes %}
+                <tr>
+                  <th>Review Notes:</th>
+                  <td><em>{{ needs_list.review_notes }}</em></td>
+                </tr>
+                {% endif %}
+              </table>
+            </div>
+          </div>
+
+          <div class="card shadow-sm">
+            <div class="card-header">
+              <h5 class="mb-0"><i class="bi bi-cart me-2"></i>Requested Items</h5>
+            </div>
+            <div class="card-body">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Quantity</th>
+                    {% if user_depot and user_depot.hub_type == 'MAIN' %}
+                    <th>Available Stock</th>
+                    {% endif %}
+                    <th>Justification</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item_entry in needs_list.items %}
+                  <tr>
+                    <td>{{ item_entry.item.name }} <small class="text-muted">({{ item_entry.item.sku }})</small></td>
+                    <td><strong>{{ item_entry.requested_qty }}</strong> {{ item_entry.item.unit }}</td>
+                    {% if user_depot and user_depot.hub_type == 'MAIN' %}
+                    <td>
+                      {% set available = stock_map.get((item_entry.item_sku, user_depot.id), 0) %}
+                      {% if available >= item_entry.requested_qty %}
+                        <span class="text-success"><strong>{{ available }}</strong></span>
+                      {% elif available > 0 %}
+                        <span class="text-warning"><strong>{{ available }}</strong></span>
+                      {% else %}
+                        <span class="text-danger"><strong>0</strong></span>
+                      {% endif %}
+                    </td>
+                    {% endif %}
+                    <td>{{ item_entry.justification or '-' }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          {% if user_depot and user_depot.hub_type == 'AGENCY' and user_depot.id == needs_list.agency_hub_id %}
+            {% if needs_list.status == 'Draft' %}
+              <div class="card shadow-sm mb-3">
+                <div class="card-header bg-primary text-white">
+                  <h6 class="mb-0"><i class="bi bi-send me-2"></i>Submit to MAIN Hub</h6>
+                </div>
+                <div class="card-body">
+                  <form method="POST" action="{{ url_for('needs_list_submit', list_id=needs_list.id) }}">
+                    <div class="mb-3">
+                      <label for="main_hub_id" class="form-label">Select MAIN Hub <span class="text-danger">*</span></label>
+                      <select class="form-select" id="main_hub_id" name="main_hub_id" required>
+                        <option value="">Choose...</option>
+                        {% for hub in main_hubs %}
+                          <option value="{{ hub.id }}">{{ hub.name }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                      <i class="bi bi-send me-1"></i>Submit Needs List
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <div class="card shadow-sm">
+                <div class="card-header bg-danger text-white">
+                  <h6 class="mb-0"><i class="bi bi-trash me-2"></i>Delete Draft</h6>
+                </div>
+                <div class="card-body">
+                  <p class="small text-muted mb-2">Delete this draft needs list permanently.</p>
+                  <form method="POST" action="{{ url_for('needs_list_delete', list_id=needs_list.id) }}" onsubmit="return confirm('Are you sure you want to delete this needs list?');">
+                    <button type="submit" class="btn btn-danger btn-sm w-100">
+                      <i class="bi bi-trash me-1"></i>Delete Draft
+                    </button>
+                  </form>
+                </div>
+              </div>
+            {% endif %}
+          {% endif %}
+
+          {% if user_depot and user_depot.hub_type == 'MAIN' and user_depot.id == needs_list.main_hub_id %}
+            {% if needs_list.status in ['Submitted', 'Under Review'] %}
+              <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                  <h6 class="mb-0"><i class="bi bi-check-circle me-2"></i>Review Needs List</h6>
+                </div>
+                <div class="card-body">
+                  <form method="POST" action="{{ url_for('needs_list_review', list_id=needs_list.id) }}">
+                    <div class="mb-3">
+                      <label for="review_notes" class="form-label">Review Notes</label>
+                      <textarea class="form-control" id="review_notes" name="review_notes" rows="3" placeholder="Add comments about this review"></textarea>
+                    </div>
+                    <div class="d-grid gap-2">
+                      <button type="submit" name="action" value="approve" class="btn btn-success">
+                        <i class="bi bi-check-circle me-1"></i>Approve
+                      </button>
+                      <button type="submit" name="action" value="review" class="btn btn-warning">
+                        <i class="bi bi-eye me-1"></i>Mark Under Review
+                      </button>
+                      <button type="submit" name="action" value="reject" class="btn btn-danger">
+                        <i class="bi bi-x-circle me-1"></i>Reject
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

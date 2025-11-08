@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Create Needs List{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-clipboard-plus me-2"></i>Create Needs List</h2>
+        <a href="{{ url_for('needs_lists') }}" class="btn btn-secondary">
+          <i class="bi bi-arrow-left me-1"></i>Back to Needs Lists
+        </a>
+      </div>
+
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>{{ user_depot.name }}</strong> - Create a needs list to request items from MAIN hubs.
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <form method="POST" action="{{ url_for('needs_list_create') }}" id="needsListForm">
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="event_id" class="form-label">Disaster Event (Optional)</label>
+                <select class="form-select" id="event_id" name="event_id">
+                  <option value="">Select Event</option>
+                  {% for event in events %}
+                    <option value="{{ event.id }}">{{ event.name }} - {{ event.start_date.strftime('%Y-%m-%d') }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="priority" class="form-label">Priority <span class="text-danger">*</span></label>
+                <select class="form-select" id="priority" name="priority" required>
+                  <option value="Low">Low</option>
+                  <option value="Medium" selected>Medium</option>
+                  <option value="High">High</option>
+                  <option value="Urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="notes" class="form-label">Notes</label>
+              <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Additional notes about this needs list"></textarea>
+            </div>
+
+            <hr class="my-4">
+
+            <h4 class="mb-3"><i class="bi bi-cart-plus me-2"></i>Requested Items</h4>
+            
+            <div id="items-container">
+              <div class="item-row row mb-3">
+                <div class="col-md-4">
+                  <label class="form-label">Item <span class="text-danger">*</span></label>
+                  <select class="form-select item-select" name="item_sku_0" required>
+                    <option value="">Select Item</option>
+                    {% for item in items %}
+                      <option value="{{ item.sku }}">{{ item.name }} ({{ item.unit }})</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label">Quantity <span class="text-danger">*</span></label>
+                  <input type="number" class="form-control" name="item_qty_0" min="1" required>
+                </div>
+                <div class="col-md-5">
+                  <label class="form-label">Justification</label>
+                  <input type="text" class="form-control" name="item_justification_0" placeholder="Why is this item needed?">
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                  <button type="button" class="btn btn-outline-danger btn-sm remove-item" style="display:none;">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button type="button" class="btn btn-outline-primary btn-sm mb-4" id="add-item">
+              <i class="bi bi-plus-circle me-1"></i>Add Another Item
+            </button>
+
+            <hr class="my-4">
+
+            <div class="d-flex justify-content-end gap-2">
+              <a href="{{ url_for('needs_lists') }}" class="btn btn-secondary">Cancel</a>
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save me-1"></i>Create Needs List
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let itemIndex = 1;
+
+document.getElementById('add-item').addEventListener('click', function() {
+  const container = document.getElementById('items-container');
+  const newRow = document.createElement('div');
+  newRow.className = 'item-row row mb-3';
+  newRow.innerHTML = `
+    <div class="col-md-4">
+      <label class="form-label">Item <span class="text-danger">*</span></label>
+      <select class="form-select item-select" name="item_sku_${itemIndex}" required>
+        <option value="">Select Item</option>
+        {% for item in items %}
+          <option value="{{ item.sku }}">{{ item.name }} ({{ item.unit }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">Quantity <span class="text-danger">*</span></label>
+      <input type="number" class="form-control" name="item_qty_${itemIndex}" min="1" required>
+    </div>
+    <div class="col-md-5">
+      <label class="form-label">Justification</label>
+      <input type="text" class="form-control" name="item_justification_${itemIndex}" placeholder="Why is this item needed?">
+    </div>
+    <div class="col-md-1 d-flex align-items-end">
+      <button type="button" class="btn btn-outline-danger btn-sm remove-item">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>
+  `;
+  container.appendChild(newRow);
+  itemIndex++;
+  updateRemoveButtons();
+});
+
+document.getElementById('items-container').addEventListener('click', function(e) {
+  if (e.target.closest('.remove-item')) {
+    e.target.closest('.item-row').remove();
+    updateRemoveButtons();
+  }
+});
+
+function updateRemoveButtons() {
+  const rows = document.querySelectorAll('.item-row');
+  rows.forEach((row, index) => {
+    const removeBtn = row.querySelector('.remove-item');
+    if (rows.length > 1) {
+      removeBtn.style.display = 'block';
+    } else {
+      removeBtn.style.display = 'none';
+    }
+  });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}All Needs Lists{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-12">
+      <h2 class="mb-4"><i class="bi bi-clipboard-check me-2"></i>All Needs Lists</h2>
+
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        View all needs lists in the system.
+      </div>
+
+      {% if needs_lists %}
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>List Number</th>
+                  <th>Agency Hub</th>
+                  <th>MAIN Hub</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Items</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for needs_list in needs_lists %}
+                <tr>
+                  <td>
+                    <a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}" class="text-decoration-none">
+                      <strong>{{ needs_list.list_number }}</strong>
+                    </a>
+                  </td>
+                  <td>{{ needs_list.agency_hub.name }}</td>
+                  <td>
+                    {% if needs_list.main_hub %}
+                      {{ needs_list.main_hub.name }}
+                    {% else %}
+                      <span class="text-muted">Not submitted</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if needs_list.priority == 'Urgent' %}
+                      <span class="badge bg-danger">Urgent</span>
+                    {% elif needs_list.priority == 'High' %}
+                      <span class="badge bg-warning text-dark">High</span>
+                    {% elif needs_list.priority == 'Medium' %}
+                      <span class="badge bg-info text-dark">Medium</span>
+                    {% else %}
+                      <span class="badge bg-secondary">Low</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if needs_list.status == 'Draft' %}
+                      <span class="badge bg-secondary">Draft</span>
+                    {% elif needs_list.status == 'Submitted' %}
+                      <span class="badge bg-primary">Submitted</span>
+                    {% elif needs_list.status == 'Under Review' %}
+                      <span class="badge bg-warning text-dark">Under Review</span>
+                    {% elif needs_list.status == 'Approved' %}
+                      <span class="badge bg-success">Approved</span>
+                    {% elif needs_list.status == 'Rejected' %}
+                      <span class="badge bg-danger">Rejected</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ needs_list.items|length }} items</td>
+                  <td>{{ needs_list.created_at.strftime('%Y-%m-%d') }}</td>
+                  <td>
+                    <a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}" class="btn btn-sm btn-outline-primary">
+                      <i class="bi bi-eye me-1"></i>View
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-secondary text-center">
+          <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+          <p class="mb-0">No needs lists in the system.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

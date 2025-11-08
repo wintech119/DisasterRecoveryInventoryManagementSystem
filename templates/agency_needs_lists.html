@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}My Needs Lists{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-clipboard-check me-2"></i>My Needs Lists</h2>
+        <a href="{{ url_for('needs_list_create') }}" class="btn btn-primary">
+          <i class="bi bi-plus-circle me-1"></i>Create Needs List
+        </a>
+      </div>
+
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>{{ user_depot.name }}</strong> - Create and manage needs lists to request items from MAIN hubs.
+      </div>
+
+      {% if needs_lists %}
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>List Number</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Submitted To</th>
+                  <th>Items</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for needs_list in needs_lists %}
+                <tr>
+                  <td>
+                    <a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}" class="text-decoration-none">
+                      <strong>{{ needs_list.list_number }}</strong>
+                    </a>
+                  </td>
+                  <td>
+                    {% if needs_list.priority == 'Urgent' %}
+                      <span class="badge bg-danger">Urgent</span>
+                    {% elif needs_list.priority == 'High' %}
+                      <span class="badge bg-warning text-dark">High</span>
+                    {% elif needs_list.priority == 'Medium' %}
+                      <span class="badge bg-info text-dark">Medium</span>
+                    {% else %}
+                      <span class="badge bg-secondary">Low</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if needs_list.status == 'Draft' %}
+                      <span class="badge bg-secondary">Draft</span>
+                    {% elif needs_list.status == 'Submitted' %}
+                      <span class="badge bg-primary">Submitted</span>
+                    {% elif needs_list.status == 'Under Review' %}
+                      <span class="badge bg-warning text-dark">Under Review</span>
+                    {% elif needs_list.status == 'Approved' %}
+                      <span class="badge bg-success">Approved</span>
+                    {% elif needs_list.status == 'Rejected' %}
+                      <span class="badge bg-danger">Rejected</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if needs_list.main_hub %}
+                      {{ needs_list.main_hub.name }}
+                    {% else %}
+                      <span class="text-muted">Not submitted</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ needs_list.items|length }} items</td>
+                  <td>{{ needs_list.created_at.strftime('%Y-%m-%d') }}</td>
+                  <td>
+                    <a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}" class="btn btn-sm btn-outline-primary">
+                      <i class="bi bi-eye me-1"></i>View
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-secondary text-center">
+          <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+          <p class="mb-2">No needs lists created yet.</p>
+          <a href="{{ url_for('needs_list_create') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i>Create Your First Needs List
+          </a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
