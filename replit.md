@@ -38,14 +38,14 @@ Comprehensive validation prevents stock levels from falling below zero during di
 ### Three-Tier Hub Orchestration System
 Implements a role-based orchestration model with three hub types for managing stock distribution and approvals:
 - **MAIN Hub**: Central distribution hubs (e.g., Pimento JDF) act as orchestrators for all SUB hubs with authority to execute transfers immediately without approval. Any MAIN hub can view and approve transfer requests from any SUB or AGENCY hub.
-- **SUB Hub**: Regional distribution hubs (e.g., Trelawny, Haining) governed by all MAIN hubs collectively. No specific parent assignment needed. Transfer requests require approval from any MAIN hub before execution.
-- **AGENCY Hub**: Independent agency-operated hubs (e.g., Montego Bay, Pimento) that can request items from MAIN hubs. Can optionally link to a MAIN hub for tracking purposes, but this does not restrict which MAIN hub can approve their transfers.
+- **SUB Hub**: Regional distribution hubs (e.g., Trelawny, Haining) governed by all MAIN hubs collectively. No parent assignment capability. Transfer requests require approval from any MAIN hub before execution.
+- **AGENCY Hub**: Independent agency-operated hubs (e.g., Montego Bay, Pimento) that can request items from MAIN hubs. Completely independent with no parent hub assignment capability.
 
 **Hub Orchestration Features:**
 - Role-based governance: SUB hubs are orchestrated by ALL MAIN hubs, not a specific parent
 - Any MAIN hub user can approve transfer requests from any SUB or AGENCY hub
 - Transfer approval workflow based purely on hub_type (MAIN transfers immediate, SUB/AGENCY require MAIN approval)
-- Optional parent_location_id for AGENCY hubs for tracking purposes only
+- No parent hub assignments for any hub type - all hubs operate independently with role-based orchestration
 - Hub Status tracking (Active/Inactive) with automatic operational timestamp recording when activated
 
 ### Stock Transfer Between Depots with Approval Workflow

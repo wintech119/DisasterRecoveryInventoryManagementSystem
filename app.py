@@ -1067,10 +1067,18 @@ def depot_new():
             flash("Hub type is required.", "danger")
             return redirect(url_for("depot_new"))
         
-        # Validate parent hub for AGENCY hubs (optional)
+        # AGENCY hubs are independent - reject any parent hub assignment
+        if hub_type == 'AGENCY' and parent_location_id:
+            flash("AGENCY hubs are independent and cannot have a parent hub.", "danger")
+            return redirect(url_for("depot_new"))
+        
         # SUB hubs don't need a parent - they're orchestrated by ALL MAIN hubs
+        # Clear any parent_location_id for SUB hubs
+        if hub_type == 'SUB':
+            parent_location_id = None
+        
+        # Validate parent hub if specified (should never happen, but defensive check)
         if parent_location_id:
-            # If a parent is specified, verify it's a MAIN hub
             parent_hub = Depot.query.get(parent_location_id)
             if not parent_hub or parent_hub.hub_type != 'MAIN':
                 flash("Parent hub must be a MAIN hub.", "danger")
@@ -1086,7 +1094,7 @@ def depot_new():
         location = Depot(
             name=name,
             hub_type=hub_type,
-            parent_location_id=int(parent_location_id) if parent_location_id else None,
+            parent_location_id=None,  # Always None - no parent hub assignments
             status=status,
             operational_timestamp=datetime.utcnow() if status == 'Active' else None
         )
@@ -1117,8 +1125,17 @@ def depot_edit(location_id):
             flash("Hub type is required.", "danger")
             return redirect(url_for("depot_edit", location_id=location_id))
         
-        # Validate parent hub for AGENCY hubs (optional)
+        # AGENCY hubs are independent - reject any parent hub assignment
+        if hub_type == 'AGENCY' and parent_location_id:
+            flash("AGENCY hubs are independent and cannot have a parent hub.", "danger")
+            return redirect(url_for("depot_edit", location_id=location_id))
+        
         # SUB hubs don't need a parent - they're orchestrated by ALL MAIN hubs
+        # Clear any parent_location_id for SUB hubs
+        if hub_type == 'SUB':
+            parent_location_id = None
+        
+        # Validate parent hub if specified (should never happen, but defensive check)
         if parent_location_id:
             # Prevent self-referencing
             if int(parent_location_id) == location_id:
@@ -1140,7 +1157,7 @@ def depot_edit(location_id):
         # Update depot with hub hierarchy
         location.name = name
         location.hub_type = hub_type
-        location.parent_location_id = int(parent_location_id) if parent_location_id else None
+        location.parent_location_id = None  # Always None - no parent hub assignments
         
         # Handle status change and update operational_timestamp when activated
         old_status = location.status
