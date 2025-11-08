@@ -23,6 +23,10 @@ class Depot(db.Model):
     __tablename__ = 'location'  # Keep existing table name for backward compatibility
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), unique=True, nullable=False)  # e.g., Parish depot / shelter
+    hub_type = db.Column(db.String(10), nullable=False, default='MAIN')  # MAIN, SUB, AGENCY
+    parent_location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=True)  # Parent hub for SUB/AGENCY
+    
+    parent_hub = db.relationship("Depot", remote_side=[id], backref="sub_hubs")
 
 class Item(db.Model):
     sku = db.Column(db.String(64), primary_key=True)
@@ -91,6 +95,26 @@ class Transaction(db.Model):
     beneficiary = db.relationship("Beneficiary")
     distributor = db.relationship("Distributor")
     event = db.relationship("DisasterEvent")
+
+class TransferRequest(db.Model):
+    """Transfer requests for hub-to-hub stock movements requiring approval"""
+    id = db.Column(db.Integer, primary_key=True)
+    from_location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=False)
+    to_location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=False)
+    item_sku = db.Column(db.String(64), db.ForeignKey("item.sku"), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='PENDING')  # PENDING, APPROVED, REJECTED, COMPLETED
+    requested_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    requested_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    reviewed_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    
+    from_location = db.relationship("Depot", foreign_keys=[from_location_id])
+    to_location = db.relationship("Depot", foreign_keys=[to_location_id])
+    item = db.relationship("Item")
+    requester = db.relationship("User", foreign_keys=[requested_by])
+    reviewer = db.relationship("User", foreign_keys=[reviewed_by])
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)

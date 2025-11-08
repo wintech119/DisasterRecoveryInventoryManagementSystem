@@ -4,10 +4,84 @@ DRIMS Test Data Seeding Script
 Populates the database with realistic demo data for testing and demonstrations
 """
 
-from app import app, db, User, Location, DisasterEvent, Item, Donor, Beneficiary, Distributor, Transaction, generate_sku
+from app import app, db, User, Depot, DisasterEvent, Item, Donor, Beneficiary, Distributor, Transaction, TransferRequest, generate_sku
 from werkzeug.security import generate_password_hash
 from datetime import datetime, timedelta
+from sqlalchemy import text, inspect
 import random
+
+def migrate_schema():
+    """Apply schema migrations for hub hierarchy"""
+    print("\nChecking and applying schema migrations...")
+    
+    with app.app_context():
+        inspector = inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('location')]
+        
+        # Check if hub_type column exists
+        if 'hub_type' not in columns:
+            print("  Adding hub_type column...")
+            db.session.execute(text("ALTER TABLE location ADD COLUMN hub_type VARCHAR(10) DEFAULT 'MAIN' NOT NULL"))
+            db.session.commit()
+            print("  ✓ hub_type column added")
+        else:
+            print("  ✓ hub_type column already exists")
+        
+        # Check if parent_location_id column exists
+        if 'parent_location_id' not in columns:
+            print("  Adding parent_location_id column...")
+            db.session.execute(text("ALTER TABLE location ADD COLUMN parent_location_id INTEGER REFERENCES location(id)"))
+            db.session.commit()
+            print("  ✓ parent_location_id column added")
+        else:
+            print("  ✓ parent_location_id column already exists")
+        
+        # Check if transfer_request table exists - use SQLAlchemy create_all for database-agnostic table creation
+        if not inspector.has_table('transfer_request'):
+            print("  Creating transfer_request table...")
+            # Use SQLAlchemy's create_all which handles SQLite vs PostgreSQL differences
+            db.create_all()
+            db.session.commit()
+            print("  ✓ transfer_request table created")
+        else:
+            print("  ✓ transfer_request table already exists")
+        
+        # Backfill existing locations with MAIN hub type if they don't have one set
+        result = db.session.execute(text("SELECT COUNT(*) FROM location WHERE hub_type IS NULL OR hub_type = ''"))
+        null_count = result.scalar()
+        if null_count > 0:
+            print(f"  Backfilling {null_count} locations with MAIN hub type...")
+            db.session.execute(text("UPDATE location SET hub_type = 'MAIN' WHERE hub_type IS NULL OR hub_type = ''"))
+            db.session.commit()
+            print(f"  ✓ Backfilled {null_count} locations")
+        
+        # Smoke test: verify TransferRequest table supports inserts with auto-incrementing ID
+        try:
+            # Try to create a test TransferRequest object to ensure auto-increment works
+            test_depot = db.session.query(Depot).first()
+            test_item = db.session.query(Item).first()
+            if test_depot and test_item:
+                test_request = TransferRequest(
+                    from_location_id=test_depot.id,
+                    to_location_id=test_depot.id,
+                    item_sku=test_item.sku,
+                    quantity=1,
+                    notes="Migration smoke test"
+                )
+                db.session.add(test_request)
+                db.session.flush()  # This will trigger ID auto-increment
+                db.session.rollback()  # Rollback to not pollute data
+                print(f"  ✓ TransferRequest table smoke test passed (auto-increment verified)")
+            else:
+                # If no test data, just count rows
+                test_count = db.session.query(TransferRequest).count()
+                print(f"  ✓ TransferRequest table smoke test passed ({test_count} existing requests)")
+        except Exception as e:
+            print(f"  ✗ TransferRequest table smoke test failed: {e}")
+            db.session.rollback()
+            raise
+        
+        print("✓ Schema migrations complete")
 
 def clear_data():
     """Clear existing data (optional)"""
@@ -19,7 +93,7 @@ def clear_data():
         Beneficiary.query.delete()
         Donor.query.delete()
         DisasterEvent.query.delete()
-        Location.query.delete()
+        Depot.query.delete()
         User.query.delete()
         db.session.commit()
     print("✓ Data cleared")
@@ -93,38 +167,51 @@ def seed_users():
     print(f"✓ Created {len(users)} users")
 
 def seed_locations():
-    """Create demo locations (parishes, shelters, depots)"""
-    print("\nSeeding locations...")
+    """Create demo locations with three-tier hub hierarchy"""
+    print("\nSeeding locations (hub hierarchy)...")
     
     with app.app_context():
-        existing_count = Location.query.count()
+        existing_count = Depot.query.count()
         if existing_count > 0:
             print(f"  Skipping - {existing_count} locations already exist")
             return
     
-    locations = [
-        Location(name="Kingston Central Depot"),
-        Location(name="St. Andrew Parish Office"),
-        Location(name="Spanish Town Emergency Shelter"),
-        Location(name="Montego Bay Distribution Center"),
-        Location(name="Port Antonio Relief Station"),
-        Location(name="Manchester Parish Warehouse"),
-        Location(name="Clarendon Emergency Center"),
-        Location(name="St. Catherine Supply Depot"),
-    ]
-    
     with app.app_context():
-        for loc in locations:
-            db.session.add(loc)
+        # Create MAIN hub first
+        main_hub = Depot(name="Pimento JDF", hub_type="MAIN", parent_location_id=None)
+        db.session.add(main_hub)
         db.session.commit()
         
-        # Update warehouse staff user with location
+        # Create SUB hubs under MAIN
+        sub_hubs = [
+            Depot(name="Trelawny", hub_type="SUB", parent_location_id=main_hub.id),
+            Depot(name="Haining", hub_type="SUB", parent_location_id=main_hub.id),
+        ]
+        for hub in sub_hubs:
+            db.session.add(hub)
+        db.session.commit()
+        
+        # Create AGENCY hubs under MAIN
+        agency_hubs = [
+            Depot(name="Montego Bay", hub_type="AGENCY", parent_location_id=main_hub.id),
+            Depot(name="Pimento", hub_type="AGENCY", parent_location_id=main_hub.id),
+        ]
+        for hub in agency_hubs:
+            db.session.add(hub)
+        db.session.commit()
+        
+        all_hubs = [main_hub] + sub_hubs + agency_hubs
+        
+        # Update warehouse staff user with location (assign to MAIN hub)
         warehouse_user = User.query.filter_by(email="warehouse@gov.jm").first()
         if warehouse_user:
-            warehouse_user.assigned_location_id = locations[0].id  # Assign to Kingston Central Depot
+            warehouse_user.assigned_location_id = main_hub.id
             db.session.commit()
     
-    print(f"✓ Created {len(locations)} locations")
+    print(f"✓ Created {len(all_hubs)} locations in hub hierarchy:")
+    print(f"  - 1 MAIN hub: Pimento JDF")
+    print(f"  - 2 SUB hubs: Trelawny, Haining")
+    print(f"  - 2 AGENCY hubs: Montego Bay, Pimento")
 
 def seed_disaster_events():
     """Create demo disaster events"""
@@ -334,7 +421,7 @@ def seed_transactions():
         
 
         items = Item.query.all()
-        locations = Location.query.all()
+        locations = Depot.query.all()
         donors = Donor.query.all()
         beneficiaries = Beneficiary.query.all()
         distributors = Distributor.query.all()
@@ -403,6 +490,9 @@ def main():
     print("=" * 60)
     print("DRIMS Test Data Seeding Script")
     print("=" * 60)
+    
+    # Apply schema migrations first
+    migrate_schema()
     
     # Uncomment to clear existing data first
     # clear_data()
