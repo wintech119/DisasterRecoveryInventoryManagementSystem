@@ -1611,31 +1611,33 @@ def reject_transfer_request(request_id):
 @app.route("/needs-lists")
 @login_required
 def needs_lists():
-    """View needs lists - different views for AGENCY, SUB, and MAIN hubs"""
+    """View needs lists - different views based on user role and hub type"""
     user_depot = None
     if current_user.assigned_location_id:
         user_depot = Depot.query.get(current_user.assigned_location_id)
     
-    if user_depot and user_depot.hub_type == 'AGENCY':
-        # AGENCY hub view: See only their own needs lists
+    # Role-based views for Logistics Officers and Managers
+    if current_user.role == ROLE_LOGISTICS_OFFICER:
+        # Logistics Officer view: All submitted needs lists awaiting fulfilment preparation
+        submitted_lists = NeedsList.query.filter_by(status='Submitted').order_by(NeedsList.submitted_at.desc()).all()
+        prepared_lists = NeedsList.query.filter(NeedsList.status.in_(['Fulfilment Prepared', 'Awaiting Approval'])).filter_by(prepared_by=current_user.full_name).order_by(NeedsList.prepared_at.desc()).all()
+        return render_template("logistics_officer_needs_lists.html", submitted_lists=submitted_lists, prepared_lists=prepared_lists)
+    
+    elif current_user.role == ROLE_LOGISTICS_MANAGER:
+        # Logistics Manager view: All needs lists awaiting approval
+        awaiting_approval = NeedsList.query.filter(NeedsList.status.in_(['Fulfilment Prepared', 'Awaiting Approval'])).order_by(NeedsList.prepared_at.desc()).all()
+        approved_lists = NeedsList.query.filter(NeedsList.status.in_(['Approved', 'Fulfilled'])).order_by(NeedsList.approved_at.desc()).limit(20).all()
+        rejected_lists = NeedsList.query.filter_by(status='Rejected').order_by(NeedsList.updated_at.desc()).limit(20).all()
+        return render_template("logistics_manager_needs_lists.html", awaiting_approval=awaiting_approval, approved_lists=approved_lists, rejected_lists=rejected_lists)
+    
+    # Hub-based views for AGENCY and SUB hubs
+    elif user_depot and user_depot.hub_type in ['AGENCY', 'SUB']:
+        # AGENCY/SUB hub view: See only their own needs lists
         lists = NeedsList.query.filter_by(agency_hub_id=user_depot.id).order_by(NeedsList.created_at.desc()).all()
         return render_template("agency_needs_lists.html", needs_lists=lists, user_depot=user_depot)
-    
-    elif user_depot and user_depot.hub_type == 'SUB':
-        # SUB hub view: See only their own needs lists (isolated from other SUB and AGENCY hubs)
-        lists = NeedsList.query.filter_by(agency_hub_id=user_depot.id).order_by(NeedsList.created_at.desc()).all()
-        return render_template("agency_needs_lists.html", needs_lists=lists, user_depot=user_depot)
-    
-    elif user_depot and user_depot.hub_type == 'MAIN':
-        # MAIN hub view: See needs lists from both AGENCY and SUB hubs submitted to them
-        lists = NeedsList.query.filter_by(main_hub_id=user_depot.id, status='Submitted').order_by(NeedsList.submitted_at.desc()).all()
-        reviewed_lists = NeedsList.query.filter_by(main_hub_id=user_depot.id).filter(
-            NeedsList.status.in_(['Under Review', 'Approved', 'Rejected'])
-        ).order_by(NeedsList.reviewed_at.desc()).limit(20).all()
-        return render_template("main_needs_lists.html", pending_lists=lists, reviewed_lists=reviewed_lists, user_depot=user_depot)
     
     else:
-        # Non-hub users or admins: See all needs lists
+        # Admin or other users: See all needs lists
         all_lists = NeedsList.query.order_by(NeedsList.created_at.desc()).all()
         return render_template("all_needs_lists.html", needs_lists=all_lists)
 
@@ -1763,7 +1765,7 @@ def needs_list_details(list_id):
 @app.route("/needs-lists/<int:list_id>/submit", methods=["POST"])
 @login_required
 def needs_list_submit(list_id):
-    """Submit needs list to a MAIN hub - AGENCY and SUB hubs only"""
+    """Submit needs list for logistics review - AGENCY and SUB hubs only"""
     needs_list = NeedsList.query.get_or_404(list_id)
     
     # Verify user is from the agency/sub hub that owns this list
@@ -1780,67 +1782,188 @@ def needs_list_submit(list_id):
         flash("Only draft needs lists can be submitted.", "warning")
         return redirect(url_for("needs_list_details", list_id=list_id))
     
-    # Get selected MAIN hub
-    main_hub_id = request.form.get("main_hub_id")
-    if not main_hub_id:
-        flash("Please select a MAIN hub to submit to.", "danger")
-        return redirect(url_for("needs_list_details", list_id=list_id))
-    
-    main_hub = Depot.query.get(int(main_hub_id))
-    if not main_hub or main_hub.hub_type != 'MAIN':
-        flash("Invalid MAIN hub selected.", "danger")
-        return redirect(url_for("needs_list_details", list_id=list_id))
-    
-    # Submit
-    needs_list.main_hub_id = main_hub.id
+    # Submit for logistics review
     needs_list.status = 'Submitted'
     needs_list.submitted_at = datetime.utcnow()
     db.session.commit()
     
-    flash(f"Needs list {needs_list.list_number} submitted to {main_hub.name} successfully.", "success")
+    flash(f"Needs list {needs_list.list_number} submitted successfully for logistics review.", "success")
     return redirect(url_for("needs_list_details", list_id=list_id))
 
-@app.route("/needs-lists/<int:list_id>/review", methods=["POST"])
-@login_required
-def needs_list_review(list_id):
-    """Review (approve/reject) a needs list - MAIN hubs only"""
+@app.route("/needs-lists/<int:list_id>/prepare", methods=["GET", "POST"])
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_OFFICER)
+def needs_list_prepare(list_id):
+    """Prepare fulfilment for a needs list - Logistics Officers only"""
     needs_list = NeedsList.query.get_or_404(list_id)
     
-    # Verify user is from MAIN hub that received this list
-    if not current_user.assigned_location_id:
-        flash("You must be assigned to a MAIN hub.", "danger")
+    if needs_list.status not in ['Submitted', 'Fulfilment Prepared']:
+        flash("Only submitted needs lists can be prepared for fulfilment.", "warning")
         return redirect(url_for("needs_list_details", list_id=list_id))
     
-    user_depot = Depot.query.get(current_user.assigned_location_id)
-    if not user_depot or user_depot.hub_type != 'MAIN' or user_depot.id != needs_list.main_hub_id:
-        flash("Only the receiving MAIN hub can review this needs list.", "danger")
+    if request.method == "POST":
+        fulfilment_notes = request.form.get("fulfilment_notes", "").strip() or None
+        
+        # Delete existing fulfilment allocations if re-preparing
+        NeedsListFulfilment.query.filter_by(needs_list_id=needs_list.id).delete()
+        
+        # Parse fulfilment allocations from form
+        allocations_created = 0
+        item_index = 0
+        while True:
+            sku_field = f"item_sku_{item_index}"
+            if sku_field not in request.form:
+                break
+            
+            sku = request.form.get(sku_field)
+            if sku:
+                # Get all depot allocations for this item
+                depot_index = 0
+                while True:
+                    depot_field = f"depot_{item_index}_{depot_index}"
+                    qty_field = f"qty_{item_index}_{depot_index}"
+                    
+                    if depot_field not in request.form:
+                        break
+                    
+                    depot_id = request.form.get(depot_field)
+                    qty_str = request.form.get(qty_field, "0").strip()
+                    
+                    if depot_id and qty_str:
+                        try:
+                            allocated_qty = int(qty_str)
+                            if allocated_qty > 0:
+                                fulfilment = NeedsListFulfilment(
+                                    needs_list_id=needs_list.id,
+                                    item_sku=sku,
+                                    source_hub_id=int(depot_id),
+                                    allocated_qty=allocated_qty
+                                )
+                                db.session.add(fulfilment)
+                                allocations_created += 1
+                        except ValueError:
+                            flash(f"Invalid quantity for item {sku}.", "danger")
+                            return redirect(url_for("needs_list_prepare", list_id=list_id))
+                    
+                    depot_index += 1
+            
+            item_index += 1
+        
+        if allocations_created == 0:
+            flash("At least one allocation is required.", "danger")
+            return redirect(url_for("needs_list_prepare", list_id=list_id))
+        
+        # Update needs list status
+        needs_list.status = 'Awaiting Approval'
+        needs_list.prepared_by = current_user.full_name
+        needs_list.prepared_at = datetime.utcnow()
+        needs_list.fulfilment_notes = fulfilment_notes
+        db.session.commit()
+        
+        flash(f"Fulfilment for {needs_list.list_number} prepared and submitted for manager approval.", "success")
         return redirect(url_for("needs_list_details", list_id=list_id))
     
-    if needs_list.status not in ['Submitted', 'Under Review']:
-        flash("This needs list cannot be reviewed.", "warning")
+    # GET request: Show fulfilment preparation form
+    # Get stock availability across all MAIN and SUB hubs
+    stock_map = get_stock_by_location()
+    odpem_hubs = Depot.query.filter(Depot.hub_type.in_(['MAIN', 'SUB'])).order_by(Depot.name).all()
+    
+    return render_template("needs_list_prepare.html", needs_list=needs_list, stock_map=stock_map, odpem_hubs=odpem_hubs)
+
+@app.route("/needs-lists/<int:list_id>/approve", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER)
+def needs_list_approve(list_id):
+    """Approve fulfilment and execute stock transfers - Logistics Managers only"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    if needs_list.status not in ['Awaiting Approval', 'Fulfilment Prepared']:
+        flash("Only needs lists awaiting approval can be approved.", "warning")
         return redirect(url_for("needs_list_details", list_id=list_id))
     
-    action = request.form.get("action")
-    review_notes = request.form.get("review_notes", "").strip() or None
+    approval_notes = request.form.get("approval_notes", "").strip() or None
     
-    if action == "approve":
-        needs_list.status = 'Approved'
-        flash(f"Needs list {needs_list.list_number} approved successfully.", "success")
-    elif action == "reject":
-        needs_list.status = 'Rejected'
-        flash(f"Needs list {needs_list.list_number} rejected.", "info")
-    elif action == "review":
-        needs_list.status = 'Under Review'
-        flash(f"Needs list {needs_list.list_number} marked as under review.", "info")
-    else:
-        flash("Invalid action.", "danger")
+    # Verify stock availability for all allocations
+    stock_map = get_stock_by_location()
+    fulfilments = NeedsListFulfilment.query.filter_by(needs_list_id=needs_list.id).all()
+    
+    if not fulfilments:
+        flash("No fulfilment allocations found. Please prepare fulfilment first.", "danger")
         return redirect(url_for("needs_list_details", list_id=list_id))
     
-    needs_list.reviewed_by = current_user.full_name
-    needs_list.reviewed_at = datetime.utcnow()
-    needs_list.review_notes = review_notes
+    # Validate stock availability
+    for fulfilment in fulfilments:
+        available = stock_map.get((fulfilment.item_sku, fulfilment.source_hub_id), 0)
+        if available < fulfilment.allocated_qty:
+            source_hub = Depot.query.get(fulfilment.source_hub_id)
+            item = Item.query.get(fulfilment.item_sku)
+            flash(f"Insufficient stock: {item.name} at {source_hub.name}. Available: {available}, Requested: {fulfilment.allocated_qty}", "danger")
+            return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    # Execute stock transfers
+    requesting_hub = needs_list.agency_hub
+    for fulfilment in fulfilments:
+        item = Item.query.get(fulfilment.item_sku)
+        source_hub = Depot.query.get(fulfilment.source_hub_id)
+        
+        # OUT transaction from source hub
+        out_txn = Transaction(
+            item_sku=fulfilment.item_sku,
+            location_id=fulfilment.source_hub_id,
+            transaction_type="OUT",
+            quantity=fulfilment.allocated_qty,
+            performed_by=current_user.full_name,
+            notes=f"Needs List Fulfilment: {needs_list.list_number} to {requesting_hub.name}",
+            disaster_event_id=needs_list.event_id
+        )
+        db.session.add(out_txn)
+        
+        # IN transaction to requesting hub
+        in_txn = Transaction(
+            item_sku=fulfilment.item_sku,
+            location_id=needs_list.agency_hub_id,
+            transaction_type="IN",
+            quantity=fulfilment.allocated_qty,
+            performed_by=current_user.full_name,
+            notes=f"Needs List Fulfilment: {needs_list.list_number} from {source_hub.name}",
+            disaster_event_id=needs_list.event_id
+        )
+        db.session.add(in_txn)
+    
+    # Update needs list status
+    needs_list.status = 'Fulfilled'
+    needs_list.approved_by = current_user.full_name
+    needs_list.approved_at = datetime.utcnow()
+    needs_list.fulfilled_at = datetime.utcnow()
+    needs_list.approval_notes = approval_notes
     db.session.commit()
     
+    flash(f"Needs list {needs_list.list_number} approved and fulfilled successfully. Stock transfers completed.", "success")
+    return redirect(url_for("needs_list_details", list_id=list_id))
+
+@app.route("/needs-lists/<int:list_id>/reject", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER)
+def needs_list_reject(list_id):
+    """Reject fulfilment - Logistics Managers only"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    if needs_list.status not in ['Awaiting Approval', 'Fulfilment Prepared']:
+        flash("Only needs lists awaiting approval can be rejected.", "warning")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    approval_notes = request.form.get("approval_notes", "").strip() or None
+    
+    # Delete fulfilment allocations and reset to submitted
+    NeedsListFulfilment.query.filter_by(needs_list_id=needs_list.id).delete()
+    
+    needs_list.status = 'Submitted'
+    needs_list.approved_by = current_user.full_name
+    needs_list.approved_at = datetime.utcnow()
+    needs_list.approval_notes = approval_notes
+    needs_list.prepared_by = None
+    needs_list.prepared_at = None
+    needs_list.fulfilment_notes = None
+    db.session.commit()
+    
+    flash(f"Fulfilment for {needs_list.list_number} rejected. Needs list returned to submitted status.", "warning")
     return redirect(url_for("needs_list_details", list_id=list_id))
 
 @app.route("/needs-lists/<int:list_id>/delete", methods=["POST"])
