@@ -1067,13 +1067,10 @@ def depot_new():
             flash("Hub type is required.", "danger")
             return redirect(url_for("depot_new"))
         
-        # Validate parent hub requirement for SUB/AGENCY hubs
-        if hub_type in ['SUB', 'AGENCY']:
-            if not parent_location_id:
-                flash(f"{hub_type} hubs require a parent MAIN hub.", "danger")
-                return redirect(url_for("depot_new"))
-            
-            # Verify parent is a MAIN hub
+        # Validate parent hub for AGENCY hubs (optional)
+        # SUB hubs don't need a parent - they're orchestrated by ALL MAIN hubs
+        if parent_location_id:
+            # If a parent is specified, verify it's a MAIN hub
             parent_hub = Depot.query.get(parent_location_id)
             if not parent_hub or parent_hub.hub_type != 'MAIN':
                 flash("Parent hub must be a MAIN hub.", "danger")
@@ -1120,18 +1117,15 @@ def depot_edit(location_id):
             flash("Hub type is required.", "danger")
             return redirect(url_for("depot_edit", location_id=location_id))
         
-        # Validate parent hub requirement for SUB/AGENCY hubs
-        if hub_type in ['SUB', 'AGENCY']:
-            if not parent_location_id:
-                flash(f"{hub_type} hubs require a parent MAIN hub.", "danger")
-                return redirect(url_for("depot_edit", location_id=location_id))
-            
+        # Validate parent hub for AGENCY hubs (optional)
+        # SUB hubs don't need a parent - they're orchestrated by ALL MAIN hubs
+        if parent_location_id:
             # Prevent self-referencing
             if int(parent_location_id) == location_id:
-                flash("A depot cannot be its own parent hub.", "danger")
+                flash("A hub cannot be its own parent hub.", "danger")
                 return redirect(url_for("depot_edit", location_id=location_id))
             
-            # Verify parent is a MAIN hub
+            # If a parent is specified, verify it's a MAIN hub
             parent_hub = Depot.query.get(parent_location_id)
             if not parent_hub or parent_hub.hub_type != 'MAIN':
                 flash("Parent hub must be a MAIN hub.", "danger")

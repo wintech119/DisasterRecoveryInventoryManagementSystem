@@ -17,12 +17,12 @@
         <select class="form-select" name="hub_type" id="hub_type" required onchange="toggleParentHub()">
           <option value="">-- Select Hub Type --</option>
           <option value="MAIN" {% if depot and depot.hub_type == 'MAIN' %}selected{% endif %}>MAIN - Central Distribution Hub</option>
-          <option value="SUB" {% if depot and depot.hub_type == 'SUB' %}selected{% endif %}>SUB - Regional Hub (requires parent)</option>
-          <option value="AGENCY" {% if depot and depot.hub_type == 'AGENCY' %}selected{% endif %}>AGENCY - Agency Hub (requires parent)</option>
+          <option value="SUB" {% if depot and depot.hub_type == 'SUB' %}selected{% endif %}>SUB - Regional Hub</option>
+          <option value="AGENCY" {% if depot and depot.hub_type == 'AGENCY' %}selected{% endif %}>AGENCY - Independent Agency Hub</option>
         </select>
         <small class="text-muted">
           <i class="bi bi-info-circle"></i> 
-          <strong>MAIN</strong> hubs can approve transfers. <strong>SUB/AGENCY</strong> hubs need approval from their parent MAIN hub.
+          <strong>MAIN</strong> hubs orchestrate all SUB hubs and can approve transfers. <strong>SUB</strong> hubs are governed by any MAIN hub. <strong>AGENCY</strong> hubs are independent.
         </small>
       </div>
       
@@ -39,9 +39,9 @@
       </div>
       
       <div class="mb-3" id="parent_hub_section" style="display: none;">
-        <label class="form-label fw-bold">Parent Hub <span class="text-danger">*</span></label>
+        <label class="form-label fw-bold">Parent Hub (Optional)</label>
         <select class="form-select" name="parent_location_id" id="parent_location_id">
-          <option value="">-- Select Parent MAIN Hub --</option>
+          <option value="">-- Select Parent MAIN Hub (Optional) --</option>
           {% for main_hub in main_hubs %}
           <option value="{{ main_hub.id }}" {% if depot and depot.parent_location_id == main_hub.id %}selected{% endif %}>
             {{ main_hub.name }}
@@ -49,14 +49,18 @@
           {% endfor %}
         </select>
         <small class="text-muted">
-          <i class="bi bi-diagram-3"></i> This hub will report to the selected MAIN hub for transfer approvals.
+          <i class="bi bi-diagram-3"></i> For AGENCY hubs: Optionally link to a MAIN hub for tracking purposes. This does not restrict which MAIN hub can approve transfers.
         </small>
       </div>
       
       <div class="alert alert-info">
         <i class="bi bi-lightbulb me-2"></i>
-        <strong>Hub Hierarchy:</strong> 
-        MAIN hubs can execute transfers immediately. SUB and AGENCY hubs must submit transfer requests that require MAIN hub approval.
+        <strong>Hub Orchestration:</strong> 
+        <ul class="mb-0 mt-2">
+          <li><strong>MAIN</strong> hubs oversee all SUB hubs and can approve/execute all transfers immediately.</li>
+          <li><strong>SUB</strong> hubs are governed by any MAIN hub. Transfers require MAIN hub approval.</li>
+          <li><strong>AGENCY</strong> hubs are independent. They can request items from MAIN hubs.</li>
+        </ul>
       </div>
       
       <div class="d-flex gap-2">
@@ -78,9 +82,11 @@ function toggleParentHub() {
   const parentSection = document.getElementById('parent_hub_section');
   const parentSelect = document.getElementById('parent_location_id');
   
-  if (hubType === 'SUB' || hubType === 'AGENCY') {
+  // Only show parent hub section for AGENCY hubs (optional)
+  // SUB hubs are orchestrated by ALL MAIN hubs, no specific parent needed
+  if (hubType === 'AGENCY') {
     parentSection.style.display = 'block';
-    parentSelect.required = true;
+    parentSelect.required = false; // Optional for AGENCY
   } else {
     parentSection.style.display = 'none';
     parentSelect.required = false;

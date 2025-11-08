@@ -9,10 +9,10 @@
 
 <div class="alert alert-info">
   <i class="bi bi-info-circle me-2"></i>
-  <strong>Hub Types:</strong>
-  <span class="badge bg-success ms-2">MAIN</span> Central hubs can approve transfers immediately.
-  <span class="badge bg-primary ms-2">SUB</span> Regional hubs report to MAIN hubs.
-  <span class="badge bg-warning text-dark ms-2">AGENCY</span> Agency hubs report to MAIN hubs.
+  <strong>Hub Orchestration Model:</strong>
+  <span class="badge bg-success ms-2">MAIN</span> Orchestrates all SUB hubs, approves/executes transfers immediately.
+  <span class="badge bg-primary ms-2">SUB</span> Governed by any MAIN hub, transfer requests require MAIN approval.
+  <span class="badge bg-warning text-dark ms-2">AGENCY</span> Independent agencies that can request items from MAIN hubs.
 </div>
 
 <table class="table table-hover">
@@ -69,7 +69,9 @@
         {% endif %}
       </td>
       <td>
-        {% if loc.parent_hub %}
+        {% if loc.hub_type == 'SUB' %}
+          <span class="text-muted small">All MAIN hubs</span>
+        {% elif loc.parent_hub %}
           <i class="bi bi-arrow-return-right me-1 text-muted"></i>
           {{ loc.parent_hub.name }}
         {% else %}
@@ -112,47 +114,79 @@
 {% if locations %}
 <div class="card mt-4">
   <div class="card-header bg-light">
-    <i class="bi bi-diagram-3 me-2"></i>Hub Hierarchy Overview
+    <i class="bi bi-diagram-3 me-2"></i>Hub Orchestration Overview
   </div>
   <div class="card-body">
-    {% for main_hub in locations if main_hub.hub_type == 'MAIN' %}
-      <div class="mb-3">
-        <div class="d-flex align-items-center mb-2">
-          <i class="bi bi-building-fill text-success me-2 fs-5"></i>
-          <strong class="fs-5">{{ main_hub.name }}</strong>
-          <span class="badge bg-success ms-2">MAIN HUB</span>
-        </div>
-        
-        {% set child_hubs = locations|selectattr('parent_location_id', 'equalto', main_hub.id)|list %}
-        {% if child_hubs %}
-          <div class="ms-4">
-            {% for child in child_hubs %}
-              <div class="d-flex align-items-center mb-1">
-                <span class="text-muted me-2">└─</span>
-                {% if child.hub_type == 'SUB' %}
-                  <i class="bi bi-diagram-3 text-primary me-2"></i>
-                  <span class="badge bg-primary">SUB</span>
-                {% else %}
-                  <i class="bi bi-diagram-2 text-warning me-2"></i>
-                  <span class="badge bg-warning text-dark">AGENCY</span>
-                {% endif %}
-                <span class="ms-2">{{ child.name }}</span>
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="ms-4 text-muted small">
-            <i class="bi bi-info-circle me-1"></i>No child hubs assigned
-          </div>
-        {% endif %}
+    <div class="row">
+      <div class="col-md-6">
+        <h6 class="text-success"><i class="bi bi-building-fill me-2"></i>MAIN Hubs (Orchestrators)</h6>
+        <ul class="list-unstyled ms-3">
+          {% for main_hub in locations if main_hub.hub_type == 'MAIN' %}
+            <li class="mb-1">
+              <span class="badge bg-success">{{ main_hub.name }}</span>
+              {% if main_hub.status == 'Active' %}
+                <i class="bi bi-check-circle text-success ms-1"></i>
+              {% else %}
+                <i class="bi bi-x-circle text-secondary ms-1"></i>
+              {% endif %}
+            </li>
+          {% else %}
+            <li class="text-muted small">No MAIN hubs defined</li>
+          {% endfor %}
+        </ul>
+        <small class="text-muted">
+          <i class="bi bi-info-circle me-1"></i>MAIN hubs oversee all SUB hubs and can approve any transfer request.
+        </small>
       </div>
-    {% endfor %}
+      
+      <div class="col-md-6">
+        <h6 class="text-primary"><i class="bi bi-diagram-3 me-2"></i>SUB Hubs (Governed)</h6>
+        <ul class="list-unstyled ms-3">
+          {% for sub_hub in locations if sub_hub.hub_type == 'SUB' %}
+            <li class="mb-1">
+              <span class="badge bg-primary">{{ sub_hub.name }}</span>
+              {% if sub_hub.status == 'Active' %}
+                <i class="bi bi-check-circle text-success ms-1"></i>
+              {% else %}
+                <i class="bi bi-x-circle text-secondary ms-1"></i>
+              {% endif %}
+            </li>
+          {% else %}
+            <li class="text-muted small">No SUB hubs defined</li>
+          {% endfor %}
+        </ul>
+        <small class="text-muted">
+          <i class="bi bi-info-circle me-1"></i>SUB hubs are orchestrated by any MAIN hub. No specific parent assignment needed.
+        </small>
+      </div>
+    </div>
     
-    {% if locations|selectattr('parent_location_id', 'none')|selectattr('hub_type', 'ne', 'MAIN')|list %}
-      <div class="alert alert-warning mb-0">
-        <i class="bi bi-exclamation-triangle me-2"></i>
-        <strong>Warning:</strong> Some non-MAIN hubs don't have a parent hub assigned. Edit them to link to a MAIN hub.
+    {% set agency_hubs = locations|selectattr('hub_type', 'equalto', 'AGENCY')|list %}
+    {% if agency_hubs %}
+    <hr>
+    <div class="row">
+      <div class="col-12">
+        <h6 class="text-warning"><i class="bi bi-diagram-2 me-2"></i>AGENCY Hubs (Independent)</h6>
+        <ul class="list-unstyled ms-3">
+          {% for agency in agency_hubs %}
+            <li class="mb-1">
+              <span class="badge bg-warning text-dark">{{ agency.name }}</span>
+              {% if agency.parent_hub %}
+                <small class="text-muted ms-2">(Linked to: {{ agency.parent_hub.name }})</small>
+              {% endif %}
+              {% if agency.status == 'Active' %}
+                <i class="bi bi-check-circle text-success ms-1"></i>
+              {% else %}
+                <i class="bi bi-x-circle text-secondary ms-1"></i>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        <small class="text-muted">
+          <i class="bi bi-info-circle me-1"></i>AGENCY hubs are independent. They can request items from MAIN hubs.
+        </small>
       </div>
+    </div>
     {% endif %}
   </div>
 </div>
