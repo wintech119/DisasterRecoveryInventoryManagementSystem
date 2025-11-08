@@ -192,6 +192,42 @@ class PackageStatusHistory(db.Model):
     
     package = db.relationship("DistributionPackage", back_populates="status_history")
 
+class NeedsList(db.Model):
+    """Needs lists created by AGENCY hubs and submitted to MAIN hubs for review"""
+    __tablename__ = 'needs_list'
+    id = db.Column(db.Integer, primary_key=True)
+    list_number = db.Column(db.String(64), unique=True, nullable=False, index=True)  # e.g., NL-000001
+    agency_hub_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=False)  # AGENCY hub creating the needs list
+    main_hub_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)  # MAIN hub to receive submission
+    event_id = db.Column(db.Integer, db.ForeignKey("disaster_event.id"), nullable=True)
+    status = db.Column(db.String(50), nullable=False, default="Draft")  # Draft, Submitted, Under Review, Approved, Rejected
+    priority = db.Column(db.String(20), nullable=False, default="Medium")  # Low, Medium, High, Urgent
+    notes = db.Column(db.Text, nullable=True)
+    created_by = db.Column(db.String(200), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    submitted_at = db.Column(db.DateTime, nullable=True)
+    reviewed_by = db.Column(db.String(200), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    review_notes = db.Column(db.Text, nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    agency_hub = db.relationship("Depot", foreign_keys=[agency_hub_id])
+    main_hub = db.relationship("Depot", foreign_keys=[main_hub_id])
+    event = db.relationship("DisasterEvent")
+    items = db.relationship("NeedsListItem", back_populates="needs_list", cascade="all, delete-orphan")
+
+class NeedsListItem(db.Model):
+    """Items requested in an agency hub's needs list"""
+    __tablename__ = 'needs_list_item'
+    id = db.Column(db.Integer, primary_key=True)
+    needs_list_id = db.Column(db.Integer, db.ForeignKey("needs_list.id"), nullable=False)
+    item_sku = db.Column(db.String(64), db.ForeignKey("item.sku"), nullable=False)
+    requested_qty = db.Column(db.Integer, nullable=False)
+    justification = db.Column(db.Text, nullable=True)  # Why this item is needed
+    
+    needs_list = db.relationship("NeedsList", back_populates="items")
+    item = db.relationship("Item")
+
 # ---------- Flask-Login Configuration ----------
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -298,6 +334,16 @@ def generate_package_number():
     else:
         new_num = 1
     return f"PKG-{new_num:06d}"
+
+def generate_needs_list_number():
+    """Generate a unique needs list number in format NL-NNNNNN"""
+    last_list = NeedsList.query.order_by(NeedsList.id.desc()).first()
+    if last_list:
+        last_num = int(last_list.list_number.split('-')[1])
+        new_num = last_num + 1
+    else:
+        new_num = 1
+    return f"NL-{new_num:06d}"
 
 def check_stock_availability(items_requested):
     """
@@ -1524,6 +1570,265 @@ def reject_transfer_request(request_id):
     
     flash(f"Transfer request rejected. {transfer_request.quantity} units of {item.name} from {from_depot.name} to {to_depot.name}.", "warning")
     return redirect(url_for("transfer_requests"))
+
+# ---------- NEEDS LIST ROUTES ----------
+
+@app.route("/needs-lists")
+@login_required
+def needs_lists():
+    """View needs lists - different views for AGENCY and MAIN hubs"""
+    user_depot = None
+    if current_user.assigned_location_id:
+        user_depot = Depot.query.get(current_user.assigned_location_id)
+    
+    if user_depot and user_depot.hub_type == 'AGENCY':
+        # AGENCY hub view: See only their own needs lists
+        lists = NeedsList.query.filter_by(agency_hub_id=user_depot.id).order_by(NeedsList.created_at.desc()).all()
+        return render_template("agency_needs_lists.html", needs_lists=lists, user_depot=user_depot)
+    
+    elif user_depot and user_depot.hub_type == 'MAIN':
+        # MAIN hub view: See needs lists submitted to them
+        lists = NeedsList.query.filter_by(main_hub_id=user_depot.id, status='Submitted').order_by(NeedsList.submitted_at.desc()).all()
+        reviewed_lists = NeedsList.query.filter_by(main_hub_id=user_depot.id).filter(
+            NeedsList.status.in_(['Under Review', 'Approved', 'Rejected'])
+        ).order_by(NeedsList.reviewed_at.desc()).limit(20).all()
+        return render_template("main_needs_lists.html", pending_lists=lists, reviewed_lists=reviewed_lists, user_depot=user_depot)
+    
+    else:
+        # Non-hub users or admins: See all needs lists
+        all_lists = NeedsList.query.order_by(NeedsList.created_at.desc()).all()
+        return render_template("all_needs_lists.html", needs_lists=all_lists)
+
+@app.route("/needs-lists/create", methods=["GET", "POST"])
+@login_required
+def needs_list_create():
+    """Create a new needs list - AGENCY hubs only"""
+    # Verify user is from AGENCY hub
+    if not current_user.assigned_location_id:
+        flash("You must be assigned to an AGENCY hub to create needs lists.", "danger")
+        return redirect(url_for("dashboard"))
+    
+    user_depot = Depot.query.get(current_user.assigned_location_id)
+    if not user_depot or user_depot.hub_type != 'AGENCY':
+        flash("Only AGENCY hub staff can create needs lists.", "danger")
+        return redirect(url_for("dashboard"))
+    
+    if request.method == "POST":
+        event_id = request.form.get("event_id") or None
+        priority = request.form.get("priority", "Medium")
+        notes = request.form.get("notes", "").strip() or None
+        
+        # Parse items from form
+        items_data = []
+        item_index = 0
+        while True:
+            sku_field = f"item_sku_{item_index}"
+            if sku_field not in request.form:
+                break
+            
+            sku = request.form.get(sku_field, "").strip()
+            if sku:
+                try:
+                    qty_str = request.form.get(f"item_qty_{item_index}", "0").strip()
+                    requested_qty = int(qty_str) if qty_str else 0
+                    justification = request.form.get(f"item_justification_{item_index}", "").strip() or None
+                    
+                    if requested_qty > 0:
+                        items_data.append({
+                            'sku': sku,
+                            'requested_qty': requested_qty,
+                            'justification': justification
+                        })
+                except ValueError:
+                    flash(f"Invalid quantity for item {sku}.", "danger")
+                    return redirect(url_for("needs_list_create"))
+            
+            item_index += 1
+        
+        if not items_data:
+            flash("At least one item with quantity is required.", "danger")
+            return redirect(url_for("needs_list_create"))
+        
+        # Create needs list
+        needs_list = NeedsList(
+            list_number=generate_needs_list_number(),
+            agency_hub_id=user_depot.id,
+            event_id=int(event_id) if event_id else None,
+            status="Draft",
+            priority=priority,
+            notes=notes,
+            created_by=current_user.full_name
+        )
+        db.session.add(needs_list)
+        db.session.flush()
+        
+        # Add items
+        for item_data in items_data:
+            needs_list_item = NeedsListItem(
+                needs_list_id=needs_list.id,
+                item_sku=item_data['sku'],
+                requested_qty=item_data['requested_qty'],
+                justification=item_data['justification']
+            )
+            db.session.add(needs_list_item)
+        
+        db.session.commit()
+        
+        flash(f"Needs list {needs_list.list_number} created successfully.", "success")
+        return redirect(url_for("needs_list_details", list_id=needs_list.id))
+    
+    # GET request
+    events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
+    items = Item.query.order_by(Item.name).all()
+    
+    return render_template("needs_list_form.html", events=events, items=items, user_depot=user_depot)
+
+@app.route("/needs-lists/<int:list_id>")
+@login_required
+def needs_list_details(list_id):
+    """View needs list details"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    # Permission check
+    user_depot = None
+    if current_user.assigned_location_id:
+        user_depot = Depot.query.get(current_user.assigned_location_id)
+    
+    # Allow access if: user is from agency that owns it, from MAIN hub it's submitted to, or is admin
+    can_access = False
+    if current_user.role == ROLE_ADMIN:
+        can_access = True
+    elif user_depot:
+        if user_depot.id == needs_list.agency_hub_id:
+            can_access = True
+        elif user_depot.id == needs_list.main_hub_id and needs_list.status != 'Draft':
+            can_access = True
+    
+    if not can_access:
+        flash("You don't have permission to view this needs list.", "danger")
+        return redirect(url_for("dashboard"))
+    
+    # Get MAIN hubs for submission (if draft and owned by agency)
+    main_hubs = []
+    if user_depot and user_depot.hub_type == 'AGENCY' and needs_list.status == 'Draft' and user_depot.id == needs_list.agency_hub_id:
+        main_hubs = Depot.query.filter_by(hub_type='MAIN').order_by(Depot.name).all()
+    
+    # Get stock availability for MAIN hub users
+    stock_map = {}
+    if user_depot and user_depot.hub_type == 'MAIN':
+        stock_map = get_stock_by_location()
+    
+    return render_template("needs_list_details.html", needs_list=needs_list, user_depot=user_depot, stock_map=stock_map, main_hubs=main_hubs)
+
+@app.route("/needs-lists/<int:list_id>/submit", methods=["POST"])
+@login_required
+def needs_list_submit(list_id):
+    """Submit needs list to a MAIN hub - AGENCY hubs only"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    # Verify user is from the agency hub that owns this list
+    if not current_user.assigned_location_id:
+        flash("You must be assigned to an AGENCY hub.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    user_depot = Depot.query.get(current_user.assigned_location_id)
+    if not user_depot or user_depot.hub_type != 'AGENCY' or user_depot.id != needs_list.agency_hub_id:
+        flash("Only the owning AGENCY hub can submit this needs list.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    if needs_list.status != 'Draft':
+        flash("Only draft needs lists can be submitted.", "warning")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    # Get selected MAIN hub
+    main_hub_id = request.form.get("main_hub_id")
+    if not main_hub_id:
+        flash("Please select a MAIN hub to submit to.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    main_hub = Depot.query.get(int(main_hub_id))
+    if not main_hub or main_hub.hub_type != 'MAIN':
+        flash("Invalid MAIN hub selected.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    # Submit
+    needs_list.main_hub_id = main_hub.id
+    needs_list.status = 'Submitted'
+    needs_list.submitted_at = datetime.utcnow()
+    db.session.commit()
+    
+    flash(f"Needs list {needs_list.list_number} submitted to {main_hub.name} successfully.", "success")
+    return redirect(url_for("needs_list_details", list_id=list_id))
+
+@app.route("/needs-lists/<int:list_id>/review", methods=["POST"])
+@login_required
+def needs_list_review(list_id):
+    """Review (approve/reject) a needs list - MAIN hubs only"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    # Verify user is from MAIN hub that received this list
+    if not current_user.assigned_location_id:
+        flash("You must be assigned to a MAIN hub.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    user_depot = Depot.query.get(current_user.assigned_location_id)
+    if not user_depot or user_depot.hub_type != 'MAIN' or user_depot.id != needs_list.main_hub_id:
+        flash("Only the receiving MAIN hub can review this needs list.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    if needs_list.status not in ['Submitted', 'Under Review']:
+        flash("This needs list cannot be reviewed.", "warning")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    action = request.form.get("action")
+    review_notes = request.form.get("review_notes", "").strip() or None
+    
+    if action == "approve":
+        needs_list.status = 'Approved'
+        flash(f"Needs list {needs_list.list_number} approved successfully.", "success")
+    elif action == "reject":
+        needs_list.status = 'Rejected'
+        flash(f"Needs list {needs_list.list_number} rejected.", "info")
+    elif action == "review":
+        needs_list.status = 'Under Review'
+        flash(f"Needs list {needs_list.list_number} marked as under review.", "info")
+    else:
+        flash("Invalid action.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    needs_list.reviewed_by = current_user.full_name
+    needs_list.reviewed_at = datetime.utcnow()
+    needs_list.review_notes = review_notes
+    db.session.commit()
+    
+    return redirect(url_for("needs_list_details", list_id=list_id))
+
+@app.route("/needs-lists/<int:list_id>/delete", methods=["POST"])
+@login_required
+def needs_list_delete(list_id):
+    """Delete a draft needs list - AGENCY hubs only"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    # Verify user is from the agency hub that owns this list
+    if not current_user.assigned_location_id:
+        flash("You must be assigned to an AGENCY hub.", "danger")
+        return redirect(url_for("needs_lists"))
+    
+    user_depot = Depot.query.get(current_user.assigned_location_id)
+    if not user_depot or user_depot.hub_type != 'AGENCY' or user_depot.id != needs_list.agency_hub_id:
+        flash("Only the owning AGENCY hub can delete this needs list.", "danger")
+        return redirect(url_for("needs_lists"))
+    
+    if needs_list.status != 'Draft':
+        flash("Only draft needs lists can be deleted.", "warning")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    list_number = needs_list.list_number
+    db.session.delete(needs_list)
+    db.session.commit()
+    
+    flash(f"Needs list {list_number} deleted successfully.", "success")
+    return redirect(url_for("needs_lists"))
 
 @app.route("/packages/<int:package_id>/fulfill", methods=["GET", "POST"])
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
