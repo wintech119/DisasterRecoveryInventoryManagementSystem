@@ -1393,7 +1393,7 @@ def package_create():
 @app.route("/stock-transfer", methods=["GET", "POST"])
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
 def stock_transfer():
-    """Transfer stock between depots"""
+    """Transfer stock between depots with approval workflow based on hub type"""
     if request.method == "POST":
         item_sku = request.form.get("item_sku")
         from_depot_id = request.form.get("from_depot_id")
@@ -1439,33 +1439,72 @@ def stock_transfer():
                 flash(f"Insufficient stock at {from_depot.name}. Available: {available_stock}, Requested: {quantity}", "danger")
                 return redirect(url_for("stock_transfer"))
             
-            # Create OUT transaction from source depot
-            transfer_note = f"Stock transfer to {to_depot.name}. {notes}" if notes else f"Stock transfer to {to_depot.name}"
-            out_transaction = Transaction(
-                item_sku=item_sku,
-                ttype="OUT",
-                qty=quantity,
-                location_id=from_depot_id,
-                notes=transfer_note,
-                created_by=current_user.full_name
-            )
-            db.session.add(out_transaction)
+            # Determine user's hub type based on their assigned location
+            # Only ADMIN role can execute transfers without assigned location
+            if not current_user.assigned_location_id:
+                if current_user.role == 'ADMIN':
+                    user_hub_type = 'MAIN'  # ADMIN has MAIN hub privileges
+                else:
+                    flash("You must have an assigned depot to perform transfers. Please contact an administrator.", "danger")
+                    return redirect(url_for("stock_transfer"))
+            else:
+                user_depot = Depot.query.get(current_user.assigned_location_id)
+                if not user_depot:
+                    flash("Your assigned depot could not be found. Please contact an administrator.", "danger")
+                    return redirect(url_for("stock_transfer"))
+                
+                user_hub_type = user_depot.hub_type
+                
+                # SUB/AGENCY users can only transfer from their assigned depot
+                if user_hub_type in ['SUB', 'AGENCY'] and from_depot_id != current_user.assigned_location_id:
+                    flash(f"You can only transfer stock from your assigned depot: {user_depot.name}", "danger")
+                    return redirect(url_for("stock_transfer"))
             
-            # Create IN transaction to destination depot
-            in_note = f"Stock transfer from {from_depot.name}. {notes}" if notes else f"Stock transfer from {from_depot.name}"
-            in_transaction = Transaction(
-                item_sku=item_sku,
-                ttype="IN",
-                qty=quantity,
-                location_id=to_depot_id,
-                notes=in_note,
-                created_by=current_user.full_name
-            )
-            db.session.add(in_transaction)
+            # Check hub type to determine if approval is needed
+            # MAIN hub can transfer immediately, SUB/AGENCY need approval
+            if user_hub_type == 'MAIN':
+                # MAIN hub: Execute transfer immediately
+                transfer_note = f"Stock transfer to {to_depot.name}. {notes}" if notes else f"Stock transfer to {to_depot.name}"
+                out_transaction = Transaction(
+                    item_sku=item_sku,
+                    ttype="OUT",
+                    qty=quantity,
+                    location_id=from_depot_id,
+                    notes=transfer_note,
+                    created_by=current_user.full_name
+                )
+                db.session.add(out_transaction)
+                
+                in_note = f"Stock transfer from {from_depot.name}. {notes}" if notes else f"Stock transfer from {from_depot.name}"
+                in_transaction = Transaction(
+                    item_sku=item_sku,
+                    ttype="IN",
+                    qty=quantity,
+                    location_id=to_depot_id,
+                    notes=in_note,
+                    created_by=current_user.full_name
+                )
+                db.session.add(in_transaction)
+                
+                db.session.commit()
+                
+                flash(f"Successfully transferred {quantity} units of {item.name} from {from_depot.name} to {to_depot.name}.", "success")
+            else:
+                # SUB or AGENCY hub: Create transfer request for approval
+                transfer_request = TransferRequest(
+                    from_location_id=from_depot_id,
+                    to_location_id=to_depot_id,
+                    item_sku=item_sku,
+                    quantity=quantity,
+                    status='PENDING',
+                    requested_by=current_user.id,
+                    notes=notes
+                )
+                db.session.add(transfer_request)
+                db.session.commit()
+                
+                flash(f"Transfer request submitted for approval. {quantity} units of {item.name} from {from_depot.name} to {to_depot.name}. This will be reviewed by MAIN hub staff.", "info")
             
-            db.session.commit()
-            
-            flash(f"Successfully transferred {quantity} units of {item.name} from {from_depot.name} to {to_depot.name}.", "success")
             return redirect(url_for("stock_transfer"))
             
         except ValueError:
@@ -1477,10 +1516,143 @@ def stock_transfer():
     depots = Depot.query.order_by(Depot.name).all()
     stock_map = get_stock_by_location()
     
+    # Get pending transfer requests for this user's depot (if SUB/AGENCY)
+    pending_requests = []
+    if current_user.assigned_location:
+        user_depot = Depot.query.get(current_user.assigned_location_id)
+        if user_depot and user_depot.hub_type in ['SUB', 'AGENCY']:
+            pending_requests = TransferRequest.query.filter(
+                TransferRequest.from_location_id == current_user.assigned_location_id,
+                TransferRequest.status == 'PENDING'
+            ).order_by(TransferRequest.requested_at.desc()).all()
+    
     return render_template("stock_transfer.html",
                          items=items,
                          depots=depots,
+                         stock_map=stock_map,
+                         pending_requests=pending_requests)
+
+@app.route("/transfer-requests")
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
+def transfer_requests():
+    """Approval queue for MAIN hub staff to review transfer requests"""
+    # Only show approval queue to users from MAIN hub
+    if current_user.assigned_location:
+        user_depot = Depot.query.get(current_user.assigned_location_id)
+        if not user_depot or user_depot.hub_type != 'MAIN':
+            flash("Only MAIN hub staff can access the transfer approval queue.", "warning")
+            return redirect(url_for("dashboard"))
+    
+    # Get all pending transfer requests
+    pending_requests = TransferRequest.query.filter_by(status='PENDING').order_by(TransferRequest.requested_at.desc()).all()
+    
+    # Get recently reviewed requests (last 30 days)
+    from datetime import timedelta
+    cutoff_date = datetime.utcnow() - timedelta(days=30)
+    reviewed_requests = TransferRequest.query.filter(
+        TransferRequest.status.in_(['APPROVED', 'REJECTED']),
+        TransferRequest.reviewed_at >= cutoff_date
+    ).order_by(TransferRequest.reviewed_at.desc()).limit(50).all()
+    
+    stock_map = get_stock_by_location()
+    
+    return render_template("transfer_requests.html",
+                         pending_requests=pending_requests,
+                         reviewed_requests=reviewed_requests,
                          stock_map=stock_map)
+
+@app.route("/transfer-requests/<int:request_id>/approve", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
+def approve_transfer_request(request_id):
+    """Approve a transfer request and execute the transfer"""
+    # Verify user is from MAIN hub
+    if current_user.assigned_location:
+        user_depot = Depot.query.get(current_user.assigned_location_id)
+        if not user_depot or user_depot.hub_type != 'MAIN':
+            flash("Only MAIN hub staff can approve transfer requests.", "danger")
+            return redirect(url_for("dashboard"))
+    
+    transfer_request = TransferRequest.query.get_or_404(request_id)
+    
+    if transfer_request.status != 'PENDING':
+        flash("This transfer request has already been reviewed.", "warning")
+        return redirect(url_for("transfer_requests"))
+    
+    # Verify stock availability
+    stock_map = get_stock_by_location()
+    available_stock = stock_map.get((transfer_request.item_sku, transfer_request.from_location_id), 0)
+    
+    if transfer_request.quantity > available_stock:
+        flash(f"Cannot approve: Insufficient stock. Available: {available_stock}, Requested: {transfer_request.quantity}", "danger")
+        return redirect(url_for("transfer_requests"))
+    
+    # Execute the transfer
+    from_depot = transfer_request.from_location
+    to_depot = transfer_request.to_location
+    item = transfer_request.item
+    
+    transfer_note = f"Approved transfer to {to_depot.name}. {transfer_request.notes}" if transfer_request.notes else f"Approved transfer to {to_depot.name}"
+    out_transaction = Transaction(
+        item_sku=transfer_request.item_sku,
+        ttype="OUT",
+        qty=transfer_request.quantity,
+        location_id=transfer_request.from_location_id,
+        notes=transfer_note,
+        created_by=current_user.full_name
+    )
+    db.session.add(out_transaction)
+    
+    in_note = f"Approved transfer from {from_depot.name}. {transfer_request.notes}" if transfer_request.notes else f"Approved transfer from {from_depot.name}"
+    in_transaction = Transaction(
+        item_sku=transfer_request.item_sku,
+        ttype="IN",
+        qty=transfer_request.quantity,
+        location_id=transfer_request.to_location_id,
+        notes=in_note,
+        created_by=current_user.full_name
+    )
+    db.session.add(in_transaction)
+    
+    # Update transfer request status
+    transfer_request.status = 'APPROVED'
+    transfer_request.reviewed_by = current_user.id
+    transfer_request.reviewed_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    flash(f"Transfer request approved and executed. {transfer_request.quantity} units of {item.name} transferred from {from_depot.name} to {to_depot.name}.", "success")
+    return redirect(url_for("transfer_requests"))
+
+@app.route("/transfer-requests/<int:request_id>/reject", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
+def reject_transfer_request(request_id):
+    """Reject a transfer request"""
+    # Verify user is from MAIN hub
+    if current_user.assigned_location:
+        user_depot = Depot.query.get(current_user.assigned_location_id)
+        if not user_depot or user_depot.hub_type != 'MAIN':
+            flash("Only MAIN hub staff can reject transfer requests.", "danger")
+            return redirect(url_for("dashboard"))
+    
+    transfer_request = TransferRequest.query.get_or_404(request_id)
+    
+    if transfer_request.status != 'PENDING':
+        flash("This transfer request has already been reviewed.", "warning")
+        return redirect(url_for("transfer_requests"))
+    
+    # Update transfer request status
+    transfer_request.status = 'REJECTED'
+    transfer_request.reviewed_by = current_user.id
+    transfer_request.reviewed_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    from_depot = transfer_request.from_location
+    to_depot = transfer_request.to_location
+    item = transfer_request.item
+    
+    flash(f"Transfer request rejected. {transfer_request.quantity} units of {item.name} from {from_depot.name} to {to_depot.name}.", "warning")
+    return redirect(url_for("transfer_requests"))
 
 @app.route("/packages/<int:package_id>/fulfill", methods=["GET", "POST"])
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)

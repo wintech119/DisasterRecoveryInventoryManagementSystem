@@ -37,10 +37,21 @@
                   <label for="from_depot_id" class="form-label fw-bold">From Depot (Source) <span class="text-danger">*</span></label>
                   <select id="from_depot_id" name="from_depot_id" class="form-select form-select-lg" required onchange="updateStockDisplay()">
                     <option value="">-- Select Source Depot --</option>
-                    {% for depot in depots %}
-                    <option value="{{ depot.id }}">{{ depot.name }}</option>
-                    {% endfor %}
+                    {% if current_user.assigned_location and current_user.assigned_location.hub_type in ['SUB', 'AGENCY'] %}
+                      {# SUB/AGENCY users can only transfer from their assigned depot #}
+                      <option value="{{ current_user.assigned_location.id }}">{{ current_user.assigned_location.name }} (Your Depot)</option>
+                    {% else %}
+                      {# MAIN hub users and ADMIN can select any depot #}
+                      {% for depot in depots %}
+                      <option value="{{ depot.id }}">{{ depot.name }} ({{ depot.hub_type }})</option>
+                      {% endfor %}
+                    {% endif %}
                   </select>
+                  {% if current_user.assigned_location and current_user.assigned_location.hub_type in ['SUB', 'AGENCY'] %}
+                  <small class="text-muted">
+                    <i class="bi bi-info-circle"></i> As a {{ current_user.assigned_location.hub_type }} hub user, you can only transfer from your assigned depot. Transfers require MAIN hub approval.
+                  </small>
+                  {% endif %}
                   <div id="source-stock-display" class="mt-2 p-2 bg-light rounded" style="display:none;">
                     <strong>Available Stock:</strong> 
                     <span id="source-stock-qty" class="badge bg-success fs-6 ms-2">0</span>

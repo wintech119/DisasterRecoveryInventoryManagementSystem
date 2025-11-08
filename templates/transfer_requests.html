@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Transfer Approval Queue - DRIMS{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-arrow-left-right"></i> Transfer Approval Queue</h2>
+        <a href="{{ url_for('stock_transfer') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Stock Transfer
+        </a>
+    </div>
+
+    {% if pending_requests %}
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="bi bi-clock-history"></i> Pending Approval ({{ pending_requests|length }})</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Request Date</th>
+                            <th>Item</th>
+                            <th>From Hub</th>
+                            <th>To Hub</th>
+                            <th>Quantity</th>
+                            <th>Available Stock</th>
+                            <th>Requested By</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in pending_requests %}
+                        <tr>
+                            <td>{{ req.requested_at.strftime('%Y-%m-%d %H:%M') if req.requested_at else 'N/A' }}</td>
+                            <td>
+                                <strong>{{ req.item.name }}</strong><br>
+                                <small class="text-muted">SKU: {{ req.item_sku }}</small>
+                            </td>
+                            <td>
+                                {{ req.from_location.name }}
+                                <span class="badge bg-secondary">{{ req.from_location.hub_type }}</span>
+                            </td>
+                            <td>
+                                {{ req.to_location.name }}
+                                <span class="badge bg-secondary">{{ req.to_location.hub_type }}</span>
+                            </td>
+                            <td><strong>{{ req.quantity }}</strong> {{ req.item.unit }}{{ 's' if req.quantity != 1 else '' }}</td>
+                            <td>
+                                {% set available = stock_map.get((req.item_sku, req.from_location_id), 0) %}
+                                {% if available >= req.quantity %}
+                                <span class="text-success">{{ available }} {{ req.item.unit }}{{ 's' if available != 1 else '' }}</span>
+                                {% else %}
+                                <span class="text-danger">{{ available }} {{ req.item.unit }}{{ 's' if available != 1 else '' }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ req.requester.full_name if req.requester else 'N/A' }}<br>
+                                <small class="text-muted">{{ req.requester.email if req.requester else '' }}</small>
+                            </td>
+                            <td>{{ req.notes if req.notes else '-' }}</td>
+                            <td>
+                                {% set available = stock_map.get((req.item_sku, req.from_location_id), 0) %}
+                                {% if available >= req.quantity %}
+                                <form method="POST" action="{{ url_for('approve_transfer_request', request_id=req.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-success" 
+                                            onclick="return confirm('Approve this transfer request and execute the transfer?')">
+                                        <i class="bi bi-check-circle"></i> Approve
+                                    </button>
+                                </form>
+                                {% else %}
+                                <button class="btn btn-sm btn-success" disabled title="Insufficient stock">
+                                    <i class="bi bi-check-circle"></i> Approve
+                                </button>
+                                {% endif %}
+                                <form method="POST" action="{{ url_for('reject_transfer_request', request_id=req.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-danger" 
+                                            onclick="return confirm('Reject this transfer request?')">
+                                        <i class="bi bi-x-circle"></i> Reject
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> No pending transfer requests at this time.
+    </div>
+    {% endif %}
+
+    {% if reviewed_requests %}
+    <div class="card">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="bi bi-archive"></i> Recently Reviewed (Last 30 Days)</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Request Date</th>
+                            <th>Item</th>
+                            <th>From → To</th>
+                            <th>Quantity</th>
+                            <th>Requested By</th>
+                            <th>Status</th>
+                            <th>Reviewed By</th>
+                            <th>Review Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in reviewed_requests %}
+                        <tr>
+                            <td>{{ req.requested_at.strftime('%Y-%m-%d %H:%M') if req.requested_at else 'N/A' }}</td>
+                            <td>{{ req.item.name }}</td>
+                            <td>
+                                {{ req.from_location.name }} <i class="bi bi-arrow-right"></i> {{ req.to_location.name }}
+                            </td>
+                            <td>{{ req.quantity }} {{ req.item.unit }}{{ 's' if req.quantity != 1 else '' }}</td>
+                            <td>{{ req.requester.full_name if req.requester else 'N/A' }}</td>
+                            <td>
+                                {% if req.status == 'APPROVED' %}
+                                <span class="badge bg-success">Approved</span>
+                                {% elif req.status == 'REJECTED' %}
+                                <span class="badge bg-danger">Rejected</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ req.reviewer.full_name if req.reviewer else 'N/A' }}</td>
+                            <td>{{ req.reviewed_at.strftime('%Y-%m-%d %H:%M') if req.reviewed_at else 'N/A' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

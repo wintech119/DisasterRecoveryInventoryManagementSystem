@@ -98,6 +98,13 @@
           {# Stock Transfer - visible to logistics staff and warehouse staff #}
           {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
             <li class="nav-item"><a class="nav-link" href="{{ url_for('stock_transfer') }}"><i class="bi bi-arrow-left-right me-1"></i>Transfer</a></li>
+            {# Transfer Approval Queue - only for MAIN hub users #}
+            {% if current_user.assigned_location %}
+              {% set user_depot = current_user.assigned_location %}
+              {% if user_depot.hub_type == 'MAIN' %}
+                <li class="nav-item"><a class="nav-link" href="{{ url_for('transfer_requests') }}"><i class="bi bi-check-circle me-1"></i>Approvals</a></li>
+              {% endif %}
+            {% endif %}
           {% endif %}
           
           {# My Needs Lists - visible to distributors #}

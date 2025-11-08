@@ -35,8 +35,25 @@ Stock levels are dynamically aggregated on-demand from transaction records (summ
 ### Stock Validation and Negative Stock Prevention
 Comprehensive validation prevents stock levels from falling below zero during distributions, transfers, and package dispatches/fulfillments. Error messages indicate item, depot, available, and requested quantities.
 
-### Stock Transfer Between Depots
-Enables logistics staff to transfer stock between depots with real-time stock visibility, live transfer previews, automatic validation, and linked IN/OUT transactions for an audit trail.
+### Three-Tier Hub Hierarchy System
+Implements a hierarchical depot structure with three hub types for managing stock distribution and approvals:
+- **MAIN Hub**: Central distribution hub (e.g., Pimento JDF) with authority to execute transfers immediately without approval. Can view and approve transfer requests from SUB and AGENCY hubs.
+- **SUB Hub**: Regional distribution hubs (e.g., Trelawny, Haining) that report to MAIN hub. Transfer requests require MAIN hub approval before execution.
+- **AGENCY Hub**: Independent agency-operated hubs (e.g., Montego Bay, Pimento) that report to MAIN hub. Transfer requests require MAIN hub approval before execution.
+
+**Hub Hierarchy Features:**
+- Each SUB and AGENCY hub has a parent_location_id linking to its MAIN hub
+- Self-referential relationship enables querying parent/child hub relationships
+- Transfer approval workflow based on hub type (MAIN transfers immediate, SUB/AGENCY require approval)
+
+### Stock Transfer Between Depots with Approval Workflow
+Enables logistics staff to transfer stock between depots with hub-based approval rules:
+- **MAIN Hub Users**: Transfers execute immediately without approval. Can access the Transfer Approval Queue to review and approve/reject requests from SUB and AGENCY hubs.
+- **SUB/AGENCY Hub Users**: Transfers create a TransferRequest for MAIN hub approval. Users can view their pending requests on the transfer page.
+- **Approval Queue**: MAIN hub staff can view all pending transfer requests, verify stock availability, and approve (executes transfer) or reject requests.
+- **Real-time validation**: Stock availability is checked before approval to prevent negative stock.
+- **Audit trail**: All transfer requests track requester, reviewer, timestamps, and status (PENDING/APPROVED/REJECTED).
+- **Linked transactions**: Approved transfers generate IN/OUT transactions with full audit trail.
 
 ### Dashboard Features
 Provides a comprehensive overview with KPIs, inventory by category, stock by location, low stock alerts, recent transactions, expiring item alerts, activity by disaster event, and transaction analytics.
