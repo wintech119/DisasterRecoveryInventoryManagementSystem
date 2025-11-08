@@ -12,10 +12,19 @@ Preferred communication style: Simple, everyday language.
 Built with Flask (Python) for rapid development and deployment.
 
 ### Data Model
-Utilizes SQLAlchemy ORM with a relational database design, supporting SQLite for development and PostgreSQL for production. Key entities include Items, Depots, Donors, Beneficiaries, DisasterEvents, and Transactions. Transactions are double-entry ("IN"/"OUT") for stock calculation and audit trails. Items feature auto-generated SKUs, standardized units, barcode support, and expiry dates tracked at the transaction level for batch management.
+Utilizes SQLAlchemy ORM with a relational database design, supporting SQLite for development and PostgreSQL for production. Key entities include Items, Depots, Donors, Beneficiaries, DisasterEvents, NeedsLists, and Transactions. Transactions are double-entry ("IN"/"OUT") for stock calculation and audit trails. Items feature auto-generated SKUs, standardized units, barcode support, and expiry dates tracked at the transaction level for batch management. NeedsLists enable AGENCY hubs to request items from MAIN hubs with approval workflows.
 
 ### Barcode Scanning for Intake
 Supports barcode scanning for efficient donation intake, reducing manual entry and errors. Items can store an optional barcode value, and the intake form allows scanning or manual entry to auto-select items and move to quantity fields.
+
+### Needs List Management for AGENCY Hubs
+Implements a workflow for AGENCY hubs to request items from MAIN hubs:
+- **AGENCY Hub Creation**: Only AGENCY hub staff can create and manage needs lists to request items from MAIN hubs.
+- **Submission to MAIN Hubs**: AGENCY hubs can submit draft needs lists only to MAIN hubs (not SUB or other AGENCY hubs). Each list includes priority levels (Low, Medium, High, Urgent) and optional justifications for each item.
+- **MAIN Hub Review**: MAIN hub staff can view submitted needs lists, check their own stock availability against requests, and approve, reject, or mark lists under review with notes.
+- **Status Workflow**: Draft → Submitted → Under Review → Approved/Rejected
+- **Agency Independence**: MAIN hubs see needs lists submitted to them but do not have access to full AGENCY hub inventory, maintaining operational independence.
+- **Audit Trail**: Complete tracking of needs list creation, submission, review actions, and timestamps.
 
 ### Distribution Package Management
 Implements a comprehensive workflow for creating, reviewing, and approving distribution packages destined for AGENCY hubs with five states: Draft, Under Review, Approved, Dispatched, and Delivered.
