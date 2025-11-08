@@ -17,13 +17,13 @@ Utilizes SQLAlchemy ORM with a relational database design, supporting SQLite for
 ### Barcode Scanning for Intake
 Supports barcode scanning for efficient donation intake, reducing manual entry and errors. Items can store an optional barcode value, and the intake form allows scanning or manual entry to auto-select items and move to quantity fields.
 
-### Needs List Management for AGENCY Hubs
-Implements a workflow for AGENCY hubs to request items from MAIN hubs:
-- **AGENCY Hub Creation**: Only AGENCY hub staff can create and manage needs lists to request items from MAIN hubs.
-- **Submission to MAIN Hubs**: AGENCY hubs can submit draft needs lists only to MAIN hubs (not SUB or other AGENCY hubs). Each list includes priority levels (Low, Medium, High, Urgent) and optional justifications for each item.
-- **MAIN Hub Review**: MAIN hub staff can view submitted needs lists, check their own stock availability against requests, and approve, reject, or mark lists under review with notes.
+### Needs List Management for AGENCY and SUB Hubs
+Implements a workflow for AGENCY and SUB hubs to request items from MAIN hubs:
+- **AGENCY and SUB Hub Creation**: AGENCY and SUB hub staff can create and manage needs lists to request items from MAIN hubs. Each hub type can only see their own needs lists.
+- **Submission to MAIN Hubs**: AGENCY and SUB hubs can submit draft needs lists only to MAIN hubs. Each list includes priority levels (Low, Medium, High, Urgent) and optional justifications for each item.
+- **MAIN Hub Review**: MAIN hub staff can view submitted needs lists from both AGENCY and SUB hubs, check their own stock availability against requests, and approve, reject, or mark lists under review with notes.
 - **Status Workflow**: Draft → Submitted → Under Review → Approved/Rejected
-- **Agency Independence**: MAIN hubs see needs lists submitted to them but do not have access to full AGENCY hub inventory, maintaining operational independence.
+- **Hub Independence**: SUB hubs cannot see needs lists from other SUB hubs or AGENCY hubs. AGENCY hubs cannot see needs lists from SUB hubs or other AGENCY hubs. MAIN hubs see needs lists submitted to them but do not have access to full AGENCY or SUB hub inventory, maintaining operational independence.
 - **Audit Trail**: Complete tracking of needs list creation, submission, review actions, and timestamps.
 
 ### Distribution Package Management
