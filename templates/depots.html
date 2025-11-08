@@ -22,7 +22,6 @@
       <th>Hub Name</th>
       <th>Hub Type</th>
       <th>Status</th>
-      <th>Parent Hub</th>
       <th>Operational Timestamp</th>
       <th>Total Stock (Units)</th>
       <th class="text-end">Actions</th>
@@ -39,10 +38,8 @@
           <i class="bi bi-building-fill text-success me-2"></i>
         {% elif loc.hub_type == 'SUB' %}
           <i class="bi bi-diagram-3 text-primary me-2"></i>
-          <span class="text-muted ms-2">└─</span>
         {% elif loc.hub_type == 'AGENCY' %}
           <i class="bi bi-diagram-2 text-warning me-2"></i>
-          <span class="text-muted ms-2">└─</span>
         {% endif %}
         <strong>{{ loc.name }}</strong>
       </td>
@@ -66,16 +63,6 @@
           <span class="badge bg-secondary">
             <i class="bi bi-x-circle me-1"></i>Inactive
           </span>
-        {% endif %}
-      </td>
-      <td>
-        {% if loc.hub_type == 'SUB' %}
-          <span class="text-muted small">All MAIN hubs</span>
-        {% elif loc.parent_hub %}
-          <i class="bi bi-arrow-return-right me-1 text-muted"></i>
-          {{ loc.parent_hub.name }}
-        {% else %}
-          <span class="text-muted">-</span>
         {% endif %}
       </td>
       <td>
@@ -106,7 +93,7 @@
       </td>
     </tr>
   {% else %}
-    <tr><td colspan="8" class="text-center py-3">No hubs found. Create one to get started.</td></tr>
+    <tr><td colspan="7" class="text-center py-3">No hubs found. Create one to get started.</td></tr>
   {% endfor %}
   </tbody>
 </table>
