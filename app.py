@@ -1057,6 +1057,7 @@ def depot_new():
         name = request.form["name"].strip()
         hub_type = request.form.get("hub_type", "MAIN")
         parent_location_id = request.form.get("parent_location_id")
+        status = request.form.get("status", "Active")
         
         if not name:
             flash("Depot name is required.", "danger")
@@ -1084,15 +1085,17 @@ def depot_new():
             flash(f"Depot '{name}' already exists.", "warning")
             return redirect(url_for("depots"))
         
-        # Create new depot with hub hierarchy
+        # Create new depot with hub hierarchy and status
         location = Depot(
             name=name,
             hub_type=hub_type,
-            parent_location_id=int(parent_location_id) if parent_location_id else None
+            parent_location_id=int(parent_location_id) if parent_location_id else None,
+            status=status,
+            operational_timestamp=datetime.utcnow() if status == 'Active' else None
         )
         db.session.add(location)
         db.session.commit()
-        flash(f"Depot '{name}' created successfully as a {hub_type} hub.", "success")
+        flash(f"Hub '{name}' created successfully as a {hub_type} hub with status: {status}.", "success")
         return redirect(url_for("depots"))
     
     # GET request - provide list of MAIN hubs for parent selection
@@ -1107,6 +1110,7 @@ def depot_edit(location_id):
         name = request.form["name"].strip()
         hub_type = request.form.get("hub_type", "MAIN")
         parent_location_id = request.form.get("parent_location_id")
+        new_status = request.form.get("status", "Active")
         
         if not name:
             flash("Depot name is required.", "danger")
@@ -1144,8 +1148,18 @@ def depot_edit(location_id):
         location.hub_type = hub_type
         location.parent_location_id = int(parent_location_id) if parent_location_id else None
         
+        # Handle status change and update operational_timestamp when activated
+        old_status = location.status
+        location.status = new_status
+        
+        # Record operational timestamp when hub is activated
+        if old_status != 'Active' and new_status == 'Active':
+            location.operational_timestamp = datetime.utcnow()
+            flash(f"Hub '{name}' updated and activated. Operational timestamp recorded.", "success")
+        else:
+            flash(f"Hub '{name}' updated successfully as a {hub_type} hub with status: {new_status}.", "success")
+        
         db.session.commit()
-        flash(f"Depot '{name}' updated successfully as a {hub_type} hub.", "success")
         return redirect(url_for("depots"))
     
     # GET request - provide list of MAIN hubs for parent selection

@@ -26,6 +26,18 @@
         </small>
       </div>
       
+      <div class="mb-3">
+        <label class="form-label fw-bold">Hub Status <span class="text-danger">*</span></label>
+        <select class="form-select" name="status" id="status" required>
+          <option value="Active" {% if not depot or depot.status == 'Active' %}selected{% endif %}>Active</option>
+          <option value="Inactive" {% if depot and depot.status == 'Inactive' %}selected{% endif %}>Inactive</option>
+        </select>
+        <small class="text-muted">
+          <i class="bi bi-clock-history"></i> 
+          When a Hub is set to <strong>Active</strong>, the system automatically records the activation timestamp.
+        </small>
+      </div>
+      
       <div class="mb-3" id="parent_hub_section" style="display: none;">
         <label class="form-label fw-bold">Parent Hub <span class="text-danger">*</span></label>
         <select class="form-select" name="parent_location_id" id="parent_location_id">

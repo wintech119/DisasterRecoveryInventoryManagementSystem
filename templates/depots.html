@@ -18,16 +18,22 @@
 <table class="table table-hover">
   <thead class="table-light">
     <tr>
-      <th>Depot Name</th>
+      <th>Hub ID</th>
+      <th>Hub Name</th>
       <th>Hub Type</th>
+      <th>Status</th>
       <th>Parent Hub</th>
+      <th>Operational Timestamp</th>
       <th>Total Stock (Units)</th>
       <th class="text-end">Actions</th>
     </tr>
   </thead>
   <tbody>
   {% for loc in locations %}
-    <tr>
+    <tr {% if loc.status == 'Inactive' %}class="table-secondary"{% endif %}>
+      <td>
+        <span class="badge bg-light text-dark">{{ loc.id }}</span>
+      </td>
       <td>
         {% if loc.hub_type == 'MAIN' %}
           <i class="bi bi-building-fill text-success me-2"></i>
@@ -52,9 +58,30 @@
         {% endif %}
       </td>
       <td>
+        {% if loc.status == 'Active' %}
+          <span class="badge bg-success">
+            <i class="bi bi-check-circle me-1"></i>Active
+          </span>
+        {% else %}
+          <span class="badge bg-secondary">
+            <i class="bi bi-x-circle me-1"></i>Inactive
+          </span>
+        {% endif %}
+      </td>
+      <td>
         {% if loc.parent_hub %}
           <i class="bi bi-arrow-return-right me-1 text-muted"></i>
           {{ loc.parent_hub.name }}
+        {% else %}
+          <span class="text-muted">-</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if loc.operational_timestamp %}
+          <small>
+            <i class="bi bi-clock-history me-1"></i>
+            {{ loc.operational_timestamp.strftime('%Y-%m-%d %H:%M') }}
+          </small>
         {% else %}
           <span class="text-muted">-</span>
         {% endif %}
@@ -77,7 +104,7 @@
       </td>
     </tr>
   {% else %}
-    <tr><td colspan="5" class="text-center py-3">No depots found. Create one to get started.</td></tr>
+    <tr><td colspan="8" class="text-center py-3">No hubs found. Create one to get started.</td></tr>
   {% endfor %}
   </tbody>
 </table>
