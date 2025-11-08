@@ -1576,7 +1576,7 @@ def reject_transfer_request(request_id):
 @app.route("/needs-lists")
 @login_required
 def needs_lists():
-    """View needs lists - different views for AGENCY and MAIN hubs"""
+    """View needs lists - different views for AGENCY, SUB, and MAIN hubs"""
     user_depot = None
     if current_user.assigned_location_id:
         user_depot = Depot.query.get(current_user.assigned_location_id)
@@ -1586,8 +1586,13 @@ def needs_lists():
         lists = NeedsList.query.filter_by(agency_hub_id=user_depot.id).order_by(NeedsList.created_at.desc()).all()
         return render_template("agency_needs_lists.html", needs_lists=lists, user_depot=user_depot)
     
+    elif user_depot and user_depot.hub_type == 'SUB':
+        # SUB hub view: See only their own needs lists (isolated from other SUB and AGENCY hubs)
+        lists = NeedsList.query.filter_by(agency_hub_id=user_depot.id).order_by(NeedsList.created_at.desc()).all()
+        return render_template("agency_needs_lists.html", needs_lists=lists, user_depot=user_depot)
+    
     elif user_depot and user_depot.hub_type == 'MAIN':
-        # MAIN hub view: See needs lists submitted to them
+        # MAIN hub view: See needs lists from both AGENCY and SUB hubs submitted to them
         lists = NeedsList.query.filter_by(main_hub_id=user_depot.id, status='Submitted').order_by(NeedsList.submitted_at.desc()).all()
         reviewed_lists = NeedsList.query.filter_by(main_hub_id=user_depot.id).filter(
             NeedsList.status.in_(['Under Review', 'Approved', 'Rejected'])
@@ -1602,15 +1607,15 @@ def needs_lists():
 @app.route("/needs-lists/create", methods=["GET", "POST"])
 @login_required
 def needs_list_create():
-    """Create a new needs list - AGENCY hubs only"""
-    # Verify user is from AGENCY hub
+    """Create a new needs list - AGENCY and SUB hubs only"""
+    # Verify user is from AGENCY or SUB hub
     if not current_user.assigned_location_id:
-        flash("You must be assigned to an AGENCY hub to create needs lists.", "danger")
+        flash("You must be assigned to an AGENCY or SUB hub to create needs lists.", "danger")
         return redirect(url_for("dashboard"))
     
     user_depot = Depot.query.get(current_user.assigned_location_id)
-    if not user_depot or user_depot.hub_type != 'AGENCY':
-        flash("Only AGENCY hub staff can create needs lists.", "danger")
+    if not user_depot or user_depot.hub_type not in ['AGENCY', 'SUB']:
+        flash("Only AGENCY and SUB hub staff can create needs lists.", "danger")
         return redirect(url_for("dashboard"))
     
     if request.method == "POST":
@@ -1708,9 +1713,9 @@ def needs_list_details(list_id):
         flash("You don't have permission to view this needs list.", "danger")
         return redirect(url_for("dashboard"))
     
-    # Get MAIN hubs for submission (if draft and owned by agency)
+    # Get MAIN hubs for submission (if draft and owned by agency/sub hub)
     main_hubs = []
-    if user_depot and user_depot.hub_type == 'AGENCY' and needs_list.status == 'Draft' and user_depot.id == needs_list.agency_hub_id:
+    if user_depot and user_depot.hub_type in ['AGENCY', 'SUB'] and needs_list.status == 'Draft' and user_depot.id == needs_list.agency_hub_id:
         main_hubs = Depot.query.filter_by(hub_type='MAIN').order_by(Depot.name).all()
     
     # Get stock availability for MAIN hub users
@@ -1723,17 +1728,17 @@ def needs_list_details(list_id):
 @app.route("/needs-lists/<int:list_id>/submit", methods=["POST"])
 @login_required
 def needs_list_submit(list_id):
-    """Submit needs list to a MAIN hub - AGENCY hubs only"""
+    """Submit needs list to a MAIN hub - AGENCY and SUB hubs only"""
     needs_list = NeedsList.query.get_or_404(list_id)
     
-    # Verify user is from the agency hub that owns this list
+    # Verify user is from the agency/sub hub that owns this list
     if not current_user.assigned_location_id:
-        flash("You must be assigned to an AGENCY hub.", "danger")
+        flash("You must be assigned to an AGENCY or SUB hub.", "danger")
         return redirect(url_for("needs_list_details", list_id=list_id))
     
     user_depot = Depot.query.get(current_user.assigned_location_id)
-    if not user_depot or user_depot.hub_type != 'AGENCY' or user_depot.id != needs_list.agency_hub_id:
-        flash("Only the owning AGENCY hub can submit this needs list.", "danger")
+    if not user_depot or user_depot.hub_type not in ['AGENCY', 'SUB'] or user_depot.id != needs_list.agency_hub_id:
+        flash("Only the owning AGENCY or SUB hub can submit this needs list.", "danger")
         return redirect(url_for("needs_list_details", list_id=list_id))
     
     if needs_list.status != 'Draft':
