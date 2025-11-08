@@ -25,6 +25,8 @@ class Depot(db.Model):
     name = db.Column(db.String(120), unique=True, nullable=False)  # e.g., Parish depot / shelter
     hub_type = db.Column(db.String(10), nullable=False, default='MAIN')  # MAIN, SUB, AGENCY
     parent_location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=True)  # Parent hub for SUB/AGENCY
+    status = db.Column(db.String(10), nullable=False, default='Active')  # Active or Inactive
+    operational_timestamp = db.Column(db.DateTime, nullable=True)  # Last time hub was activated
     
     parent_hub = db.relationship("Depot", remote_side=[id], backref="sub_hubs")
 
