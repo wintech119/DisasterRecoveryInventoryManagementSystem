@@ -53,19 +53,6 @@ class Beneficiary(db.Model):
     contact = db.Column(db.String(200), nullable=True)
     parish = db.Column(db.String(120), nullable=True)
 
-class Distributor(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
-    contact = db.Column(db.String(200), nullable=True)
-    organization = db.Column(db.String(200), nullable=True)
-    parish = db.Column(db.String(100), nullable=True)
-    address = db.Column(db.String(500), nullable=True)
-    latitude = db.Column(db.Float, nullable=True)
-    longitude = db.Column(db.Float, nullable=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)  # Link to distributor login account
-    
-    user = db.relationship("User", backref="distributor_profile")
-
 class DisasterEvent(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
@@ -84,7 +71,6 @@ class Transaction(db.Model):
     location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)
     donor_id = db.Column(db.Integer, db.ForeignKey("donor.id"), nullable=True)
     beneficiary_id = db.Column(db.Integer, db.ForeignKey("beneficiary.id"), nullable=True)
-    distributor_id = db.Column(db.Integer, db.ForeignKey("distributor.id"), nullable=True)
     event_id = db.Column(db.Integer, db.ForeignKey("disaster_event.id"), nullable=True)
     expiry_date = db.Column(db.Date, nullable=True)  # Expiry date for this batch of items
     notes = db.Column(db.Text, nullable=True)
@@ -95,7 +81,6 @@ class Transaction(db.Model):
     location = db.relationship("Depot")
     donor = db.relationship("Donor")
     beneficiary = db.relationship("Beneficiary")
-    distributor = db.relationship("Distributor")
     event = db.relationship("DisasterEvent")
 
 class TransferRequest(db.Model):
@@ -123,7 +108,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(200), unique=True, nullable=False, index=True)
     full_name = db.Column(db.String(200), nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    role = db.Column(db.String(50), nullable=False)  # WAREHOUSE_STAFF, FIELD_PERSONNEL, LOGISTICS_OFFICER, LOGISTICS_MANAGER, EXECUTIVE, ADMIN, AUDITOR, DISTRIBUTOR
+    role = db.Column(db.String(50), nullable=False)  # WAREHOUSE_STAFF, FIELD_PERSONNEL, LOGISTICS_OFFICER, LOGISTICS_MANAGER, EXECUTIVE, ADMIN, AUDITOR
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     assigned_location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)  # For warehouse staff
     last_login_at = db.Column(db.DateTime, nullable=True)
@@ -144,17 +129,13 @@ class User(UserMixin, db.Model):
         return str(self.id)
 
 class DistributionPackage(db.Model):
-    """Distribution packages created from distributor needs lists"""
+    """Distribution packages for relief operations"""
     id = db.Column(db.Integer, primary_key=True)
     package_number = db.Column(db.String(64), unique=True, nullable=False, index=True)  # e.g., PKG-000001
-    distributor_id = db.Column(db.Integer, db.ForeignKey("distributor.id"), nullable=False)
     assigned_location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)  # Warehouse/outpost
     event_id = db.Column(db.Integer, db.ForeignKey("disaster_event.id"), nullable=True)
     status = db.Column(db.String(50), nullable=False, default="Draft")  # Draft, Under Review, Approved, Dispatched, Delivered
     is_partial = db.Column(db.Boolean, default=False, nullable=False)  # True if stock insufficient for full fulfillment
-    distributor_accepted_partial = db.Column(db.Boolean, nullable=True)  # None=pending, True=accepted, False=rejected
-    distributor_response_at = db.Column(db.DateTime, nullable=True)
-    distributor_response_notes = db.Column(db.Text, nullable=True)
     created_by = db.Column(db.String(200), nullable=False)
     approved_by = db.Column(db.String(200), nullable=True)
     approved_at = db.Column(db.DateTime, nullable=True)
@@ -165,12 +146,10 @@ class DistributionPackage(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
-    distributor = db.relationship("Distributor")
     assigned_location = db.relationship("Depot")
     event = db.relationship("DisasterEvent")
     items = db.relationship("PackageItem", back_populates="package", cascade="all, delete-orphan")
     status_history = db.relationship("PackageStatusHistory", back_populates="package", cascade="all, delete-orphan")
-    notifications = db.relationship("DistributorNotification", back_populates="package", cascade="all, delete-orphan")
 
 class PackageItem(db.Model):
     """Items in a distribution package"""
@@ -211,19 +190,6 @@ class PackageStatusHistory(db.Model):
     
     package = db.relationship("DistributionPackage", back_populates="status_history")
 
-class DistributorNotification(db.Model):
-    """In-app notifications for distributors (partial fulfillment alerts)"""
-    id = db.Column(db.Integer, primary_key=True)
-    package_id = db.Column(db.Integer, db.ForeignKey("distribution_package.id"), nullable=False)
-    distributor_id = db.Column(db.Integer, db.ForeignKey("distributor.id"), nullable=False)
-    notification_type = db.Column(db.String(50), nullable=False)  # partial_fulfillment, status_update, etc.
-    message = db.Column(db.Text, nullable=False)
-    is_read = db.Column(db.Boolean, default=False, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    
-    package = db.relationship("DistributionPackage", back_populates="notifications")
-    distributor = db.relationship("Distributor")
-
 # ---------- Flask-Login Configuration ----------
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -235,20 +201,6 @@ login_manager.login_message_category = "warning"
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# ---------- Context Processor ----------
-@app.context_processor
-def inject_notification_count():
-    """Inject unread notification count for distributors into all templates"""
-    unread_count = 0
-    if current_user.is_authenticated and current_user.role == ROLE_DISTRIBUTOR:
-        distributor = Distributor.query.filter_by(user_id=current_user.id).first()
-        if distributor:
-            unread_count = DistributorNotification.query.filter_by(
-                distributor_id=distributor.id,
-                is_read=False
-            ).count()
-    return dict(unread_notification_count=unread_count)
-
 # ---------- Role Constants ----------
 ROLE_WAREHOUSE_STAFF = "WAREHOUSE_STAFF"
 ROLE_FIELD_PERSONNEL = "FIELD_PERSONNEL"
@@ -257,7 +209,6 @@ ROLE_LOGISTICS_MANAGER = "LOGISTICS_MANAGER"
 ROLE_EXECUTIVE = "EXECUTIVE"
 ROLE_ADMIN = "ADMIN"
 ROLE_AUDITOR = "AUDITOR"
-ROLE_DISTRIBUTOR = "DISTRIBUTOR"
 
 ALL_ROLES = [
     ROLE_WAREHOUSE_STAFF,
@@ -266,8 +217,7 @@ ALL_ROLES = [
     ROLE_LOGISTICS_MANAGER,
     ROLE_EXECUTIVE,
     ROLE_ADMIN,
-    ROLE_AUDITOR,
-    ROLE_DISTRIBUTOR
+    ROLE_AUDITOR
 ]
 
 # ---------- Utility ----------
@@ -409,66 +359,6 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     
     return R * c
 
-def assign_nearest_warehouse(distributor):
-    """
-    Assign package to nearest warehouse based on distributor's location.
-    Uses GPS coordinates if available, otherwise falls back to parish matching.
-    
-    Returns:
-        Depot object or None
-    """
-    locations = Depot.query.all()
-    if not locations:
-        return None
-    
-    # Method 1: Use GPS coordinates if both distributor and locations have them
-    # (Future enhancement: add latitude/longitude to Depot model for precise matching)
-    # For now, we'll use parish-based matching
-    
-    # Method 2: Parish matching (if distributor has parish field)
-    if distributor.parish:
-        distributor_parish_lower = distributor.parish.lower()
-        for location in locations:
-            location_name_lower = location.name.lower()
-            # Match if location name contains distributor's parish
-            if distributor_parish_lower in location_name_lower:
-                return location
-    
-    # Method 3: Legacy organization-based matching (fallback)
-    distributor_org = (distributor.organization or "").lower()
-    for location in locations:
-        location_name_lower = location.name.lower()
-        if any(parish in location_name_lower for parish in ["kingston", "st. andrew"] if parish in distributor_org):
-            return location
-        if "st. catherine" in distributor_org and "st. catherine" in location_name_lower:
-            return location
-        if "st. james" in distributor_org and "st. james" in location_name_lower:
-            return location
-        if "clarendon" in distributor_org and "clarendon" in location_name_lower:
-            return location
-    
-    # Fallback: return first available location
-    return locations[0]
-
-def create_package_notification(package, notification_type, message):
-    """
-    Create an in-app notification for the distributor.
-    
-    Args:
-        package: DistributionPackage object
-        notification_type: str (e.g., 'partial_fulfillment', 'status_update')
-        message: str - notification message
-    """
-    notification = DistributorNotification(
-        package_id=package.id,
-        distributor_id=package.distributor_id,
-        notification_type=notification_type,
-        message=message
-    )
-    db.session.add(notification)
-    db.session.commit()
-    return notification
-
 def record_package_status_change(package, old_status, new_status, changed_by, notes=None):
     """
     Record a package status change in the audit trail.
@@ -550,7 +440,6 @@ def dashboard():
     # KPIs - Operations
     total_donors = Donor.query.count()
     total_beneficiaries = Beneficiary.query.count()
-    total_distributors = Distributor.query.count()
     active_events = DisasterEvent.query.filter_by(status="Active").count()
     total_events = DisasterEvent.query.count()
     
@@ -684,7 +573,6 @@ def dashboard():
                            stock_by_category_full=stock_by_category_full,
                            total_donors=total_donors,
                            total_beneficiaries=total_beneficiaries,
-                           total_distributors=total_distributors,
                            active_events=active_events,
                            total_events=total_events,
                            total_intakes=total_intakes,
@@ -904,7 +792,6 @@ def barcode_lookup():
 def distribute():
     items = Item.query.order_by(Item.name.asc()).all()
     locations = Depot.query.order_by(Depot.name.asc()).all()
-    distributors = Distributor.query.order_by(Distributor.name.asc()).all()
     events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
     if request.method == "POST":
         item_sku = request.form["item_sku"]
@@ -912,7 +799,6 @@ def distribute():
         location_id = int(request.form["location_id"]) if request.form.get("location_id") else None
         beneficiary_name = request.form.get("beneficiary_name", "").strip() or None
         parish = request.form.get("parish", "").strip() or None
-        distributor_id = int(request.form["distributor_id"]) if request.form.get("distributor_id") else None
         event_id = int(request.form["event_id"]) if request.form.get("event_id") else None
         
         beneficiary = None
@@ -938,13 +824,13 @@ def distribute():
 
         tx = Transaction(item_sku=item_sku, ttype="OUT", qty=qty, location_id=location_id,
                          beneficiary_id=beneficiary.id if beneficiary else None, 
-                         distributor_id=distributor_id, event_id=event_id, notes=notes,
+                         event_id=event_id, notes=notes,
                          created_by=current_user.full_name)
         db.session.add(tx)
         db.session.commit()
         flash("Distribution recorded.", "success")
         return redirect(url_for("dashboard"))
-    return render_template("distribute.html", items=items, locations=locations, distributors=distributors, events=events)
+    return render_template("distribute.html", items=items, locations=locations, events=events)
 
 @app.route("/transactions")
 @login_required
@@ -1204,114 +1090,6 @@ def depot_inventory(location_id):
     
     return render_template("depot_inventory.html", depot=location, rows=rows)
 
-@app.route("/distributors")
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
-def distributors():
-    distrs = Distributor.query.order_by(Distributor.name.asc()).all()
-    # Get distribution count per distributor
-    dist_count = {}
-    for d in distrs:
-        count = Transaction.query.filter_by(distributor_id=d.id, ttype="OUT").count()
-        dist_count[d.id] = count
-    return render_template("distributors.html", distributors=distrs, dist_count=dist_count)
-
-@app.route("/distributors/new", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
-def distributor_new():
-    if request.method == "POST":
-        name = request.form["name"].strip()
-        if not name:
-            flash("Distributor name is required.", "danger")
-            return redirect(url_for("distributor_new"))
-        
-        contact = request.form.get("contact", "").strip() or None
-        organization = request.form.get("organization", "").strip() or None
-        parish = request.form.get("parish", "").strip() or None
-        address = request.form.get("address", "").strip() or None
-        
-        # Handle GPS coordinates
-        latitude = None
-        longitude = None
-        if request.form.get("latitude"):
-            try:
-                latitude = float(request.form.get("latitude"))
-            except ValueError:
-                flash("Invalid latitude value.", "warning")
-        if request.form.get("longitude"):
-            try:
-                longitude = float(request.form.get("longitude"))
-            except ValueError:
-                flash("Invalid longitude value.", "warning")
-        
-        distributor = Distributor(
-            name=name, 
-            contact=contact, 
-            organization=organization,
-            parish=parish,
-            address=address,
-            latitude=latitude,
-            longitude=longitude
-        )
-        db.session.add(distributor)
-        db.session.commit()
-        flash(f"Distributor '{name}' created successfully.", "success")
-        return redirect(url_for("distributors"))
-    
-    # Get list of Jamaican parishes for dropdown
-    parishes = [
-        "Kingston", "St. Andrew", "St. Thomas", "Portland", "St. Mary",
-        "St. Ann", "Trelawny", "St. James", "Hanover", "Westmoreland",
-        "St. Elizabeth", "Manchester", "Clarendon", "St. Catherine"
-    ]
-    return render_template("distributor_form.html", distributor=None, parishes=parishes)
-
-@app.route("/distributors/<int:distributor_id>/edit", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
-def distributor_edit(distributor_id):
-    distributor = Distributor.query.get_or_404(distributor_id)
-    if request.method == "POST":
-        name = request.form["name"].strip()
-        if not name:
-            flash("Distributor name is required.", "danger")
-            return redirect(url_for("distributor_edit", distributor_id=distributor_id))
-        
-        distributor.name = name
-        distributor.contact = request.form.get("contact", "").strip() or None
-        distributor.organization = request.form.get("organization", "").strip() or None
-        distributor.parish = request.form.get("parish", "").strip() or None
-        distributor.address = request.form.get("address", "").strip() or None
-        
-        # Handle GPS coordinates
-        if request.form.get("latitude"):
-            try:
-                distributor.latitude = float(request.form.get("latitude"))
-            except ValueError:
-                flash("Invalid latitude value.", "warning")
-                distributor.latitude = None
-        else:
-            distributor.latitude = None
-            
-        if request.form.get("longitude"):
-            try:
-                distributor.longitude = float(request.form.get("longitude"))
-            except ValueError:
-                flash("Invalid longitude value.", "warning")
-                distributor.longitude = None
-        else:
-            distributor.longitude = None
-        
-        db.session.commit()
-        flash(f"Distributor updated successfully.", "success")
-        return redirect(url_for("distributors"))
-    
-    # Get list of Jamaican parishes for dropdown
-    parishes = [
-        "Kingston", "St. Andrew", "St. Thomas", "Portland", "St. Mary",
-        "St. Ann", "Trelawny", "St. James", "Hanover", "Westmoreland",
-        "St. Elizabeth", "Manchester", "Clarendon", "St. Catherine"
-    ]
-    return render_template("distributor_form.html", distributor=distributor, parishes=parishes)
-
 # ---------- Distribution Package Routes ----------
 
 @app.route("/packages")
@@ -1319,40 +1097,29 @@ def distributor_edit(distributor_id):
 def packages():
     """List all distribution packages with filters"""
     status_filter = request.args.get("status")
-    distributor_filter = request.args.get("distributor_id")
     
     query = DistributionPackage.query
     
     if status_filter:
         query = query.filter_by(status=status_filter)
-    if distributor_filter:
-        query = query.filter_by(distributor_id=int(distributor_filter))
     
     packages_list = query.order_by(DistributionPackage.created_at.desc()).all()
-    distributors = Distributor.query.order_by(Distributor.name).all()
     
     # Define status options for filter
     status_options = ["Draft", "Under Review", "Approved", "Dispatched", "Delivered"]
     
     return render_template("packages.html", 
                          packages=packages_list, 
-                         distributors=distributors,
                          status_filter=status_filter,
-                         distributor_filter=distributor_filter,
                          status_options=status_options)
 
 @app.route("/packages/create", methods=["GET", "POST"])
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def package_create():
-    """Create a new distribution package from needs list"""
+    """Create a new distribution package"""
     if request.method == "POST":
-        distributor_id = request.form.get("distributor_id")
         event_id = request.form.get("event_id") or None
         notes = request.form.get("notes", "").strip() or None
-        
-        if not distributor_id:
-            flash("Distributor is required.", "danger")
-            return redirect(url_for("package_create"))
         
         # Parse items from form (dynamic fields: item_sku_N, item_requested_N, depot_allocation_N_DEPOT)
         items_data = []
@@ -1433,7 +1200,6 @@ def package_create():
         # Create package
         package = DistributionPackage(
             package_number=generate_package_number(),
-            distributor_id=int(distributor_id),
             event_id=int(event_id) if event_id else None,
             status="Draft",
             is_partial=is_partial,
@@ -1472,7 +1238,6 @@ def package_create():
         return redirect(url_for("package_details", package_id=package.id))
     
     # GET request
-    distributors = Distributor.query.order_by(Distributor.name).all()
     events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
     items = Item.query.order_by(Item.name).all()
     # Exclude AGENCY hubs from package fulfillment - they're independent agencies
@@ -1480,7 +1245,6 @@ def package_create():
     stock_map = get_stock_by_location()
     
     return render_template("package_form.html", 
-                         distributors=distributors, 
                          events=events,
                          items=items,
                          locations=locations,
@@ -1907,11 +1671,6 @@ def package_submit_review(package_id):
     record_package_status_change(package, old_status, "Under Review", current_user.full_name, 
                                 "Package submitted for review")
     
-    # If package is partial, create notification for distributor
-    if package.is_partial:
-        message = f"Package {package.package_number} has partial fulfillment. Some items are not available in requested quantities. Please review and accept or reject."
-        create_package_notification(package, "partial_fulfillment", message)
-    
     db.session.commit()
     
     flash(f"Package {package.package_number} submitted for review.", "success")
@@ -1927,15 +1686,6 @@ def package_approve(package_id):
         flash("Only packages under review can be approved.", "warning")
         return redirect(url_for("package_details", package_id=package_id))
     
-    # Check if partial and distributor hasn't accepted
-    if package.is_partial and package.distributor_accepted_partial is None:
-        flash("Waiting for distributor to accept partial fulfillment.", "warning")
-        return redirect(url_for("package_details", package_id=package_id))
-    
-    if package.is_partial and package.distributor_accepted_partial is False:
-        flash("Distributor rejected partial fulfillment. Package requires revision.", "warning")
-        return redirect(url_for("package_details", package_id=package_id))
-    
     approval_notes = request.form.get("approval_notes", "").strip() or None
     
     old_status = package.status
@@ -1944,20 +1694,11 @@ def package_approve(package_id):
     package.approved_at = datetime.utcnow()
     package.updated_at = datetime.utcnow()
     
-    # Auto-assign to nearest warehouse
-    assigned_location = assign_nearest_warehouse(package.distributor)
-    if assigned_location:
-        package.assigned_location_id = assigned_location.id
-    
     record_package_status_change(package, old_status, "Approved", current_user.full_name, approval_notes)
-    
-    # Create status update notification
-    message = f"Package {package.package_number} has been approved and assigned to {assigned_location.name if assigned_location else 'warehouse'}."
-    create_package_notification(package, "status_update", message)
     
     db.session.commit()
     
-    flash(f"Package {package.package_number} approved and assigned to {assigned_location.name if assigned_location else 'warehouse'}.", "success")
+    flash(f"Package {package.package_number} approved.", "success")
     return redirect(url_for("package_details", package_id=package_id))
 
 @app.route("/packages/<int:package_id>/dispatch", methods=["POST"])
@@ -1999,7 +1740,6 @@ def package_dispatch(package_id):
                     ttype="OUT",
                     qty=allocation.allocated_qty,
                     location_id=allocation.depot_id,  # Transaction from specific depot
-                    distributor_id=package.distributor_id,
                     event_id=package.event_id,
                     notes=f"Dispatched from {allocation.depot.name} via package {package.package_number}",
                     created_by=current_user.full_name
@@ -2013,10 +1753,6 @@ def package_dispatch(package_id):
     package.updated_at = datetime.utcnow()
     
     record_package_status_change(package, old_status, "Dispatched", current_user.full_name, dispatch_notes)
-    
-    # Create dispatch notification
-    message = f"Package {package.package_number} has been dispatched from {package.assigned_location.name}."
-    create_package_notification(package, "status_update", message)
     
     db.session.commit()
     
@@ -2042,216 +1778,10 @@ def package_deliver(package_id):
     
     record_package_status_change(package, old_status, "Delivered", current_user.full_name, delivery_notes)
     
-    # Create delivery confirmation notification
-    message = f"Package {package.package_number} has been marked as delivered."
-    create_package_notification(package, "status_update", message)
-    
     db.session.commit()
     
     flash(f"Package {package.package_number} marked as delivered.", "success")
     return redirect(url_for("package_details", package_id=package_id))
-
-@app.route("/packages/<int:package_id>/distributor_response", methods=["POST"])
-@login_required
-def package_distributor_response(package_id):
-    """Distributor accepts or rejects partial fulfillment"""
-    package = DistributionPackage.query.get_or_404(package_id)
-    
-    # Verify user has access to this distributor's packages
-    # For now, allow any logged-in user (in future, add distributor-user linking)
-    
-    if package.status != "Under Review":
-        flash("Package is not awaiting distributor response.", "warning")
-        return redirect(url_for("package_details", package_id=package_id))
-    
-    if not package.is_partial:
-        flash("This package has full fulfillment, no response needed.", "warning")
-        return redirect(url_for("package_details", package_id=package_id))
-    
-    response = request.form.get("response")  # 'accept' or 'reject'
-    response_notes = request.form.get("response_notes", "").strip() or None
-    
-    if response == "accept":
-        package.distributor_accepted_partial = True
-        flash_message = "You have accepted the partial fulfillment. Package will proceed to approval."
-        flash_type = "success"
-    elif response == "reject":
-        package.distributor_accepted_partial = False
-        flash_message = "You have requested revision. Inventory manager will be notified."
-        flash_type = "info"
-    else:
-        flash("Invalid response.", "danger")
-        return redirect(url_for("package_details", package_id=package_id))
-    
-    package.distributor_response_at = datetime.utcnow()
-    package.distributor_response_notes = response_notes
-    package.updated_at = datetime.utcnow()
-    
-    # Mark notification as read
-    for notification in package.notifications:
-        if notification.notification_type == "partial_fulfillment" and not notification.is_read:
-            notification.is_read = True
-    
-    # Create response record in audit trail
-    response_text = "Accepted partial fulfillment" if response == "accept" else "Rejected partial fulfillment - requested revision"
-    record_package_status_change(package, package.status, package.status, 
-                                package.distributor.name, 
-                                f"{response_text}. {response_notes or ''}")
-    
-    db.session.commit()
-    
-    flash(flash_message, flash_type)
-    return redirect(url_for("package_details", package_id=package_id))
-
-# ---------- Distributor Self-Service Routes ----------
-
-@app.route("/my-needs-lists")
-@role_required("DISTRIBUTOR")
-def distributor_needs_lists():
-    """Distributor view of their own needs lists (packages)"""
-    # Find distributor profile linked to current user
-    distributor = Distributor.query.filter_by(user_id=current_user.id).first()
-    
-    if not distributor:
-        flash("No distributor profile is linked to your account. Please contact administrator.", "warning")
-        return redirect(url_for("dashboard"))
-    
-    # Get packages for this distributor
-    packages = DistributionPackage.query.filter_by(distributor_id=distributor.id)\
-                                        .order_by(DistributionPackage.created_at.desc()).all()
-    
-    # Get all notifications (unread and read)
-    all_notifications = DistributorNotification.query.filter_by(
-        distributor_id=distributor.id
-    ).order_by(DistributorNotification.created_at.desc()).all()
-    
-    # Separate unread notifications
-    unread_notifications = [n for n in all_notifications if not n.is_read]
-    
-    return render_template("distributor_needs_lists.html", 
-                         packages=packages, 
-                         distributor=distributor,
-                         notifications=all_notifications,
-                         unread_notifications=unread_notifications)
-
-@app.route("/my-needs-lists/create", methods=["GET", "POST"])
-@role_required("DISTRIBUTOR")
-def distributor_create_needs_list():
-    """Distributor creates their own needs list"""
-    # Find distributor profile linked to current user
-    distributor = Distributor.query.filter_by(user_id=current_user.id).first()
-    
-    if not distributor:
-        flash("No distributor profile is linked to your account. Please contact administrator.", "danger")
-        return redirect(url_for("dashboard"))
-    
-    if request.method == "POST":
-        event_id = request.form.get("event_id") or None
-        notes = request.form.get("notes", "").strip() or None
-        
-        # Parse items from form (dynamic fields: item_sku_N, item_qty_N)
-        items_requested = []
-        item_index = 0
-        while True:
-            sku_key = f"item_sku_{item_index}"
-            qty_key = f"item_qty_{item_index}"
-            
-            if sku_key not in request.form:
-                break
-            
-            sku = request.form[sku_key].strip()
-            qty_str = request.form[qty_key].strip()
-            
-            if sku and qty_str:
-                try:
-                    qty = int(qty_str)
-                    if qty > 0:
-                        items_requested.append((sku, qty))
-                except ValueError:
-                    pass
-            
-            item_index += 1
-        
-        if not items_requested:
-            flash("At least one item with quantity is required.", "danger")
-            return redirect(url_for("distributor_create_needs_list"))
-        
-        # Create package in Draft state
-        package = DistributionPackage(
-            package_number=generate_package_number(),
-            distributor_id=distributor.id,
-            event_id=int(event_id) if event_id else None,
-            status="Draft",
-            is_partial=False,  # Will be checked when submitted for review
-            created_by=f"{current_user.full_name} (Distributor)"
-        )
-        db.session.add(package)
-        db.session.flush()  # Get package ID
-        
-        # Add package items
-        for sku, qty in items_requested:
-            package_item = PackageItem(
-                package_id=package.id,
-                item_sku=sku,
-                requested_qty=qty,
-                allocated_qty=qty  # Initially same as requested, will be adjusted during review
-            )
-            db.session.add(package_item)
-        
-        # Record initial status in audit trail
-        record_package_status_change(package, None, "Draft", current_user.full_name, 
-                                    f"Needs list created by distributor. {notes or ''}")
-        
-        db.session.commit()
-        
-        flash(f"Needs list {package.package_number} created successfully! It will be reviewed by inventory managers.", "success")
-        return redirect(url_for("distributor_needs_lists"))
-    
-    # GET request - show form
-    items = Item.query.order_by(Item.category.asc(), Item.name.asc()).all()
-    events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
-    
-    return render_template("distributor_needs_list_form.html", 
-                         items=items, 
-                         events=events,
-                         distributor=distributor)
-
-@app.route("/notifications/mark-read/<int:notification_id>", methods=["POST"])
-@role_required("DISTRIBUTOR")
-def mark_notification_read(notification_id):
-    """Mark a notification as read"""
-    notification = DistributorNotification.query.get_or_404(notification_id)
-    
-    # Verify the notification belongs to the current user's distributor
-    distributor = Distributor.query.filter_by(user_id=current_user.id).first()
-    if not distributor or notification.distributor_id != distributor.id:
-        flash("Unauthorized access to notification.", "danger")
-        return redirect(url_for("dashboard"))
-    
-    notification.is_read = True
-    db.session.commit()
-    
-    flash("Notification marked as read.", "success")
-    return redirect(request.referrer or url_for("distributor_needs_lists"))
-
-@app.route("/notifications/mark-all-read", methods=["POST"])
-@role_required("DISTRIBUTOR")
-def mark_all_notifications_read():
-    """Mark all notifications as read for current distributor"""
-    distributor = Distributor.query.filter_by(user_id=current_user.id).first()
-    
-    if not distributor:
-        flash("No distributor profile found.", "danger")
-        return redirect(url_for("dashboard"))
-    
-    DistributorNotification.query.filter_by(
-        distributor_id=distributor.id,
-        is_read=False
-    ).update({"is_read": True})
-    db.session.commit()
-    
-    flash("All notifications marked as read.", "success")
-    return redirect(url_for("distributor_needs_lists"))
 
 @app.route("/disaster-events")
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
@@ -2523,9 +2053,8 @@ def create_user():
     print("5. Executive Management")
     print("6. System Administrator")
     print("7. Auditor")
-    print("8. Distributor")
     
-    role_choice = input("\nSelect role (1-8): ").strip()
+    role_choice = input("\nSelect role (1-7): ").strip()
     role_map = {
         "1": ROLE_WAREHOUSE_STAFF,
         "2": ROLE_FIELD_PERSONNEL,
@@ -2533,8 +2062,7 @@ def create_user():
         "4": ROLE_LOGISTICS_MANAGER,
         "5": ROLE_EXECUTIVE,
         "6": ROLE_ADMIN,
-        "7": ROLE_AUDITOR,
-        "8": ROLE_DISTRIBUTOR
+        "7": ROLE_AUDITOR
     }
     
     if role_choice not in role_map:
