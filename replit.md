@@ -84,10 +84,15 @@ Implements Flask-Login with role-based access control (RBAC) for seven user role
 
 **Role Hierarchy and Responsibilities:**
 - **ADMIN**: Full system access including user management, can add/remove users and assign roles.
-- **LOGISTICS_MANAGER**: Supervises logistics operations, allocates items, approves packages, and reviews work done by Logistics Officers. **Final approval authority for Needs List fulfilments** - can approve/reject fulfilments and execute stock transfers. Can dispatch and deliver packages. Part of ODPEM (Office of Disaster Preparedness and Emergency Management).
+- **LOGISTICS_MANAGER**: Supervises logistics operations, allocates items, approves packages, and reviews work done by Logistics Officers. **Full access to Needs List workflow** - can prepare fulfilments by allocating stock from MAIN/SUB hubs AND provide final approval to execute stock transfers. Can dispatch and deliver packages. Part of ODPEM (Office of Disaster Preparedness and Emergency Management).
 - **LOGISTICS_OFFICER**: Creates draft allocations for distribution packages, manages inventory data, submits work for approval by Logistics Manager. **Prepares Needs List fulfilments** by reviewing requests, assigning quantities, and selecting source hubs (MAIN/SUB), then submitting for manager approval. Cannot finalize fulfilments independently. Can dispatch and deliver packages. Part of ODPEM.
-- **WAREHOUSE_STAFF**: Can dispatch and deliver packages.
+- **WAREHOUSE_STAFF**: Can dispatch and deliver packages. When assigned to AGENCY hubs, can create and submit needs lists, view received packages, and track hub-specific transactions.
 - **FIELD_PERSONNEL, EXECUTIVE, AUDITOR**: Operational and oversight roles.
+
+**AGENCY Hub User Experience:**
+- AGENCY hub users have a simplified navigation menu with only essential features: Needs Lists, Packages, and History.
+- They can create and submit supply requests to ODPEM, view the status of their requests through the approval workflow, and receive packages from ODPEM hubs.
+- A workflow guide is displayed on needs list detail pages to help users understand the complete process from draft to fulfillment.
 
 ### File Storage and Attachments
 Supports file attachments (e.g., product photos) stored locally in `/uploads/items/` with UUID-based filenames. A modular `storage_service.py` allows future migration to cloud storage.
