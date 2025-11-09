@@ -51,15 +51,22 @@
     <!-- Main Content Area -->
     <div class="col-lg-9">
       <!-- Enhanced Summary Panel for Completed Status -->
-      {% if needs_list.status == 'Completed' %}
+      {% if needs_list.status == 'Completed' and completed_context %}
         <div class="card border-0 shadow-sm mb-4">
           <div class="card-body p-4">
-            <div class="d-flex align-items-center mb-4">
-              <i class="bi bi-check-circle-fill text-success me-3" style="font-size: 2rem;"></i>
-              <div>
-                <h4 class="mb-1">Workflow Completed</h4>
-                <p class="text-muted mb-0">All approved items have been dispatched and received</p>
+            <div class="d-flex align-items-center justify-content-between mb-4">
+              <div class="d-flex align-items-center">
+                <i class="bi bi-check-circle-fill text-success me-3" style="font-size: 2rem;"></i>
+                <div>
+                  <h4 class="mb-1">Workflow Completed</h4>
+                  <p class="text-muted mb-0">All approved items have been dispatched and received</p>
+                </div>
               </div>
+              {% if completed_context.roles.agency.can_download_pdf %}
+                <a href="{{ url_for('needs_list_completed_report', list_id=needs_list.id) }}" class="btn btn-outline-primary" target="_blank">
+                  <i class="bi bi-file-earmark-pdf me-2"></i>Download Report
+                </a>
+              {% endif %}
             </div>
             
             <!-- Key Outcome Metrics -->
@@ -68,50 +75,36 @@
                 <div class="text-center p-3 bg-light rounded">
                   <i class="bi bi-box text-primary d-block mb-2" style="font-size: 1.5rem;"></i>
                   <small class="text-muted d-block">Total Items</small>
-                  <strong class="fs-5">{{ needs_list.items|length }}</strong>
+                  <strong class="fs-5">{{ completed_context.summary.total_items }}</strong>
                 </div>
               </div>
               
-              {% set total_dispatched_qty = 0 %}
-              {% set total_requested_qty = 0 %}
-              {% for item_entry in needs_list.items %}
-                {% set item_dispatched = 0 %}
-                {% for fulfilment in needs_list.fulfilments %}
-                  {% if fulfilment.item_sku == item_entry.item_sku %}
-                    {% set item_dispatched = item_dispatched + fulfilment.allocated_qty %}
-                  {% endif %}
-                {% endfor %}
-                {% set total_dispatched_qty = total_dispatched_qty + item_dispatched %}
-                {% set total_requested_qty = total_requested_qty + item_entry.requested_qty %}
-              {% endfor %}
-              {% set fulfillment_rate = ((total_dispatched_qty / total_requested_qty * 100)|int) if total_requested_qty > 0 else 0 %}
-              {% set shortfall_qty = [total_requested_qty - total_dispatched_qty, 0]|max %}
-              
               <div class="col-md-2">
                 <div class="text-center p-3 bg-light rounded">
-                  <i class="bi bi-check-circle {% if fulfillment_rate >= 100 %}text-success{% elif fulfillment_rate >= 50 %}text-warning{% else %}text-danger{% endif %} d-block mb-2" style="font-size: 1.5rem;"></i>
+                  <i class="bi bi-check-circle {{ completed_context.summary.fulfillment_class }} d-block mb-2" style="font-size: 1.5rem;"></i>
                   <small class="text-muted d-block">Fulfilled</small>
-                  <strong class="fs-5 {% if fulfillment_rate >= 100 %}text-success{% elif fulfillment_rate >= 50 %}text-warning{% else %}text-danger{% endif %}">{{ total_dispatched_qty }}</strong>
-                  <small class="d-block text-muted">of {{ total_requested_qty }}</small>
+                  <strong class="fs-5 {{ completed_context.summary.fulfillment_class }}">{{ completed_context.summary.total_dispatched_qty }}</strong>
+                  <small class="d-block text-muted">of {{ completed_context.summary.total_requested_qty }}</small>
                 </div>
               </div>
               
               <div class="col-md-2">
                 <div class="text-center p-3 bg-light rounded">
-                  <i class="bi bi-speedometer2 {% if fulfillment_rate >= 100 %}text-success{% elif fulfillment_rate >= 50 %}text-warning{% else %}text-danger{% endif %} d-block mb-2" style="font-size: 1.5rem;"></i>
+                  <i class="bi bi-speedometer2 {{ completed_context.summary.fulfillment_class }} d-block mb-2" style="font-size: 1.5rem;"></i>
                   <small class="text-muted d-block">Rate</small>
-                  <strong class="fs-5 {% if fulfillment_rate >= 100 %}text-success{% elif fulfillment_rate >= 50 %}text-warning{% else %}text-danger{% endif %}">{{ fulfillment_rate }}%</strong>
+                  <strong class="fs-5 {{ completed_context.summary.fulfillment_class }}">{{ completed_context.summary.fulfillment_rate }}%</strong>
                   <div class="progress mt-2" style="height: 6px;">
-                    <div class="progress-bar {% if fulfillment_rate >= 100 %}bg-success{% elif fulfillment_rate >= 50 %}bg-warning{% else %}bg-danger{% endif %}" style="width: {{ [fulfillment_rate, 100]|min }}%;"></div>
+                    {% set rate_class = 'bg-success' if completed_context.summary.fulfillment_rate >= 100 else 'bg-warning' if completed_context.summary.fulfillment_rate >= 50 else 'bg-danger' %}
+                    <div class="progress-bar {{ rate_class }}" style="width: {{ [completed_context.summary.fulfillment_rate, 100]|min }}%;"></div>
                   </div>
                 </div>
               </div>
               
               <div class="col-md-2">
                 <div class="text-center p-3 bg-light rounded">
-                  <i class="bi bi-{% if shortfall_qty == 0 %}check-circle text-success{% else %}exclamation-triangle text-warning{% endif %} d-block mb-2" style="font-size: 1.5rem;"></i>
+                  <i class="bi bi-{% if completed_context.summary.shortfall_qty == 0 %}check-circle text-success{% else %}exclamation-triangle text-warning{% endif %} d-block mb-2" style="font-size: 1.5rem;"></i>
                   <small class="text-muted d-block">Shortfall</small>
-                  <strong class="fs-5 {% if shortfall_qty == 0 %}text-success{% else %}text-warning{% endif %}">{{ shortfall_qty }}</strong>
+                  <strong class="fs-5 {% if completed_context.summary.shortfall_qty == 0 %}text-success{% else %}text-warning{% endif %}">{{ completed_context.summary.shortfall_qty }}</strong>
                   <small class="d-block text-muted">units</small>
                 </div>
               </div>
@@ -120,9 +113,9 @@
                 <div class="text-center p-3 bg-light rounded">
                   <i class="bi bi-truck text-primary d-block mb-2" style="font-size: 1.5rem;"></i>
                   <small class="text-muted d-block">Dispatched</small>
-                  {% if needs_list.dispatched_at %}
-                    <strong class="d-block">{{ needs_list.dispatched_at.strftime('%b %d') }}</strong>
-                    <small class="text-muted">{{ needs_list.dispatched_at.strftime('%H:%M') }}</small>
+                  {% if completed_context.summary.dispatch_date %}
+                    <strong class="d-block">{{ completed_context.summary.dispatch_date.strftime('%b %d') }}</strong>
+                    <small class="text-muted">{{ completed_context.summary.dispatch_date.strftime('%H:%M') }}</small>
                   {% else %}
                     <span class="text-muted">N/A</span>
                   {% endif %}
@@ -133,9 +126,9 @@
                 <div class="text-center p-3 bg-light rounded">
                   <i class="bi bi-check2-circle text-success d-block mb-2" style="font-size: 1.5rem;"></i>
                   <small class="text-muted d-block">Received</small>
-                  {% if needs_list.received_at %}
-                    <strong class="d-block">{{ needs_list.received_at.strftime('%b %d') }}</strong>
-                    <small class="text-muted">{{ needs_list.received_at.strftime('%H:%M') }}</small>
+                  {% if completed_context.summary.receipt_date %}
+                    <strong class="d-block">{{ completed_context.summary.receipt_date.strftime('%b %d') }}</strong>
+                    <small class="text-muted">{{ completed_context.summary.receipt_date.strftime('%H:%M') }}</small>
                   {% else %}
                     <span class="text-muted">N/A</span>
                   {% endif %}
@@ -143,16 +136,51 @@
               </div>
             </div>
             
-            {% if needs_list.received_by_user %}
+            {% if completed_context.summary.confirmed_by %}
               <div class="mt-3 p-3 bg-success bg-opacity-10 rounded border border-success">
                 <div class="d-flex align-items-center">
                   <i class="bi bi-person-check text-success me-2"></i>
-                  <span><strong>Confirmed by:</strong> {{ needs_list.received_by_user.full_name }} ({{ needs_list.agency_hub.name }})</span>
+                  <span><strong>Confirmed by:</strong> {{ completed_context.summary.confirmed_by }} ({{ needs_list.agency_hub.name }})</span>
+                </div>
+              </div>
+            {% endif %}
+            
+            <!-- Visual Timeline Component -->
+            {% if completed_context.timeline %}
+              <div class="mt-4">
+                <h6 class="mb-3"><i class="bi bi-clock-history me-2"></i>Workflow Timeline</h6>
+                <div class="timeline">
+                  {% for event in completed_context.timeline %}
+                    <div class="timeline-item">
+                      <div class="timeline-marker">
+                        <i class="{{ event.icon }}"></i>
+                      </div>
+                      <div class="timeline-content">
+                        <div class="d-flex justify-content-between align-items-start">
+                          <div>
+                            <strong>{{ event.label }}</strong>
+                            <p class="mb-1 small text-muted">
+                              <i class="bi bi-person me-1"></i>{{ event.actor }}
+                              <span class="mx-2">•</span>
+                              <i class="bi bi-calendar me-1"></i>{{ event.timestamp.strftime('%b %d, %Y %H:%M') }}
+                            </p>
+                            {% if event.notes %}
+                              <p class="mb-0 small text-muted"><i class="bi bi-sticky me-1"></i>{{ event.notes }}</p>
+                            {% endif %}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  {% endfor %}
                 </div>
               </div>
             {% endif %}
           </div>
         </div>
+        
+        <!-- Role-Specific Panels -->
+        {% include '_completed_role_panels.html' %}
+        
       {% endif %}
       
       <!-- Summary Panel -->

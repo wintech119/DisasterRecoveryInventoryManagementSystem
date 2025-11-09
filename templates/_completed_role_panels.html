@@ -1,0 +1,186 @@
+{# Role-Specific Panels for Completed Needs Lists #}
+{% if completed_context and completed_context.roles %}
+
+  {# Agency Hub Users - Simple summary of what they received #}
+  {% if current_user.assigned_location_id and current_user.assigned_location_id == needs_list.agency_hub_id %}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-bottom">
+        <h5 class="mb-0"><i class="bi bi-building me-2"></i>Receipt Summary</h5>
+      </div>
+      <div class="card-body p-4">
+        <div class="alert alert-success mb-4">
+          <div class="d-flex align-items-start">
+            <i class="bi bi-check-circle-fill me-3" style="font-size: 1.5rem;"></i>
+            <div>
+              <h6 class="alert-heading mb-2">Items Successfully Received</h6>
+              <p class="mb-0">Your request has been fulfilled. {{ completed_context.roles.agency.total_received }} units received from {{ completed_context.roles.agency.dispatch_sources|length }} source location(s).</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded">
+              <small class="text-muted d-block">Dispatch Sources</small>
+              <ul class="list-unstyled mb-0 mt-2">
+                {% for source in completed_context.roles.agency.dispatch_sources %}
+                  <li><i class="bi bi-geo-alt text-primary me-2"></i>{{ source }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="p-3 bg-light rounded">
+              <small class="text-muted d-block">Receipt Confirmation</small>
+              <p class="mb-1 mt-2">
+                <strong>Confirmed by:</strong> {{ completed_context.roles.agency.confirmed_by or 'N/A' }}
+              </p>
+              <p class="mb-0">
+                <strong>Date:</strong> {{ completed_context.roles.agency.confirmed_at.strftime('%b %d, %Y %H:%M') if completed_context.roles.agency.confirmed_at else 'N/A' }}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <p class="text-muted small mb-0">
+          <i class="bi bi-info-circle me-1"></i>
+          All approved items have been dispatched and confirmed. For detailed records, you can download the summary report above.
+        </p>
+      </div>
+    </div>
+  {% endif %}
+  
+  {# Logistics Officers - Operational visibility #}
+  {% if current_user.role in ['LOGISTICS_OFFICER', 'ADMIN'] %}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-bottom">
+        <h5 class="mb-0"><i class="bi bi-clipboard-data me-2"></i>Operational Summary</h5>
+      </div>
+      <div class="card-body p-4">
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded text-center">
+              <i class="bi bi-check-circle text-success d-block mb-2" style="font-size: 1.5rem;"></i>
+              <small class="text-muted d-block">Approved</small>
+              <strong class="fs-5">{{ completed_context.roles.officer.approved_qty }}</strong>
+              <small class="d-block text-muted">units</small>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded text-center">
+              <i class="bi bi-truck text-primary d-block mb-2" style="font-size: 1.5rem;"></i>
+              <small class="text-muted d-block">Dispatcher</small>
+              <strong class="d-block">{{ completed_context.roles.officer.dispatch_details.dispatcher or 'N/A' }}</strong>
+              <small class="d-block text-muted">
+                {{ completed_context.roles.officer.dispatch_details.dispatch_date.strftime('%b %d, %H:%M') if completed_context.roles.officer.dispatch_details.dispatch_date else 'N/A' }}
+              </small>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded text-center">
+              {% if completed_context.roles.officer.has_discrepancies %}
+                <i class="bi bi-exclamation-triangle text-warning d-block mb-2" style="font-size: 1.5rem;"></i>
+                <small class="text-muted d-block">Discrepancies</small>
+                <strong class="fs-5 text-warning">{{ completed_context.roles.officer.shortfall_items|length }}</strong>
+                <small class="d-block text-muted">items</small>
+              {% else %}
+                <i class="bi bi-check-circle text-success d-block mb-2" style="font-size: 1.5rem;"></i>
+                <small class="text-muted d-block">Status</small>
+                <strong class="d-block text-success">Complete</strong>
+                <small class="d-block text-muted">No discrepancies</small>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        
+        {% if completed_context.roles.officer.has_discrepancies %}
+          <div class="alert alert-warning">
+            <h6 class="alert-heading"><i class="bi bi-exclamation-triangle me-2"></i>Shortfall Items</h6>
+            <ul class="mb-0">
+              {% for item in completed_context.roles.officer.shortfall_items %}
+                <li>{{ item.item_name }} - Shortfall: {{ item.shortfall }} {{ item.unit }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+        
+        {% if completed_context.roles.officer.dispatch_details.dispatch_notes %}
+          <div class="p-3 bg-light rounded">
+            <small class="text-muted d-block mb-2"><i class="bi bi-sticky me-1"></i>Dispatch Notes</small>
+            <p class="mb-0">{{ completed_context.roles.officer.dispatch_details.dispatch_notes }}</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+  
+  {# Logistics Managers - Strategic overview #}
+  {% if current_user.role in ['LOGISTICS_MANAGER', 'ADMIN', 'EXECUTIVE'] %}
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-bar-chart-line me-2"></i>Strategic Summary</h5>
+        {% if completed_context.roles.manager.verified_completed %}
+          <span class="badge bg-success">
+            <i class="bi bi-shield-check me-1"></i>Verified Completed
+          </span>
+        {% endif %}
+      </div>
+      <div class="card-body p-4">
+        <h6 class="mb-3">Variance Analysis</h6>
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded text-center">
+              <small class="text-muted d-block">Requested</small>
+              <strong class="fs-5">{{ completed_context.roles.manager.variance_summary.requested }}</strong>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded text-center">
+              <small class="text-muted d-block">Approved</small>
+              <strong class="fs-5">{{ completed_context.roles.manager.variance_summary.approved }}</strong>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded text-center">
+              <small class="text-muted d-block">Dispatched</small>
+              <strong class="fs-5">{{ completed_context.roles.manager.variance_summary.dispatched }}</strong>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="p-3 bg-light rounded text-center">
+              <small class="text-muted d-block">Variance</small>
+              <strong class="fs-5 {% if completed_context.roles.manager.variance_summary.variance == 0 %}text-success{% else %}text-warning{% endif %}">
+                {{ completed_context.roles.manager.variance_summary.variance }}
+              </strong>
+            </div>
+          </div>
+        </div>
+        
+        <h6 class="mb-3">Audit Trail</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover">
+            <thead>
+              <tr>
+                <th>Milestone</th>
+                <th>Date & Time</th>
+                <th>Responsible</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for event in completed_context.roles.manager.full_timeline %}
+                <tr>
+                  <td><i class="{{ event.icon }} me-2"></i>{{ event.label }}</td>
+                  <td>{{ event.timestamp.strftime('%b %d, %Y %H:%M') }}</td>
+                  <td>{{ event.actor }}</td>
+                  <td>{{ event.notes or '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+  
+{% endif %}

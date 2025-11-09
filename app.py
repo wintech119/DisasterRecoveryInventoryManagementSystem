@@ -2930,6 +2930,35 @@ def needs_list_confirm_receipt(list_id):
     flash(f"Receipt confirmed for needs list {needs_list.list_number}. Request is now completed.", "success")
     return redirect(url_for("needs_list_details", list_id=list_id))
 
+@app.route("/needs-lists/<int:list_id>/completed-report")
+@login_required
+def needs_list_completed_report(list_id):
+    """Download PDF summary report for completed needs list - Agency Hub users and Admins"""
+    needs_list = NeedsList.query.options(
+        db.joinedload(NeedsList.fulfilments).joinedload(NeedsListFulfilment.source_hub),
+        db.joinedload(NeedsList.dispatched_by_user),
+        db.joinedload(NeedsList.received_by_user)
+    ).get_or_404(list_id)
+    
+    # Permission check - Only agency hub users or admins can download
+    if current_user.role != ROLE_ADMIN:
+        if not current_user.assigned_location_id or current_user.assigned_location_id != needs_list.agency_hub_id:
+            flash("You don't have permission to download this report.", "danger")
+            return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    # Only allow for completed needs lists
+    if needs_list.status != 'Completed':
+        flash("PDF reports are only available for completed needs lists.", "warning")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    # Prepare context for PDF rendering
+    completed_context = prepare_completed_context(needs_list, current_user)
+    
+    # TODO: Implement PDF generation using WeasyPrint
+    # For now, return a placeholder message
+    flash("PDF download feature is coming soon. This will generate a comprehensive summary report.", "info")
+    return redirect(url_for("needs_list_details", list_id=list_id))
+
 @app.route("/needs-lists/<int:list_id>/delete", methods=["POST"])
 @login_required
 def needs_list_delete(list_id):

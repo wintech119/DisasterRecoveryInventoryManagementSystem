@@ -336,6 +336,65 @@
       transform: none;
       box-shadow: none;
     }
+    
+    /* Timeline Component for Completed Needs Lists */
+    .timeline {
+      position: relative;
+      padding: 20px 0;
+    }
+    
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 20px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, #e0e0e0 0%, #e0e0e0 100%);
+    }
+    
+    .timeline-item {
+      position: relative;
+      padding-left: 60px;
+      padding-bottom: 30px;
+    }
+    
+    .timeline-item:last-child {
+      padding-bottom: 0;
+    }
+    
+    .timeline-marker {
+      position: absolute;
+      left: 8px;
+      top: 0;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: white;
+      border: 2px solid var(--goj-green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
+    }
+    
+    .timeline-marker i {
+      font-size: 0.8rem;
+      color: var(--goj-green);
+    }
+    
+    .timeline-content {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      transition: all 0.3s;
+    }
+    
+    .timeline-content:hover {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      transform: translateX(4px);
+    }
   </style>
 </head>
 <body>
