@@ -1,50 +1,68 @@
 {% extends "base.html" %}
 
-{% block title %}Create Needs List{% endblock %}
+{% block title %}{% if is_edit %}Edit{% else %}Create{% endif %} Needs List{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
   <div class="row">
     <div class="col-md-12">
       <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="bi bi-clipboard-plus me-2"></i>Create Needs List</h2>
-        <a href="{{ url_for('needs_lists') }}" class="btn btn-secondary">
-          <i class="bi bi-arrow-left me-1"></i>Back to Needs Lists
+        <h2>
+          <i class="bi bi-clipboard-{{ 'pencil' if is_edit else 'plus' }} me-2"></i>
+          {% if is_edit %}Edit{% else %}Create{% endif %} Needs List
+          {% if is_edit %}<span class="badge bg-secondary ms-2">{{ needs_list.status }}</span>{% endif %}
+        </h2>
+        <a href="{% if is_edit %}{{ url_for('needs_list_details', list_id=needs_list.id) }}{% else %}{{ url_for('needs_lists') }}{% endif %}" class="btn btn-secondary">
+          <i class="bi bi-arrow-left me-1"></i>Back
         </a>
       </div>
 
       <div class="alert alert-info">
         <i class="bi bi-info-circle me-2"></i>
-        <strong>{{ user_depot.name }}</strong> ({{ user_depot.hub_type }} Hub) - Create a needs list to request items from MAIN hubs.
+        <strong>{{ user_depot.name }}</strong> ({{ user_depot.hub_type }} Hub) - 
+        {% if is_edit %}
+          Edit your needs list before submitting to ODPEM. All changes will be saved.
+        {% else %}
+          Create a needs list to request items from MAIN hubs.
+        {% endif %}
       </div>
+
+      {% if is_edit and needs_list.status == 'Draft' %}
+      <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        <strong>Draft Status:</strong> This needs list can still be edited. Use "Save as Draft" to save your progress, or "Submit to ODPEM" when ready to send for review.
+      </div>
+      {% endif %}
 
       <div class="card shadow-sm">
         <div class="card-body">
-          <form method="POST" action="{{ url_for('needs_list_create') }}" id="needsListForm">
+          <form method="POST" action="{% if is_edit %}{{ url_for('needs_list_edit', list_id=needs_list.id) }}{% else %}{{ url_for('needs_list_create') }}{% endif %}" id="needsListForm">
             <div class="row mb-3">
               <div class="col-md-6">
                 <label for="event_id" class="form-label">Disaster Event (Optional)</label>
                 <select class="form-select" id="event_id" name="event_id">
                   <option value="">Select Event</option>
                   {% for event in events %}
-                    <option value="{{ event.id }}">{{ event.name }} - {{ event.start_date.strftime('%Y-%m-%d') }}</option>
+                    <option value="{{ event.id }}" {% if is_edit and needs_list.event_id == event.id %}selected{% endif %}>
+                      {{ event.name }} - {{ event.start_date.strftime('%Y-%m-%d') }}
+                    </option>
                   {% endfor %}
                 </select>
               </div>
               <div class="col-md-6">
                 <label for="priority" class="form-label">Priority <span class="text-danger">*</span></label>
                 <select class="form-select" id="priority" name="priority" required>
-                  <option value="Low">Low</option>
-                  <option value="Medium" selected>Medium</option>
-                  <option value="High">High</option>
-                  <option value="Urgent">Urgent</option>
+                  <option value="Low" {% if is_edit and needs_list.priority == 'Low' %}selected{% endif %}>Low</option>
+                  <option value="Medium" {% if is_edit and needs_list.priority == 'Medium' %}selected{% elif not is_edit %}selected{% endif %}>Medium</option>
+                  <option value="High" {% if is_edit and needs_list.priority == 'High' %}selected{% endif %}>High</option>
+                  <option value="Urgent" {% if is_edit and needs_list.priority == 'Urgent' %}selected{% endif %}>Urgent</option>
                 </select>
               </div>
             </div>
 
             <div class="mb-3">
               <label for="notes" class="form-label">Notes</label>
-              <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Additional notes about this needs list"></textarea>
+              <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Additional notes about this needs list">{% if is_edit and needs_list.notes %}{{ needs_list.notes }}{% endif %}</textarea>
             </div>
 
             <hr class="my-4">
@@ -52,30 +70,63 @@
             <h4 class="mb-3"><i class="bi bi-cart-plus me-2"></i>Requested Items</h4>
             
             <div id="items-container">
-              <div class="item-row row mb-3">
-                <div class="col-md-4">
-                  <label class="form-label">Item <span class="text-danger">*</span></label>
-                  <select class="form-select item-select" name="item_sku_0" required>
-                    <option value="">Select Item</option>
-                    {% for item in items %}
-                      <option value="{{ item.sku }}">{{ item.name }} ({{ item.unit }})</option>
-                    {% endfor %}
-                  </select>
+              {% if is_edit and needs_list.items %}
+                {# Edit mode: Pre-fill existing items #}
+                {% for item_entry in needs_list.items %}
+                  <div class="item-row row mb-3">
+                    <div class="col-md-4">
+                      <label class="form-label">Item <span class="text-danger">*</span></label>
+                      <select class="form-select item-select" name="item_sku_{{ loop.index0 }}" required>
+                        <option value="">Select Item</option>
+                        {% for item in items %}
+                          <option value="{{ item.sku }}" {% if item.sku == item_entry.item_sku %}selected{% endif %}>
+                            {{ item.name }} ({{ item.unit }})
+                          </option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-md-2">
+                      <label class="form-label">Quantity <span class="text-danger">*</span></label>
+                      <input type="number" class="form-control" name="item_qty_{{ loop.index0 }}" min="1" value="{{ item_entry.requested_qty }}" required>
+                    </div>
+                    <div class="col-md-5">
+                      <label class="form-label">Justification</label>
+                      <input type="text" class="form-control" name="item_justification_{{ loop.index0 }}" placeholder="Why is this item needed?" value="{% if item_entry.justification %}{{ item_entry.justification }}{% endif %}">
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                      <button type="button" class="btn btn-outline-danger btn-sm remove-item" {% if loop.length == 1 %}style="display:none;"{% endif %}>
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                {% endfor %}
+              {% else %}
+                {# Create mode: One blank row #}
+                <div class="item-row row mb-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Item <span class="text-danger">*</span></label>
+                    <select class="form-select item-select" name="item_sku_0" required>
+                      <option value="">Select Item</option>
+                      {% for item in items %}
+                        <option value="{{ item.sku }}">{{ item.name }} ({{ item.unit }})</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label">Quantity <span class="text-danger">*</span></label>
+                    <input type="number" class="form-control" name="item_qty_0" min="1" required>
+                  </div>
+                  <div class="col-md-5">
+                    <label class="form-label">Justification</label>
+                    <input type="text" class="form-control" name="item_justification_0" placeholder="Why is this item needed?">
+                  </div>
+                  <div class="col-md-1 d-flex align-items-end">
+                    <button type="button" class="btn btn-outline-danger btn-sm remove-item" style="display:none;">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </div>
                 </div>
-                <div class="col-md-2">
-                  <label class="form-label">Quantity <span class="text-danger">*</span></label>
-                  <input type="number" class="form-control" name="item_qty_0" min="1" required>
-                </div>
-                <div class="col-md-5">
-                  <label class="form-label">Justification</label>
-                  <input type="text" class="form-control" name="item_justification_0" placeholder="Why is this item needed?">
-                </div>
-                <div class="col-md-1 d-flex align-items-end">
-                  <button type="button" class="btn btn-outline-danger btn-sm remove-item" style="display:none;">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </div>
-              </div>
+              {% endif %}
             </div>
 
             <button type="button" class="btn btn-outline-primary btn-sm mb-4" id="add-item">
@@ -84,11 +135,22 @@
 
             <hr class="my-4">
 
-            <div class="d-flex justify-content-end gap-2">
-              <a href="{{ url_for('needs_lists') }}" class="btn btn-secondary">Cancel</a>
-              <button type="submit" class="btn btn-primary">
-                <i class="bi bi-save me-1"></i>Create Needs List
-              </button>
+            <div class="d-flex justify-content-between align-items-center">
+              <a href="{% if is_edit %}{{ url_for('needs_list_details', list_id=needs_list.id) }}{% else %}{{ url_for('needs_lists') }}{% endif %}" class="btn btn-secondary">Cancel</a>
+              <div class="d-flex gap-2">
+                {% if is_edit %}
+                  <button type="submit" name="action" value="save_draft" class="btn btn-outline-primary">
+                    <i class="bi bi-save me-1"></i>Save as Draft
+                  </button>
+                  <button type="submit" name="action" value="submit" class="btn btn-success">
+                    <i class="bi bi-send me-1"></i>Submit to ODPEM / Main Hub
+                  </button>
+                {% else %}
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save me-1"></i>Create Needs List
+                  </button>
+                {% endif %}
+              </div>
             </div>
           </form>
         </div>
@@ -98,7 +160,11 @@
 </div>
 
 <script>
-let itemIndex = 1;
+{% if is_edit %}
+  let itemIndex = {{ needs_list.items|length }};
+{% else %}
+  let itemIndex = 1;
+{% endif %}
 
 document.getElementById('add-item').addEventListener('click', function() {
   const container = document.getElementById('items-container');

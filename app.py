@@ -1999,15 +1999,20 @@ def needs_list_create():
         priority = request.form.get("priority", "Medium")
         notes = request.form.get("notes", "").strip() or None
         
-        # Parse items from form
+        # Parse items from form - collect all item_sku_* keys to handle gaps from removed rows
         items_data = []
-        item_index = 0
-        while True:
-            sku_field = f"item_sku_{item_index}"
-            if sku_field not in request.form:
-                break
-            
-            sku = request.form.get(sku_field, "").strip()
+        item_indices = set()
+        for key in request.form.keys():
+            if key.startswith("item_sku_"):
+                try:
+                    index = int(key.split("_")[-1])
+                    item_indices.add(index)
+                except ValueError:
+                    continue
+        
+        # Process each item by index
+        for item_index in sorted(item_indices):
+            sku = request.form.get(f"item_sku_{item_index}", "").strip()
             if sku:
                 try:
                     qty_str = request.form.get(f"item_qty_{item_index}", "0").strip()
@@ -2023,8 +2028,6 @@ def needs_list_create():
                 except ValueError:
                     flash(f"Invalid quantity for item {sku}.", "danger")
                     return redirect(url_for("needs_list_create"))
-            
-            item_index += 1
         
         if not items_data:
             flash("At least one item with quantity is required.", "danger")
@@ -2154,6 +2157,151 @@ def needs_list_submit(list_id):
     
     flash(f"Needs list {needs_list.list_number} submitted successfully for logistics review.", "success")
     return redirect(url_for("needs_list_details", list_id=list_id))
+
+@app.route("/needs-lists/<int:list_id>/edit", methods=["GET", "POST"])
+@login_required
+def needs_list_edit(list_id):
+    """Edit a draft needs list - AGENCY and SUB hubs only"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    # Permission check using centralized helper
+    allowed, error_msg = can_edit_needs_list(current_user, needs_list)
+    if not allowed:
+        flash(error_msg, "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    # Get user depot
+    user_depot = Depot.query.get(current_user.assigned_location_id)
+    if not user_depot or user_depot.hub_type not in ['AGENCY', 'SUB']:
+        flash("Only AGENCY and SUB hub staff can edit needs lists.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    if request.method == "POST":
+        action = request.form.get("action", "save_draft")  # "save_draft" or "submit"
+        
+        event_id = request.form.get("event_id") or None
+        priority = request.form.get("priority", "Medium")
+        notes = request.form.get("notes", "").strip() or None
+        
+        # Parse items from form - collect all item_sku_* keys to handle gaps from removed rows
+        items_data = []
+        item_indices = set()
+        for key in request.form.keys():
+            if key.startswith("item_sku_"):
+                try:
+                    index = int(key.split("_")[-1])
+                    item_indices.add(index)
+                except ValueError:
+                    continue
+        
+        # Process each item by index
+        for item_index in sorted(item_indices):
+            sku = request.form.get(f"item_sku_{item_index}", "").strip()
+            if sku:
+                try:
+                    qty_str = request.form.get(f"item_qty_{item_index}", "0").strip()
+                    requested_qty = int(qty_str) if qty_str else 0
+                    justification = request.form.get(f"item_justification_{item_index}", "").strip() or None
+                    
+                    if requested_qty > 0:
+                        items_data.append({
+                            'sku': sku,
+                            'requested_qty': requested_qty,
+                            'justification': justification
+                        })
+                except ValueError:
+                    flash(f"Invalid quantity for item {sku}.", "danger")
+                    return redirect(url_for("needs_list_edit", list_id=list_id))
+        
+        if not items_data:
+            flash("At least one item with quantity is required.", "danger")
+            return redirect(url_for("needs_list_edit", list_id=list_id))
+        
+        # Update needs list metadata
+        needs_list.event_id = int(event_id) if event_id else None
+        needs_list.priority = priority
+        needs_list.notes = notes
+        needs_list.updated_at = datetime.utcnow()
+        
+        # Delete existing items and add updated ones
+        NeedsListItem.query.filter_by(needs_list_id=needs_list.id).delete()
+        db.session.flush()
+        
+        # Add updated items
+        for item_data in items_data:
+            needs_list_item = NeedsListItem(
+                needs_list_id=needs_list.id,
+                item_sku=item_data['sku'],
+                requested_qty=item_data['requested_qty'],
+                justification=item_data['justification']
+            )
+            db.session.add(needs_list_item)
+        
+        # Handle action: save as draft or submit
+        if action == "submit":
+            # Submit for logistics review
+            needs_list.status = 'Submitted'
+            needs_list.submitted_at = datetime.utcnow()
+            db.session.commit()
+            
+            # Create notifications (same as in needs_list_submit)
+            create_notification_for_agency_hub(
+                needs_list=needs_list,
+                title="Needs List Submitted",
+                message=f"Your needs list {needs_list.list_number} has been submitted for ODPEM review.",
+                notification_type="submitted",
+                triggered_by_user=current_user
+            )
+            
+            create_notifications_for_role(
+                role=ROLE_LOGISTICS_OFFICER,
+                title="New Needs List Submitted",
+                message=f"Needs list {needs_list.list_number} from {needs_list.agency_hub.name} needs fulfillment preparation.",
+                notification_type="task_assigned",
+                link_url=f"/needs-lists/{needs_list.id}/prepare",
+                payload_data={
+                    "needs_list_number": needs_list.list_number,
+                    "agency_hub": needs_list.agency_hub.name,
+                    "submitted_by": current_user.full_name,
+                    "submitted_by_id": current_user.id
+                },
+                needs_list_id=needs_list.id
+            )
+            
+            create_notifications_for_role(
+                role=ROLE_ADMIN,
+                title="Needs List Submitted",
+                message=f"New needs list {needs_list.list_number} submitted by {needs_list.agency_hub.name} for system monitoring.",
+                notification_type="task_assigned",
+                link_url=f"/needs-lists/{needs_list.id}",
+                payload_data={
+                    "needs_list_number": needs_list.list_number,
+                    "agency_hub": needs_list.agency_hub.name,
+                    "submitted_by": current_user.full_name,
+                    "submitted_by_id": current_user.id,
+                    "event_type": "system_monitoring"
+                },
+                needs_list_id=needs_list.id
+            )
+            
+            flash(f"Needs list {needs_list.list_number} submitted successfully for logistics review.", "success")
+        else:
+            # Save as draft
+            db.session.commit()
+            flash(f"Needs list {needs_list.list_number} saved as draft.", "success")
+        
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    # GET request - show form with existing values
+    events = DisasterEvent.query.filter_by(status="Active").order_by(DisasterEvent.start_date.desc()).all()
+    items = Item.query.order_by(Item.name).all()
+    
+    return render_template("needs_list_form.html", 
+                          events=events, 
+                          items=items, 
+                          user_depot=user_depot,
+                          needs_list=needs_list,
+                          is_edit=True)
 
 @app.route("/needs-lists/<int:list_id>/prepare", methods=["GET", "POST"])
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER)

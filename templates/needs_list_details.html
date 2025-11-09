@@ -412,12 +412,10 @@
 
         <!-- Actions -->
         {% if user_depot and user_depot.hub_type in ['AGENCY', 'SUB'] and user_depot.id == needs_list.agency_hub_id and needs_list.status == 'Draft' %}
-          <div class="d-grid gap-2 mb-2">
-            <form method="POST" action="{{ url_for('needs_list_submit', list_id=needs_list.id) }}">
-              <button type="submit" class="btn btn-primary w-100">
-                <i class="bi bi-send me-1"></i>Submit to ODPEM
-              </button>
-            </form>
+          <div class="d-grid gap-2 mb-3">
+            <a href="{{ url_for('needs_list_edit', list_id=needs_list.id) }}" class="btn btn-warning">
+              <i class="bi bi-pencil-square me-1"></i>Edit Needs List
+            </a>
           </div>
           <div class="d-grid">
             <form method="POST" action="{{ url_for('needs_list_delete', list_id=needs_list.id) }}" onsubmit="return confirm('Delete this draft?');">
