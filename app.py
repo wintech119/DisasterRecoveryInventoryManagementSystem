@@ -1947,11 +1947,11 @@ def needs_list_prepare(list_id):
                 out_txn = Transaction(
                     item_sku=fulfilment.item_sku,
                     location_id=fulfilment.source_hub_id,
-                    transaction_type="OUT",
-                    quantity=fulfilment.allocated_qty,
-                    performed_by=current_user.full_name,
+                    ttype="OUT",
+                    qty=fulfilment.allocated_qty,
+                    created_by=current_user.full_name,
                     notes=f"Needs List Fulfilment: {needs_list.list_number} to {requesting_hub.name}",
-                    disaster_event_id=needs_list.event_id
+                    event_id=needs_list.event_id
                 )
                 db.session.add(out_txn)
                 
@@ -1959,11 +1959,11 @@ def needs_list_prepare(list_id):
                 in_txn = Transaction(
                     item_sku=fulfilment.item_sku,
                     location_id=needs_list.agency_hub_id,
-                    transaction_type="IN",
-                    quantity=fulfilment.allocated_qty,
-                    performed_by=current_user.full_name,
+                    ttype="IN",
+                    qty=fulfilment.allocated_qty,
+                    created_by=current_user.full_name,
                     notes=f"Needs List Fulfilment: {needs_list.list_number} from {source_hub.name}",
-                    disaster_event_id=needs_list.event_id
+                    event_id=needs_list.event_id
                 )
                 db.session.add(in_txn)
             
@@ -2036,11 +2036,11 @@ def needs_list_approve(list_id):
         out_txn = Transaction(
             item_sku=fulfilment.item_sku,
             location_id=fulfilment.source_hub_id,
-            transaction_type="OUT",
-            quantity=fulfilment.allocated_qty,
-            performed_by=current_user.full_name,
+            ttype="OUT",
+            qty=fulfilment.allocated_qty,
+            created_by=current_user.full_name,
             notes=f"Needs List Fulfilment: {needs_list.list_number} to {requesting_hub.name}",
-            disaster_event_id=needs_list.event_id
+            event_id=needs_list.event_id
         )
         db.session.add(out_txn)
         
@@ -2048,11 +2048,11 @@ def needs_list_approve(list_id):
         in_txn = Transaction(
             item_sku=fulfilment.item_sku,
             location_id=needs_list.agency_hub_id,
-            transaction_type="IN",
-            quantity=fulfilment.allocated_qty,
-            performed_by=current_user.full_name,
+            ttype="IN",
+            qty=fulfilment.allocated_qty,
+            created_by=current_user.full_name,
             notes=f"Needs List Fulfilment: {needs_list.list_number} from {source_hub.name}",
-            disaster_event_id=needs_list.event_id
+            event_id=needs_list.event_id
         )
         db.session.add(in_txn)
     

@@ -1,0 +1,49 @@
+In my DRIMS Flask app, fix the stock availability bug on the Prepare Fulfilment page where items such as “First Aid Kits” are showing “No stock available” even though the system indicates there are 245 units in stock.
+
+Expected Behavior:
+
+The Prepare Fulfilment page should correctly display real-time available stock for each item and each source Hub.
+
+The availability calculation must accurately subtract all pending and approved allocations from the total stock but not misreport items with positive quantities as “No stock.”
+
+The system should show correct available stock across all relevant pages (e.g., Inventory, Transfers, and Needs List Fulfilment).
+
+Tasks:
+
+Diagnose and fix the root cause of the incorrect “No stock” message — likely an issue with:
+
+The SQL query or ORM aggregation for available stock.
+
+A missing or incorrect filter on Hub type, status, or stock balance.
+
+A logic error where items with zero allocated are being mistaken for zero available.
+
+Validate all stock calculation functions and templates, including:
+
+Prepare Fulfilment
+
+Needs List submission and review
+
+Inventory (Items) overview
+
+Reports and Transfer pages
+
+Ensure all pages use a single, consistent stock calculation method, for example:
+
+available_stock = total_intake - total_distributed - total_allocated_pending
+
+Add backend safeguards so the system never displays “No stock available” for items that have positive quantities.
+
+Enhance error handling:
+
+If stock data can’t be fetched, show a friendly fallback message like “Stock data unavailable — please refresh” instead of false “No stock.”
+
+Testing & Validation:
+
+Test specifically with First Aid Kits and at least 3 other items across multiple Hubs.
+
+Confirm consistent and accurate results in all inventory and fulfilment pages.
+
+Add a small test log or console output for debugging during verification.
+
+The result should be that stock levels display accurately and consistently throughout the app, eliminating the false “No stock available” issue for any item.
