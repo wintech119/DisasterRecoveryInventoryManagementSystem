@@ -1624,11 +1624,12 @@ def needs_lists():
         return render_template("logistics_officer_needs_lists.html", submitted_lists=submitted_lists, prepared_lists=prepared_lists)
     
     elif current_user.role == ROLE_LOGISTICS_MANAGER:
-        # Logistics Manager view: All needs lists awaiting approval
+        # Logistics Manager view: Can do EVERYTHING - prepare AND approve
+        submitted_lists = NeedsList.query.filter_by(status='Submitted').order_by(NeedsList.submitted_at.desc()).all()
         awaiting_approval = NeedsList.query.filter(NeedsList.status.in_(['Fulfilment Prepared', 'Awaiting Approval'])).order_by(NeedsList.prepared_at.desc()).all()
         approved_lists = NeedsList.query.filter(NeedsList.status.in_(['Approved', 'Fulfilled'])).order_by(NeedsList.approved_at.desc()).limit(20).all()
         rejected_lists = NeedsList.query.filter_by(status='Rejected').order_by(NeedsList.updated_at.desc()).limit(20).all()
-        return render_template("logistics_manager_needs_lists.html", awaiting_approval=awaiting_approval, approved_lists=approved_lists, rejected_lists=rejected_lists)
+        return render_template("logistics_manager_needs_lists.html", submitted_lists=submitted_lists, awaiting_approval=awaiting_approval, approved_lists=approved_lists, rejected_lists=rejected_lists)
     
     # Hub-based views for AGENCY and SUB hubs
     elif user_depot and user_depot.hub_type in ['AGENCY', 'SUB']:
@@ -1791,13 +1792,13 @@ def needs_list_submit(list_id):
     return redirect(url_for("needs_list_details", list_id=list_id))
 
 @app.route("/needs-lists/<int:list_id>/prepare", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_OFFICER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER)
 def needs_list_prepare(list_id):
-    """Prepare fulfilment for a needs list - Logistics Officers only"""
+    """Prepare/edit fulfilment for a needs list - Logistics Officers and Managers"""
     needs_list = NeedsList.query.get_or_404(list_id)
     
-    if needs_list.status not in ['Submitted', 'Fulfilment Prepared']:
-        flash("Only submitted needs lists can be prepared for fulfilment.", "warning")
+    if needs_list.status not in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval']:
+        flash("Only submitted or prepared needs lists can be edited.", "warning")
         return redirect(url_for("needs_list_details", list_id=list_id))
     
     if request.method == "POST":

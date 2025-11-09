@@ -200,15 +200,15 @@
             {% endif %}
           {% endif %}
 
-          {# Logistics Officer Actions #}
-          {% if current_user.role == 'LOGISTICS_OFFICER' and needs_list.status == 'Submitted' %}
-            <div class="card shadow-sm">
+          {# Logistics Officer & Manager Actions - Prepare/Edit Fulfilment #}
+          {% if current_user.role in ['LOGISTICS_OFFICER', 'LOGISTICS_MANAGER'] and needs_list.status in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval'] %}
+            <div class="card shadow-sm mb-3">
               <div class="card-header bg-primary text-white">
-                <h6 class="mb-0"><i class="bi bi-box-seam me-2"></i>Prepare Fulfilment</h6>
+                <h6 class="mb-0"><i class="bi bi-box-seam me-2"></i>{% if needs_list.status == 'Submitted' %}Prepare{% else %}Edit{% endif %} Fulfilment</h6>
               </div>
               <div class="card-body">
                 <a href="{{ url_for('needs_list_prepare', list_id=needs_list.id) }}" class="btn btn-primary w-100">
-                  <i class="bi bi-box-seam me-1"></i>Prepare Fulfilment
+                  <i class="bi bi-{% if needs_list.status == 'Submitted' %}box-seam{% else %}pencil{% endif %} me-1"></i>{% if needs_list.status == 'Submitted' %}Prepare{% else %}Edit{% endif %} Fulfilment
                 </a>
               </div>
             </div>
