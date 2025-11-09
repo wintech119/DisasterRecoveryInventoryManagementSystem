@@ -2316,6 +2316,128 @@ def needs_list_reject(list_id):
     flash(f"Fulfilment for {needs_list.list_number} rejected. Needs list returned to submitted status.", "warning")
     return redirect(url_for("needs_list_details", list_id=list_id))
 
+@app.route("/needs-lists/<int:list_id>/dispatch", methods=["POST"])
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER)
+def needs_list_dispatch(list_id):
+    """Dispatch approved needs list - Creates stock transactions and updates status to Dispatched"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    # Permission check using centralized helper
+    allowed, error_msg = can_dispatch_needs_list(current_user, needs_list)
+    if not allowed:
+        flash(error_msg, "warning")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    dispatch_notes = request.form.get("dispatch_notes", "").strip() or None
+    
+    # Verify fulfilment allocations exist
+    fulfilments = NeedsListFulfilment.query.filter_by(needs_list_id=needs_list.id).all()
+    if not fulfilments:
+        flash("No fulfilment allocations found. Cannot dispatch.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    # Validate stock availability before creating transactions
+    requesting_hub = Depot.query.get(needs_list.agency_hub_id)
+    stock_validation_errors = []
+    
+    for fulfilment in fulfilments:
+        source_hub = Depot.query.get(fulfilment.source_hub_id)
+        
+        # Calculate current stock at source hub
+        in_stock = db.session.query(func.sum(Transaction.qty)).filter(
+            Transaction.item_sku == fulfilment.item_sku,
+            Transaction.location_id == fulfilment.source_hub_id,
+            Transaction.ttype == 'IN'
+        ).scalar() or 0
+        
+        out_stock = db.session.query(func.sum(Transaction.qty)).filter(
+            Transaction.item_sku == fulfilment.item_sku,
+            Transaction.location_id == fulfilment.source_hub_id,
+            Transaction.ttype == 'OUT'
+        ).scalar() or 0
+        
+        available = in_stock - out_stock
+        
+        if available < fulfilment.allocated_qty:
+            item = Item.query.get(fulfilment.item_sku)
+            stock_validation_errors.append(
+                f"{item.name} at {source_hub.name}: Requested {fulfilment.allocated_qty}, Available {available}"
+            )
+    
+    if stock_validation_errors:
+        flash("Insufficient stock to dispatch: " + "; ".join(stock_validation_errors), "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    # Create stock movement transactions
+    for fulfilment in fulfilments:
+        source_hub = Depot.query.get(fulfilment.source_hub_id)
+        
+        # OUT transaction from source hub
+        out_txn = Transaction(
+            item_sku=fulfilment.item_sku,
+            location_id=fulfilment.source_hub_id,
+            ttype="OUT",
+            qty=fulfilment.allocated_qty,
+            created_by=current_user.full_name,
+            notes=f"Dispatched for Needs List: {needs_list.list_number} to {requesting_hub.name}",
+            event_id=needs_list.event_id
+        )
+        db.session.add(out_txn)
+        
+        # IN transaction to requesting hub
+        in_txn = Transaction(
+            item_sku=fulfilment.item_sku,
+            location_id=needs_list.agency_hub_id,
+            ttype="IN",
+            qty=fulfilment.allocated_qty,
+            created_by=current_user.full_name,
+            notes=f"Dispatched from Needs List: {needs_list.list_number} from {source_hub.name}",
+            event_id=needs_list.event_id
+        )
+        db.session.add(in_txn)
+    
+    # Update needs list status and dispatch tracking
+    needs_list.status = 'Dispatched'
+    needs_list.dispatched_by_id = current_user.id
+    needs_list.dispatched_at = datetime.utcnow()
+    needs_list.dispatch_notes = dispatch_notes
+    
+    # If not yet approved, mark as approved during dispatch
+    if needs_list.status in ['Awaiting Approval', 'Fulfilment Prepared']:
+        needs_list.approved_by = current_user.full_name
+        needs_list.approved_at = datetime.utcnow()
+    
+    db.session.commit()
+    
+    flash(f"Needs list {needs_list.list_number} dispatched successfully. Stock transfers completed and {requesting_hub.name} will be notified.", "success")
+    return redirect(url_for("needs_list_details", list_id=list_id))
+
+@app.route("/needs-lists/<int:list_id>/confirm-receipt", methods=["POST"])
+@login_required
+def needs_list_confirm_receipt(list_id):
+    """Confirm receipt of dispatched items - Agency Hub users only"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    # Permission check using centralized helper
+    allowed, error_msg = can_confirm_receipt(current_user, needs_list)
+    if not allowed:
+        flash(error_msg, "warning")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    receipt_notes = request.form.get("receipt_notes", "").strip() or None
+    
+    # Update needs list to Completed status
+    needs_list.status = 'Completed'
+    needs_list.received_by_id = current_user.id
+    needs_list.received_at = datetime.utcnow()
+    needs_list.receipt_notes = receipt_notes
+    needs_list.fulfilled_at = datetime.utcnow()  # Mark as fully fulfilled
+    
+    db.session.commit()
+    
+    flash(f"Receipt confirmed for needs list {needs_list.list_number}. Request is now completed.", "success")
+    return redirect(url_for("needs_list_details", list_id=list_id))
+
 @app.route("/needs-lists/<int:list_id>/delete", methods=["POST"])
 @login_required
 def needs_list_delete(list_id):
