@@ -20,6 +20,16 @@ Supports barcode scanning for efficient donation intake, reducing manual entry a
 ### Needs List Management
 Implements an end-to-end workflow for AGENCY and SUB hubs to request supplies, including preparation, approval, dispatch, and receipt confirmation. Logistics Officers and Managers have global visibility for orchestration and approval. A centralized permission system enforces role-based access control. The system ensures a complete audit trail for all actions.
 
+**Draft Editing Workflow:**
+Agency and SUB hub users can create needs lists in Draft status and edit them before submission. Key features include:
+-   **Edit Button**: Draft needs lists display an "Edit Needs List" button in the details view
+-   **Quantity Preservation**: When reopening a draft for editing, all previously entered quantities, justifications, and metadata are pre-filled
+-   **Save as Draft**: Users can save progress without submitting, allowing iterative refinement
+-   **Submit to ODPEM**: Distinct submission button that locks the needs list from further editing and changes status to Submitted
+-   **Add/Remove Items**: Users can dynamically add or remove items while in Draft status without losing existing data
+-   **Gap-Resistant Parsing**: Form parsing handles non-sequential item numbering from removed rows, ensuring no data loss
+-   **Permission Enforcement**: Only the owning Agency/SUB hub can edit their Draft needs lists; editing is disabled once submitted
+
 ### Distribution Package Management
 Manages the creation, review, and approval of distribution packages for AGENCY hubs. It includes stock validation against available inventory across all ODPEM locations (MAIN and SUB hubs) and supports multi-depot fulfillment with smart allocation filtering and real-time stock updates. A comprehensive audit trail tracks the package lifecycle.
 
