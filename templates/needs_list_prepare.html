@@ -143,6 +143,7 @@
                                   <span class="badge bg-light text-dark available-stock" style="font-size: 0.75rem;">{{ available }}</span>
                                 </div>
                                 <div class="col-4">
+                                  {% set existing_qty = existing_allocations.get(item_entry.item_sku, {}).get(hub.id, 0) %}
                                   <input type="hidden" name="depot_{{ item_index }}_{{ depot_counter.value }}" value="{{ hub.id }}">
                                   <input 
                                     type="number" 
@@ -150,7 +151,7 @@
                                     name="qty_{{ item_index }}_{{ depot_counter.value }}" 
                                     min="0" 
                                     max="{{ available }}" 
-                                    value="0"
+                                    value="{{ existing_qty }}"
                                     data-item-index="{{ item_index }}"
                                     data-hub-id="{{ hub.id }}"
                                     data-max="{{ available }}"
@@ -263,7 +264,7 @@
               name="fulfilment_notes" 
               rows="3" 
               form="fulfilmentForm"
-              placeholder="Add notes..."></textarea>
+              placeholder="Add notes...">{{ needs_list.fulfilment_notes or '' }}</textarea>
           </div>
         </div>
 

@@ -2139,7 +2139,21 @@ def needs_list_prepare(list_id):
     stock_map = get_stock_by_location()
     odpem_hubs = Depot.query.filter(Depot.hub_type.in_(['MAIN', 'SUB'])).order_by(Depot.name).all()
     
-    return render_template("needs_list_prepare.html", needs_list=needs_list, stock_map=stock_map, odpem_hubs=odpem_hubs)
+    # Get existing fulfilment allocations if editing
+    existing_fulfilments = NeedsListFulfilment.query.filter_by(needs_list_id=needs_list.id).all()
+    
+    # Organize existing allocations by item_sku -> {source_hub_id: allocated_qty}
+    existing_allocations = {}
+    for fulfilment in existing_fulfilments:
+        if fulfilment.item_sku not in existing_allocations:
+            existing_allocations[fulfilment.item_sku] = {}
+        existing_allocations[fulfilment.item_sku][fulfilment.source_hub_id] = fulfilment.allocated_qty
+    
+    return render_template("needs_list_prepare.html", 
+                         needs_list=needs_list, 
+                         stock_map=stock_map, 
+                         odpem_hubs=odpem_hubs,
+                         existing_allocations=existing_allocations)
 
 @app.route("/needs-lists/<int:list_id>/approve", methods=["POST"])
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER)
