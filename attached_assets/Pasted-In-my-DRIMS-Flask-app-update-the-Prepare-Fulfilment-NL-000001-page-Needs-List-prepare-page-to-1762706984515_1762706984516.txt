@@ -1,0 +1,71 @@
+In my DRIMS Flask app, update the “Prepare Fulfilment – NL-000001” page (Needs List prepare page) to show live allocation and fulfilment of items in a clean, modern, and user-friendly way.
+
+UI Changes
+
+Redesign the page using a clear card-based layout and table with Bootstrap 5 (or existing design system), keeping it consistent with the left-side navigation layout.
+
+For each requested item, show a row with:
+
+Item description
+
+Requested quantity
+
+One or more allocation input fields (e.g. per source Hub)
+
+Allocated total (live sum)
+
+Remaining to allocate (Requested − Allocated)
+
+Status badge:
+
+“Unallocated” / “Partially Allocated” / “Fully Allocated” / “Over-Allocated”
+
+At the top of the page, show a small summary panel:
+
+Total items requested
+
+Total items allocated
+
+Count of fully allocated vs partially allocated lines
+
+Warning if any line is over-allocated.
+
+Dynamic Behaviour (JavaScript)
+
+Update the JavaScript so all calculations are live and reactive as the user types:
+
+Automatically recalc per-row totals when allocation inputs change.
+
+Highlight rows in real time:
+
+Green when fully allocated.
+
+Amber when partially allocated.
+
+Red when over-allocated.
+
+When choosing source Hubs, show each Hub’s available stock for that item and decrement it live as allocations are entered, so users can’t allocate more than available.
+
+Prevent submission if:
+
+Any row is over-allocated.
+
+Any required allocation is missing where business rules require full allocation.
+
+Use clear inline validation messages instead of alerts.
+
+UX & Visual Polish
+
+Keep the interface simple and readable: good spacing, clear labels, consistent font sizes.
+
+Use tooltips or subtle info icons to explain fields like “Remaining to allocate” and “Source Hub stock”.
+
+Make the page responsive and easy to use on laptops and tablets.
+
+Ensure keyboard accessibility (tab navigation) and good contrast.
+
+Integration
+
+Ensure all allocation data is submitted back to the existing Fulfilment endpoint in the same or improved structured format.
+
+Do not break the existing Needs List workflow statuses; just improve the Prepare Fulfilment UI and JS interactivity.

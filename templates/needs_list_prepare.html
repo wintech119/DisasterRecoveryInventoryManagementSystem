@@ -1,52 +1,436 @@
 {% extends "base.html" %}
 {% block title %}Prepare Fulfilment - {{ needs_list.list_number }}{% endblock %}
 {% block content %}
-<div class="container mt-4">
+<div class="container-fluid">
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-box-seam me-2"></i>Prepare Fulfilment - {{ needs_list.list_number }}</h2>
-    <a href="{{ url_for('needs_lists') }}" class="btn btn-secondary"><i class="bi bi-arrow-left me-1"></i>Back</a>
+    <div>
+      <h2><i class="bi bi-box-seam me-2"></i>Prepare Fulfilment</h2>
+      <p class="text-muted mb-0">{{ needs_list.list_number }} • {{ needs_list.agency_hub.name }} ({{ needs_list.agency_hub.hub_type }})</p>
+    </div>
+    <a href="{{ url_for('needs_lists') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
   </div>
-  <div class="alert alert-info">
-    <strong>{{ needs_list.agency_hub.name }}</strong> ({{ needs_list.agency_hub.hub_type }}) - Assign quantities from ODPEM hubs
+
+  <!-- Summary Panel -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-shrink-0">
+              <i class="bi bi-box text-primary" style="font-size: 2rem;"></i>
+            </div>
+            <div class="flex-grow-1 ms-3">
+              <div class="text-muted small">Total Items</div>
+              <div class="h4 mb-0" id="summary-total-items">{{ needs_list.items|length }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-shrink-0">
+              <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+            </div>
+            <div class="flex-grow-1 ms-3">
+              <div class="text-muted small">Fully Allocated</div>
+              <div class="h4 mb-0" id="summary-fully-allocated">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-shrink-0">
+              <i class="bi bi-hourglass-split text-warning" style="font-size: 2rem;"></i>
+            </div>
+            <div class="flex-grow-1 ms-3">
+              <div class="text-muted small">Partially Allocated</div>
+              <div class="h4 mb-0" id="summary-partial">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-shrink-0">
+              <i class="bi bi-exclamation-triangle text-danger" style="font-size: 2rem;"></i>
+            </div>
+            <div class="flex-grow-1 ms-3">
+              <div class="text-muted small">Over-Allocated</div>
+              <div class="h4 mb-0" id="summary-over-allocated">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
-  <form method="POST">
+
+  <!-- Allocation Form -->
+  <form method="POST" id="fulfilmentForm">
     {% for item_entry in needs_list.items %}
       {% set item_index = loop.index0 %}
-      <div class="card mb-3">
-        <div class="card-header bg-light">
-          <h5 class="mb-0">{{ item_entry.item.name }} <small class="text-muted">({{ item_entry.item.sku }})</small></h5>
-          <p class="mb-0 small">Requested: <strong>{{ item_entry.requested_qty }}</strong> {{ item_entry.item.unit }}
-          {% if item_entry.justification %}<br>Justification: {{ item_entry.justification }}{% endif %}</p>
+      <div class="card mb-3 shadow-sm item-card" data-item-index="{{ item_index }}" data-requested="{{ item_entry.requested_qty }}">
+        <div class="card-header bg-white">
+          <div class="row align-items-center">
+            <div class="col-md-6">
+              <h5 class="mb-1">{{ item_entry.item.name }}</h5>
+              <small class="text-muted">SKU: {{ item_entry.item.sku }} • Unit: {{ item_entry.item.unit }}</small>
+            </div>
+            <div class="col-md-6 text-md-end">
+              <div class="d-inline-flex align-items-center gap-3">
+                <div>
+                  <small class="text-muted d-block">Requested</small>
+                  <strong class="text-primary">{{ item_entry.requested_qty }}</strong>
+                </div>
+                <div>
+                  <small class="text-muted d-block">Allocated</small>
+                  <strong class="allocated-total" id="allocated-{{ item_index }}">0</strong>
+                </div>
+                <div>
+                  <small class="text-muted d-block">Remaining</small>
+                  <strong class="remaining" id="remaining-{{ item_index }}">{{ item_entry.requested_qty }}</strong>
+                </div>
+                <span class="badge status-badge" id="status-{{ item_index }}">Unallocated</span>
+              </div>
+            </div>
+          </div>
+          {% if item_entry.justification %}
+            <div class="mt-2">
+              <small><i class="bi bi-info-circle me-1"></i><strong>Justification:</strong> {{ item_entry.justification }}</small>
+            </div>
+          {% endif %}
         </div>
         <div class="card-body">
           <input type="hidden" name="item_sku_{{ item_index }}" value="{{ item_entry.item_sku }}">
-          <table class="table table-sm">
-            <thead><tr><th>Hub</th><th>Available</th><th>Allocate</th></tr></thead>
-            <tbody id="allocations_{{ item_index }}">
-              {% for hub in odpem_hubs %}
-                {% set available = stock_map.get((item_entry.item_sku, hub.id), 0) %}
-                {% if available > 0 %}
-                  <tr>
-                    <td>{{ hub.name }} <small class="text-muted">({{ hub.hub_type }})</small></td>
-                    <td>{{ available }}</td>
-                    <td><input type="hidden" name="depot_{{ item_index }}_{{ loop.index0 }}" value="{{ hub.id }}">
-                        <input type="number" class="form-control form-control-sm" name="qty_{{ item_index }}_{{ loop.index0 }}" min="0" max="{{ available }}" value="0"></td>
-                  </tr>
-                {% endif %}
-              {% endfor %}
-            </tbody>
-          </table>
+          
+          <div class="table-responsive">
+            <table class="table table-sm table-hover">
+              <thead>
+                <tr>
+                  <th style="width: 40%;">Source Hub</th>
+                  <th style="width: 20%;">
+                    Available
+                    <i class="bi bi-info-circle text-muted" data-bs-toggle="tooltip" title="Current stock at this hub"></i>
+                  </th>
+                  <th style="width: 30%;">Allocate Quantity</th>
+                  <th style="width: 10%;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="allocations-{{ item_index }}">
+                {% for hub in odpem_hubs %}
+                  {% set available = stock_map.get((item_entry.item_sku, hub.id), 0) %}
+                  {% if available > 0 %}
+                    <tr class="allocation-row" data-hub-id="{{ hub.id }}" data-max-available="{{ available }}">
+                      <td>
+                        <i class="bi bi-geo-alt me-1"></i>
+                        <strong>{{ hub.name }}</strong>
+                        <small class="text-muted ms-1">({{ hub.hub_type }})</small>
+                      </td>
+                      <td>
+                        <span class="badge bg-light text-dark available-stock">{{ available }}</span>
+                        <small class="text-muted ms-1">{{ item_entry.item.unit }}</small>
+                      </td>
+                      <td>
+                        <input type="hidden" name="depot_{{ item_index }}_{{ loop.index0 }}" value="{{ hub.id }}">
+                        <input 
+                          type="number" 
+                          class="form-control form-control-sm allocation-input" 
+                          name="qty_{{ item_index }}_{{ loop.index0 }}" 
+                          min="0" 
+                          max="{{ available }}" 
+                          value="0"
+                          data-item-index="{{ item_index }}"
+                          data-hub-id="{{ hub.id }}"
+                          data-max="{{ available }}"
+                          placeholder="0"
+                          aria-label="Allocate quantity from {{ hub.name }}">
+                        <div class="invalid-feedback">Cannot exceed available stock</div>
+                      </td>
+                      <td>
+                        <button type="button" class="btn btn-sm btn-outline-primary fill-max-btn" data-input="qty_{{ item_index }}_{{ loop.index0 }}" title="Fill maximum available">
+                          <i class="bi bi-arrow-bar-up"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="validation-message text-danger small mt-2" id="validation-{{ item_index }}" style="display: none;"></div>
         </div>
       </div>
     {% endfor %}
-    <div class="mb-3">
-      <label class="form-label">Fulfilment Notes</label>
-      <textarea class="form-control" name="fulfilment_notes" rows="3" placeholder="Optional notes about this fulfilment"></textarea>
+
+    <!-- Fulfilment Notes -->
+    <div class="card mb-4 shadow-sm">
+      <div class="card-body">
+        <label class="form-label fw-bold">
+          <i class="bi bi-chat-left-text me-1"></i>Fulfilment Notes
+          <span class="text-muted fw-normal">(Optional)</span>
+        </label>
+        <textarea 
+          class="form-control" 
+          name="fulfilment_notes" 
+          rows="3" 
+          placeholder="Add any notes about this fulfilment preparation..."></textarea>
+      </div>
     </div>
-    <div class="d-flex justify-content-end gap-2">
-      <a href="{{ url_for('needs_lists') }}" class="btn btn-secondary">Cancel</a>
-      <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle me-1"></i>Submit for Manager Approval</button>
+
+    <!-- Form Validation Alert -->
+    <div class="alert alert-danger" id="form-validation-alert" style="display: none;">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      <span id="form-validation-message"></span>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="d-flex justify-content-end gap-2 mb-4">
+      <a href="{{ url_for('needs_lists') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-x-circle me-1"></i>Cancel
+      </a>
+      <button type="submit" class="btn btn-primary" id="submitBtn">
+        <i class="bi bi-check-circle me-1"></i>Submit for Manager Approval
+      </button>
     </div>
   </form>
 </div>
+
+<style>
+  .item-card {
+    transition: all 0.3s ease;
+    border-left: 4px solid #e9ecef;
+  }
+  
+  .item-card.fully-allocated {
+    border-left-color: #198754;
+    background-color: #f8fff9;
+  }
+  
+  .item-card.partially-allocated {
+    border-left-color: #ffc107;
+    background-color: #fffef8;
+  }
+  
+  .item-card.over-allocated {
+    border-left-color: #dc3545;
+    background-color: #fff8f8;
+  }
+  
+  .status-badge {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  
+  .allocation-input:focus {
+    border-color: #009639;
+    box-shadow: 0 0 0 0.2rem rgba(0, 150, 57, 0.25);
+  }
+  
+  .fill-max-btn {
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .available-stock {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize tooltips
+  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+  
+  // Track original available stock for each hub/item combination
+  const originalStock = {};
+  document.querySelectorAll('.allocation-row').forEach(row => {
+    const hubId = row.dataset.hubId;
+    const maxAvailable = parseInt(row.dataset.maxAvailable);
+    const itemCard = row.closest('.item-card');
+    const itemIndex = itemCard.dataset.itemIndex;
+    const key = `${itemIndex}_${hubId}`;
+    originalStock[key] = maxAvailable;
+  });
+  
+  // Live calculation function
+  function updateCalculations() {
+    let fullyAllocated = 0;
+    let partiallyAllocated = 0;
+    let overAllocated = 0;
+    
+    document.querySelectorAll('.item-card').forEach(card => {
+      const itemIndex = card.dataset.itemIndex;
+      const requested = parseFloat(card.dataset.requested);
+      let totalAllocated = 0;
+      
+      // Sum all allocations for this item
+      const inputs = card.querySelectorAll('.allocation-input');
+      inputs.forEach(input => {
+        const value = parseFloat(input.value) || 0;
+        totalAllocated += value;
+        
+        // Validate against max available
+        const max = parseFloat(input.dataset.max);
+        if (value > max) {
+          input.classList.add('is-invalid');
+        } else {
+          input.classList.remove('is-invalid');
+        }
+      });
+      
+      const remaining = requested - totalAllocated;
+      
+      // Update display
+      document.getElementById(`allocated-${itemIndex}`).textContent = totalAllocated.toFixed(0);
+      document.getElementById(`remaining-${itemIndex}`).textContent = remaining.toFixed(0);
+      
+      // Update status badge and card styling
+      const statusBadge = document.getElementById(`status-${itemIndex}`);
+      const validationMsg = document.getElementById(`validation-${itemIndex}`);
+      
+      card.classList.remove('fully-allocated', 'partially-allocated', 'over-allocated');
+      
+      if (totalAllocated > requested) {
+        statusBadge.textContent = 'Over-Allocated';
+        statusBadge.className = 'badge status-badge bg-danger';
+        card.classList.add('over-allocated');
+        validationMsg.textContent = `Over-allocated by ${(totalAllocated - requested).toFixed(0)} units`;
+        validationMsg.style.display = 'block';
+        overAllocated++;
+      } else if (totalAllocated === requested && totalAllocated > 0) {
+        statusBadge.textContent = 'Fully Allocated';
+        statusBadge.className = 'badge status-badge bg-success';
+        card.classList.add('fully-allocated');
+        validationMsg.style.display = 'none';
+        fullyAllocated++;
+      } else if (totalAllocated > 0) {
+        statusBadge.textContent = 'Partially Allocated';
+        statusBadge.className = 'badge status-badge bg-warning text-dark';
+        card.classList.add('partially-allocated');
+        validationMsg.textContent = `Still need ${remaining.toFixed(0)} units`;
+        validationMsg.style.display = 'block';
+        partiallyAllocated++;
+      } else {
+        statusBadge.textContent = 'Unallocated';
+        statusBadge.className = 'badge status-badge bg-secondary';
+        validationMsg.style.display = 'none';
+      }
+      
+      // Update live available stock display per hub
+      inputs.forEach(input => {
+        const hubId = input.dataset.hubId;
+        const key = `${itemIndex}_${hubId}`;
+        const originalAvailable = originalStock[key];
+        const currentAllocation = parseFloat(input.value) || 0;
+        const liveAvailable = originalAvailable - currentAllocation;
+        
+        const row = input.closest('.allocation-row');
+        const availableBadge = row.querySelector('.available-stock');
+        availableBadge.textContent = liveAvailable;
+        
+        // Color code based on availability
+        if (liveAvailable === 0) {
+          availableBadge.className = 'badge bg-secondary text-white available-stock';
+        } else if (liveAvailable < originalAvailable * 0.3) {
+          availableBadge.className = 'badge bg-warning text-dark available-stock';
+        } else {
+          availableBadge.className = 'badge bg-light text-dark available-stock';
+        }
+      });
+    });
+    
+    // Update summary panel
+    document.getElementById('summary-fully-allocated').textContent = fullyAllocated;
+    document.getElementById('summary-partial').textContent = partiallyAllocated;
+    document.getElementById('summary-over-allocated').textContent = overAllocated;
+    
+    // Enable/disable submit button
+    const submitBtn = document.getElementById('submitBtn');
+    const formAlert = document.getElementById('form-validation-alert');
+    const alertMsg = document.getElementById('form-validation-message');
+    
+    if (overAllocated > 0) {
+      submitBtn.disabled = true;
+      formAlert.style.display = 'block';
+      alertMsg.textContent = `Cannot submit: ${overAllocated} item(s) are over-allocated. Please adjust quantities.`;
+    } else {
+      submitBtn.disabled = false;
+      formAlert.style.display = 'none';
+    }
+  }
+  
+  // Attach event listeners to all allocation inputs
+  document.querySelectorAll('.allocation-input').forEach(input => {
+    input.addEventListener('input', updateCalculations);
+    input.addEventListener('change', updateCalculations);
+  });
+  
+  // Fill max button functionality
+  document.querySelectorAll('.fill-max-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const inputName = this.dataset.input;
+      const input = document.querySelector(`input[name="${inputName}"]`);
+      const max = parseFloat(input.dataset.max);
+      input.value = max;
+      updateCalculations();
+    });
+  });
+  
+  // Form submission validation
+  document.getElementById('fulfilmentForm').addEventListener('submit', function(e) {
+    const overAllocatedCount = parseInt(document.getElementById('summary-over-allocated').textContent);
+    
+    if (overAllocatedCount > 0) {
+      e.preventDefault();
+      alert('Cannot submit: Some items are over-allocated. Please adjust quantities.');
+      return false;
+    }
+    
+    // Check if at least one allocation exists
+    let hasAllocations = false;
+    document.querySelectorAll('.allocation-input').forEach(input => {
+      if (parseFloat(input.value) > 0) {
+        hasAllocations = true;
+      }
+    });
+    
+    if (!hasAllocations) {
+      e.preventDefault();
+      alert('Please allocate at least one item before submitting.');
+      return false;
+    }
+  });
+  
+  // Initial calculation
+  updateCalculations();
+  
+  // Keyboard accessibility improvements
+  document.querySelectorAll('.allocation-input').forEach((input, index, arr) => {
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (index < arr.length - 1) {
+          arr[index + 1].focus();
+        }
+      }
+    });
+  });
+});
+</script>
 {% endblock %}
