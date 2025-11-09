@@ -17,16 +17,17 @@ Utilizes SQLAlchemy ORM with a relational database design, supporting SQLite for
 ### Barcode Scanning for Intake
 Supports barcode scanning for efficient donation intake, reducing manual entry and errors. Items can store an optional barcode value, and the intake form allows scanning or manual entry to auto-select items and move to quantity fields.
 
-### Needs List Management with Logistics Hierarchy
-Implements a role-based workflow for AGENCY and SUB hubs to request supplies with Logistics Officer preparation and Logistics Manager approval:
+### Needs List Management with Dispatch and Receipt Workflow
+Implements a complete end-to-end workflow for AGENCY and SUB hubs to request supplies with preparation, approval, dispatch, and receipt confirmation:
 - **Hub Creation & Submission**: AGENCY and SUB hub staff create needs lists with item quantities, priorities (Low/Medium/High/Urgent), and justifications. They submit lists for logistics review. Each hub type can only see their own needs lists.
 - **Logistics Officer Review**: Logistics Officers have **global visibility** on all submitted needs lists regardless of their assigned location, allowing them to orchestrate supply distribution across the entire system. They prepare fulfilments by verifying requests, assigning quantities from source hubs (MAIN/SUB), and submitting for manager approval. Cannot finalize fulfilments independently.
-- **Logistics Manager Approval**: Logistics Managers have **global visibility** on all needs lists and final approval authority. They can approve fulfilments (triggering automatic stock transfers), reject fulfilments (returning to submitted status), or directly prepare and approve in one step bypassing the awaiting approval status.
-- **Automatic Stock Transfers**: Upon manager approval, the system automatically executes stock transfers: deducts from source hubs (MAIN/SUB), increments to requesting hub (AGENCY/SUB), and creates transaction records marked as "Needs List Fulfilment".
-- **Status Workflow**: Draft → Submitted → Fulfilment Prepared → Awaiting Approval → Fulfilled (or Rejected → Submitted). Logistics Managers can bypass Awaiting Approval and directly execute fulfilments.
-- **Centralized Permission System**: Seven helper functions (`can_view_needs_list`, `can_edit_needs_list`, `can_submit_needs_list`, `can_prepare_fulfilment`, `can_approve_fulfilment`, `can_reject_fulfilment`, `can_delete_needs_list`) enforce consistent role-based access control across all needs list routes.
+- **Logistics Manager Approval**: Logistics Managers have **global visibility** on all needs lists and final approval authority. They can approve fulfilments (setting status to "Approved"), reject fulfilments (returning to submitted status), or directly prepare and approve in one step. Approval does NOT create stock transactions - only dispatch does.
+- **Dispatch Process**: After approval, Logistics Officers and Managers can dispatch items, which creates actual stock transfers: deducts from source hubs (MAIN/SUB), increments to requesting hub (AGENCY/SUB), and creates transaction records marked as "Dispatched for Needs List". Status changes to "Dispatched". Dispatched by user and timestamp tracked via foreign key to User model.
+- **Receipt Confirmation**: Agency Hub users can confirm receipt of dispatched items, marking the needs list as "Completed". Receipt confirmation includes notes and is tracked with user foreign key and timestamp. Only the requesting hub can confirm receipt.
+- **Status Workflow**: Draft → Submitted → Fulfilment Prepared → Awaiting Approval → Approved → Dispatched → Received/Completed (or Rejected → Submitted at any approval stage). Logistics Managers can directly approve prepared fulfilments.
+- **Centralized Permission System**: Nine helper functions (`can_view_needs_list`, `can_edit_needs_list`, `can_submit_needs_list`, `can_prepare_fulfilment`, `can_approve_fulfilment`, `can_reject_fulfilment`, `can_delete_needs_list`, `can_dispatch_needs_list`, `can_confirm_receipt`) enforce consistent role-based access control across all needs list routes.
 - **Hub Independence**: SUB hubs cannot see needs lists from other SUB hubs or AGENCY hubs. AGENCY hubs cannot see needs lists from SUB hubs or other AGENCY hubs. Only Logistics Officers/Managers and ADMIN have cross-hub visibility.
-- **Complete Audit Trail**: Tracks who created the list, when submitted, who prepared fulfilment, who approved/rejected, and completion timestamps.
+- **Complete Audit Trail**: Tracks who created the list, when submitted, who prepared fulfilment, who approved/rejected, who dispatched (FK to User), dispatch timestamp, who confirmed receipt (FK to User), receipt timestamp, and all associated notes.
 - **Multi-Hub Fulfilment**: Logistics Officers can allocate items from multiple source hubs (MAIN and SUB) to fulfill a single needs list, optimizing stock distribution.
 
 ### Distribution Package Management

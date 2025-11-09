@@ -558,9 +558,8 @@ def can_dispatch_needs_list(user, needs_list):
     Returns:
         tuple: (allowed: bool, error_message: str or None)
     """
-    # Must be in Awaiting Approval status (ready to approve & dispatch simultaneously)
-    # OR already Approved status (dispatch after separate approval)
-    if needs_list.status not in ['Awaiting Approval', 'Approved']:
+    # Must be in Approved status (post-approval, ready for dispatch)
+    if needs_list.status != 'Approved':
         return (False, "Only approved needs lists can be dispatched.")
     
     # Only ADMIN, Logistics Officers, and Logistics Managers can dispatch
@@ -2128,60 +2127,16 @@ def needs_list_prepare(list_id):
         is_manager = current_user.role == ROLE_LOGISTICS_MANAGER
         
         if is_manager:
-            # Logistics Managers: Directly approve and execute stock transfers
-            stock_map = get_stock_by_location()
-            fulfilments = NeedsListFulfilment.query.filter_by(needs_list_id=needs_list.id).all()
-            
-            # Validate stock availability
-            for fulfilment in fulfilments:
-                available = stock_map.get((fulfilment.item_sku, fulfilment.source_hub_id), 0)
-                if available < fulfilment.allocated_qty:
-                    source_hub = Depot.query.get(fulfilment.source_hub_id)
-                    item = Item.query.get(fulfilment.item_sku)
-                    flash(f"Insufficient stock: {item.name} at {source_hub.name}. Available: {available}, Requested: {fulfilment.allocated_qty}", "danger")
-                    return redirect(url_for("needs_list_prepare", list_id=list_id))
-            
-            # Execute stock transfers
-            requesting_hub = needs_list.agency_hub
-            for fulfilment in fulfilments:
-                item = Item.query.get(fulfilment.item_sku)
-                source_hub = Depot.query.get(fulfilment.source_hub_id)
-                
-                # OUT transaction from source hub
-                out_txn = Transaction(
-                    item_sku=fulfilment.item_sku,
-                    location_id=fulfilment.source_hub_id,
-                    ttype="OUT",
-                    qty=fulfilment.allocated_qty,
-                    created_by=current_user.full_name,
-                    notes=f"Needs List Fulfilment: {needs_list.list_number} to {requesting_hub.name}",
-                    event_id=needs_list.event_id
-                )
-                db.session.add(out_txn)
-                
-                # IN transaction to requesting hub
-                in_txn = Transaction(
-                    item_sku=fulfilment.item_sku,
-                    location_id=needs_list.agency_hub_id,
-                    ttype="IN",
-                    qty=fulfilment.allocated_qty,
-                    created_by=current_user.full_name,
-                    notes=f"Needs List Fulfilment: {needs_list.list_number} from {source_hub.name}",
-                    event_id=needs_list.event_id
-                )
-                db.session.add(in_txn)
-            
-            # Update needs list status to Fulfilled
-            needs_list.status = 'Fulfilled'
+            # Logistics Managers: Directly approve (stock transfers will happen during dispatch)
+            needs_list.status = 'Approved'
             needs_list.prepared_by = current_user.full_name
             needs_list.prepared_at = datetime.utcnow()
             needs_list.approved_by = current_user.full_name
             needs_list.approved_at = datetime.utcnow()
-            needs_list.fulfilled_at = datetime.utcnow()
             needs_list.fulfilment_notes = fulfilment_notes
             db.session.commit()
             
-            flash(f"Needs list {needs_list.list_number} approved and fulfilled successfully. Stock transfers completed.", "success")
+            flash(f"Needs list {needs_list.list_number} approved successfully. Ready for dispatch.", "success")
         else:
             # Logistics Officers: Submit for manager approval
             needs_list.status = 'Awaiting Approval'
@@ -2229,62 +2184,21 @@ def needs_list_approve(list_id):
     
     approval_notes = request.form.get("approval_notes", "").strip() or None
     
-    # Verify stock availability for all allocations
-    stock_map = get_stock_by_location()
+    # Verify fulfilment allocations exist
     fulfilments = NeedsListFulfilment.query.filter_by(needs_list_id=needs_list.id).all()
     
     if not fulfilments:
         flash("No fulfilment allocations found. Please prepare fulfilment first.", "danger")
         return redirect(url_for("needs_list_details", list_id=list_id))
     
-    # Validate stock availability
-    for fulfilment in fulfilments:
-        available = stock_map.get((fulfilment.item_sku, fulfilment.source_hub_id), 0)
-        if available < fulfilment.allocated_qty:
-            source_hub = Depot.query.get(fulfilment.source_hub_id)
-            item = Item.query.get(fulfilment.item_sku)
-            flash(f"Insufficient stock: {item.name} at {source_hub.name}. Available: {available}, Requested: {fulfilment.allocated_qty}", "danger")
-            return redirect(url_for("needs_list_details", list_id=list_id))
-    
-    # Execute stock transfers
-    requesting_hub = needs_list.agency_hub
-    for fulfilment in fulfilments:
-        item = Item.query.get(fulfilment.item_sku)
-        source_hub = Depot.query.get(fulfilment.source_hub_id)
-        
-        # OUT transaction from source hub
-        out_txn = Transaction(
-            item_sku=fulfilment.item_sku,
-            location_id=fulfilment.source_hub_id,
-            ttype="OUT",
-            qty=fulfilment.allocated_qty,
-            created_by=current_user.full_name,
-            notes=f"Needs List Fulfilment: {needs_list.list_number} to {requesting_hub.name}",
-            event_id=needs_list.event_id
-        )
-        db.session.add(out_txn)
-        
-        # IN transaction to requesting hub
-        in_txn = Transaction(
-            item_sku=fulfilment.item_sku,
-            location_id=needs_list.agency_hub_id,
-            ttype="IN",
-            qty=fulfilment.allocated_qty,
-            created_by=current_user.full_name,
-            notes=f"Needs List Fulfilment: {needs_list.list_number} from {source_hub.name}",
-            event_id=needs_list.event_id
-        )
-        db.session.add(in_txn)
-    
-    # Update needs list status
-    needs_list.status = 'Fulfilled'
+    # Update needs list status to Approved (stock transfers will happen during dispatch)
+    needs_list.status = 'Approved'
     needs_list.approved_by = current_user.full_name
     needs_list.approved_at = datetime.utcnow()
-    needs_list.fulfilled_at = datetime.utcnow()
     needs_list.approval_notes = approval_notes
     db.session.commit()
     
-    flash(f"Needs list {needs_list.list_number} approved and fulfilled successfully. Stock transfers completed.", "success")
+    flash(f"Needs list {needs_list.list_number} approved successfully. Ready for dispatch.", "success")
     return redirect(url_for("needs_list_details", list_id=list_id))
 
 @app.route("/needs-lists/<int:list_id>/reject", methods=["POST"])
