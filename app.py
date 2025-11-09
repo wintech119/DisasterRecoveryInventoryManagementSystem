@@ -2114,7 +2114,8 @@ def needs_list_prepare(list_id):
         fulfilment_notes = request.form.get("fulfilment_notes", "").strip() or None
         
         # Delete existing fulfilment allocations if re-preparing
-        NeedsListFulfilment.query.filter_by(needs_list_id=needs_list.id).delete()
+        NeedsListFulfilment.query.filter_by(needs_list_id=needs_list.id).delete(synchronize_session=False)
+        db.session.flush()
         
         # Parse fulfilment allocations from form
         allocations_created = 0
