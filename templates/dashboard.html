@@ -384,27 +384,33 @@ document.addEventListener('DOMContentLoaded', function() {
   const hubsCtx = document.getElementById('hubsChart');
   if (hubsCtx) {
     const hubTypes = {{ hubs_by_type|tojson|safe }};
-    new Chart(hubsCtx, {
-      type: 'doughnut',
-      data: {
-        labels: Object.keys(hubTypes),
-        datasets: [{
-          data: Object.values(hubTypes),
-          backgroundColor: ['#0d6efd', '#198754', '#ffc107'],
-          borderWidth: 0
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { padding: 10, font: { size: 11 } }
+    
+    // Only create chart if we have data
+    if (hubTypes && Object.keys(hubTypes).length > 0) {
+      new Chart(hubsCtx, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(hubTypes),
+          datasets: [{
+            data: Object.values(hubTypes),
+            backgroundColor: ['#0d6efd', '#198754', '#ffc107'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { padding: 10, font: { size: 11 } }
+            }
           }
         }
-      }
-    });
+      });
+    } else {
+      hubsCtx.parentElement.innerHTML = '<div class="text-center text-muted py-4"><p class="mb-0">No hub data available</p></div>';
+    }
   }
   
   // Stock by Category Chart
@@ -412,56 +418,69 @@ document.addEventListener('DOMContentLoaded', function() {
   if (stockCtx) {
     const categories = {{ category_labels|tojson|safe }};
     const categoryData = {{ category_data|tojson|safe }};
-    new Chart(stockCtx, {
-      type: 'bar',
-      data: {
-        labels: categories,
-        datasets: [{
-          label: 'Units',
-          data: categoryData,
-          backgroundColor: '#198754',
-          borderRadius: 4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false }
+    
+    // Only create chart if we have data
+    if (categories && categories.length > 0 && categoryData && categoryData.length > 0) {
+      new Chart(stockCtx, {
+        type: 'bar',
+        data: {
+          labels: categories,
+          datasets: [{
+            label: 'Units',
+            data: categoryData,
+            backgroundColor: '#198754',
+            borderRadius: 4
+          }]
         },
-        scales: {
-          y: { beginAtZero: true, ticks: { font: { size: 10 } } },
-          x: { ticks: { font: { size: 10 } } }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+            x: { ticks: { font: { size: 10 } } }
+          }
         }
-      }
-    });
+      });
+    } else {
+      // Display message when no data
+      stockCtx.parentElement.innerHTML = '<div class="text-center text-muted py-4"><p class="mb-0">No category data available</p></div>';
+    }
   }
   
   // Needs Lists Status Chart
   const needsListsCtx = document.getElementById('needsListsChart');
   if (needsListsCtx) {
     const needsListsData = {{ needs_lists_chart_data|tojson|safe }};
-    new Chart(needsListsCtx, {
-      type: 'doughnut',
-      data: {
-        labels: Object.keys(needsListsData),
-        datasets: [{
-          data: Object.values(needsListsData),
-          backgroundColor: ['#6c757d', '#ffc107', '#0d6efd', '#198754'],
-          borderWidth: 0
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { padding: 10, font: { size: 11 } }
+    
+    // Only create chart if we have data
+    if (needsListsData && Object.keys(needsListsData).length > 0) {
+      new Chart(needsListsCtx, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(needsListsData),
+          datasets: [{
+            data: Object.values(needsListsData),
+            backgroundColor: ['#6c757d', '#ffc107', '#0d6efd', '#198754'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { padding: 10, font: { size: 11 } }
+            }
           }
         }
-      }
-    });
+      });
+    } else {
+      needsListsCtx.parentElement.innerHTML = '<div class="text-center text-muted py-4"><p class="mb-0">No needs list data available</p></div>';
+    }
   }
 });
 </script>
