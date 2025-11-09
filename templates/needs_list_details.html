@@ -13,30 +13,6 @@
         </a>
       </div>
 
-      {# Workflow Guide for AGENCY and SUB Hub Users #}
-      {% if user_depot and user_depot.hub_type in ['AGENCY', 'SUB'] and user_depot.id == needs_list.agency_hub_id %}
-        <div class="alert alert-info mb-4">
-          <h5 class="alert-heading"><i class="bi bi-info-circle me-2"></i>Needs List Workflow</h5>
-          <p class="mb-2">This is how your supply request will be processed:</p>
-          <ol class="mb-0">
-            <li><strong>Draft:</strong> You create your needs list with required items and quantities.</li>
-            <li><strong>Submit:</strong> You submit the list for ODPEM logistics review.</li>
-            <li><strong>Fulfilment Preparation:</strong> ODPEM Logistics Officers review your request and allocate stock from available ODPEM hubs (MAIN and SUB hubs).</li>
-            <li><strong>Manager Approval:</strong> ODPEM Logistics Managers review and approve the fulfilment, which automatically executes stock transfers.</li>
-            <li><strong>Fulfilled:</strong> Items are transferred to your hub and you'll receive notification when complete.</li>
-          </ol>
-          <hr>
-          <p class="mb-0 small"><strong>Current Status:</strong> 
-            {% if needs_list.status == 'Draft' %}Your needs list is in draft. Review and submit when ready.
-            {% elif needs_list.status == 'Submitted' %}Your request has been submitted and is awaiting ODPEM logistics review.
-            {% elif needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval'] %}ODPEM logistics is preparing your fulfilment.
-            {% elif needs_list.status == 'Fulfilled' %}Your request has been fulfilled! Items have been transferred to your hub.
-            {% elif needs_list.status == 'Rejected' %}Your request was rejected. Please review the feedback and create a new needs list if needed.
-            {% endif %}
-          </p>
-        </div>
-      {% endif %}
-
       <div class="row">
         <div class="col-md-8">
           <div class="card shadow-sm mb-4">
@@ -194,6 +170,83 @@
         </div>
 
         <div class="col-md-4">
+          {# Workflow Guide for AGENCY and SUB Hub Users #}
+          {% if user_depot and user_depot.hub_type in ['AGENCY', 'SUB'] and user_depot.id == needs_list.agency_hub_id %}
+            <div class="card shadow-sm mb-3" style="border-left: 4px solid #0066cc;">
+              <div class="card-body">
+                <h6 class="card-title mb-3"><i class="bi bi-signpost-2 me-2"></i>Request Workflow</h6>
+                <div class="workflow-steps">
+                  <div class="step {% if needs_list.status == 'Draft' %}active{% else %}completed{% endif %} mb-3">
+                    <div class="d-flex align-items-start">
+                      <div class="step-icon me-2">
+                        <i class="bi bi-{% if needs_list.status == 'Draft' %}circle{% else %}check-circle-fill text-success{% endif %}"></i>
+                      </div>
+                      <div>
+                        <strong class="d-block">1. Create Request</strong>
+                        <small class="text-muted">Add items and quantities needed</small>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="step {% if needs_list.status == 'Submitted' %}active{% elif needs_list.status not in ['Draft'] %}completed{% endif %} mb-3">
+                    <div class="d-flex align-items-start">
+                      <div class="step-icon me-2">
+                        <i class="bi bi-{% if needs_list.status == 'Submitted' %}circle{% elif needs_list.status == 'Draft' %}circle{% else %}check-circle-fill text-success{% endif %}"></i>
+                      </div>
+                      <div>
+                        <strong class="d-block">2. Submit to ODPEM</strong>
+                        <small class="text-muted">Send request for review</small>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="step {% if needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval'] %}active{% elif needs_list.status == 'Fulfilled' %}completed{% endif %} mb-3">
+                    <div class="d-flex align-items-start">
+                      <div class="step-icon me-2">
+                        <i class="bi bi-{% if needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval'] %}arrow-repeat text-primary{% elif needs_list.status == 'Fulfilled' %}check-circle-fill text-success{% else %}circle{% endif %}"></i>
+                      </div>
+                      <div>
+                        <strong class="d-block">3. ODPEM Processing</strong>
+                        <small class="text-muted">Logistics team allocates stock</small>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="step {% if needs_list.status == 'Fulfilled' %}active completed{% endif %}">
+                    <div class="d-flex align-items-start">
+                      <div class="step-icon me-2">
+                        <i class="bi bi-{% if needs_list.status == 'Fulfilled' %}check-circle-fill text-success{% else %}circle{% endif %}"></i>
+                      </div>
+                      <div>
+                        <strong class="d-block">4. Receive Items</strong>
+                        <small class="text-muted">Items transferred to your hub</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <hr class="my-3">
+                
+                <div class="current-status">
+                  <p class="mb-1"><strong>Current Step:</strong></p>
+                  <p class="mb-0 small">
+                    {% if needs_list.status == 'Draft' %}
+                      <i class="bi bi-pencil-square text-secondary me-1"></i>Review your request and submit when ready.
+                    {% elif needs_list.status == 'Submitted' %}
+                      <i class="bi bi-hourglass-split text-primary me-1"></i>Awaiting ODPEM review.
+                    {% elif needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval'] %}
+                      <i class="bi bi-gear-fill text-primary me-1"></i>ODPEM is processing your request.
+                    {% elif needs_list.status == 'Fulfilled' %}
+                      <i class="bi bi-check-circle-fill text-success me-1"></i>Items ready at your hub!
+                    {% elif needs_list.status == 'Rejected' %}
+                      <i class="bi bi-x-circle-fill text-danger me-1"></i>Request not approved. Review feedback below.
+                    {% endif %}
+                  </p>
+                </div>
+              </div>
+            </div>
+          {% endif %}
+          
           {# AGENCY/SUB Hub Actions #}
           {% if user_depot and user_depot.hub_type in ['AGENCY', 'SUB'] and user_depot.id == needs_list.agency_hub_id %}
             {% if needs_list.status == 'Draft' %}
