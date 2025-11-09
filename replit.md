@@ -72,8 +72,8 @@ Implements a best-practice layout with responsive design and data visualizations
 ### Authentication and User Management
 Implements Flask-Login with role-based access control (RBAC) for seven user roles: ADMIN, LOGISTICS_MANAGER, LOGISTICS_OFFICER, WAREHOUSE_STAFF, FIELD_PERSONNEL, EXECUTIVE, and AUDITOR. Features include secure password hashing, session management, role-aware navigation, and route protection. An ADMIN-only web interface manages user accounts. AGENCY hub users have a simplified navigation menu focused on Needs Lists and History.
 
-### Universal In-App Notification System
-Provides real-time notifications to all user roles for relevant workflow events. The system features role-specific notification triggers to ensure each user receives actionable alerts:
+### Universal In-App Notification System with Deep-Linking
+Provides real-time, clickable notifications to all user roles for relevant workflow events. Each notification acts as a quick navigation shortcut directly to the specific workflow task page. The system features role-specific notification triggers to ensure each user receives actionable alerts:
 
 **Notification Triggers by Role:**
 -   **Agency Hub Users**: Needs list lifecycle events (submitted, approved, dispatched, received)
@@ -87,6 +87,18 @@ Provides real-time notifications to all user roles for relevant workflow events.
 
 **Technical Architecture:**
 The system uses generalized service functions (`create_notifications_for_users`, `create_notifications_for_role`) for flexible fan-out to target recipients. Notifications are automatically created at key workflow transitions with role-appropriate messages and links. The UI features a bell icon with unread badge counter in the navigation for all users, a Bootstrap offcanvas panel for quick access, auto-polling every 30 seconds with visibility-aware pausing, and individual/batch "mark as read" functionality. API endpoints (`/notifications/*`) are role-agnostic and secured with user ownership verification. Backward-compatible `/agency/*` aliases are maintained for existing integrations. Notifications include comprehensive audit trail information (triggered_by, needs_list_number, timestamps) stored in JSON payload. The system supports pagination (20-50 per page), archival flags for retention policies, and composite indexes for efficient queries.
+
+**Deep-Linking Navigation:**
+Every notification is clickable and deep-links to the specific workflow task page for seamless navigation. Notifications automatically mark as read when clicked. The system includes:
+-   **Smart URL Routing**: Each notification type targets the appropriate page:
+    -   Needs List Submitted → Details page (`/needs-lists/{id}`) or Prepare page (`/needs-lists/{id}/prepare` for Logistics Officers)
+    -   Awaiting Approval → Logistics Manager approval queue (`/logistics/needs-lists`)
+    -   Approved/Dispatched/Received → Details page for workflow tracking
+    -   Transfer Requests → Transfer approval queue (`/logistics/transfer-requests`)
+-   **Enhanced UI/UX**: Clickable notifications feature hover states with transform animations, clear cursor indicators (pointer for clickable, not-allowed for disabled), visual arrow icons, and smooth transitions. Disabled notifications (without link_url) are visually distinct with reduced opacity.
+-   **Auto Mark-as-Read**: JavaScript `handleNotificationClick()` function validates link URLs, marks unread notifications as read via API call, provides 100ms visual feedback delay, then navigates to the target page. Graceful error handling ensures navigation occurs even if marking as read fails.
+-   **Role-Based Access Control**: Protected routes maintain `@role_required` decorators. Unauthorized access attempts (e.g., clicking a link without proper permissions) trigger a user-friendly 403 error page with clear messaging and navigation options.
+-   **Consistent Behavior**: Both the offcanvas notification panel and full notification history page (`/notifications/history`) implement identical deep-linking behavior, ensuring a cohesive user experience across all notification interfaces.
 
 ### File Storage
 Supports file attachments stored locally with UUID-based filenames, with a modular service for future cloud migration.
