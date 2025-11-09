@@ -417,6 +417,202 @@ def generate_needs_list_number():
         new_num = 1
     return f"NL-{new_num:06d}"
 
+def get_fulfillment_class(fulfillment_rate):
+    """Return CSS class token based on fulfillment rate threshold"""
+    if fulfillment_rate >= 100:
+        return 'text-success'
+    elif fulfillment_rate >= 50:
+        return 'text-warning'
+    else:
+        return 'text-danger'
+
+def prepare_completed_context(needs_list, current_user):
+    """
+    Prepare comprehensive context for completed needs list view
+    
+    Args:
+        needs_list: NeedsList object with fulfilments eagerly loaded
+        current_user: Current logged-in user
+        
+    Returns:
+        dict: Context with summary, items, timeline, and role-specific data
+    """
+    # Calculate summary metrics
+    total_items = len(needs_list.items)
+    total_requested_qty = 0
+    total_dispatched_qty = 0
+    items_data = []
+    
+    # Build per-item details with source hubs
+    for item_entry in needs_list.items:
+        item_requested = item_entry.requested_qty
+        item_dispatched = 0
+        source_hubs = []
+        
+        # Aggregate dispatched quantities from fulfilments
+        for fulfilment in needs_list.fulfilments:
+            if fulfilment.item_sku == item_entry.item_sku:
+                item_dispatched += fulfilment.allocated_qty
+                source_hubs.append({
+                    'hub_name': fulfilment.source_hub.name,
+                    'qty': fulfilment.allocated_qty
+                })
+        
+        total_requested_qty += item_requested
+        total_dispatched_qty += item_dispatched
+        
+        # Calculate item-level metrics
+        item_fulfillment_pct = int((item_dispatched / item_requested * 100)) if item_requested > 0 else 0
+        item_shortfall = max(item_requested - item_dispatched, 0)
+        
+        items_data.append({
+            'item_name': item_entry.item.name,
+            'sku': item_entry.item_sku,
+            'unit': item_entry.item.unit,
+            'requested_qty': item_requested,
+            'dispatched_qty': item_dispatched,
+            'fulfillment_pct': item_fulfillment_pct,
+            'shortfall': item_shortfall,
+            'source_hubs': source_hubs,
+            'justification': item_entry.justification,
+            'has_shortfall': item_shortfall > 0
+        })
+    
+    # Calculate overall metrics
+    fulfillment_rate = int((total_dispatched_qty / total_requested_qty * 100)) if total_requested_qty > 0 else 0
+    shortfall_qty = max(total_requested_qty - total_dispatched_qty, 0)
+    fulfillment_class = get_fulfillment_class(fulfillment_rate)
+    
+    # Build timeline events from NeedsList fields
+    timeline = []
+    
+    if needs_list.created_at:
+        timeline.append({
+            'milestone': 'Created',
+            'label': 'Needs List Created',
+            'timestamp': needs_list.created_at,
+            'actor': needs_list.created_by or 'System',
+            'notes': None,
+            'icon': 'bi-file-earmark-plus'
+        })
+    
+    if needs_list.submitted_at:
+        timeline.append({
+            'milestone': 'Submitted',
+            'label': 'Submitted to ODPEM',
+            'timestamp': needs_list.submitted_at,
+            'actor': needs_list.created_by or 'System',
+            'notes': None,
+            'icon': 'bi-send'
+        })
+    
+    if needs_list.prepared_at and needs_list.prepared_by:
+        timeline.append({
+            'milestone': 'Prepared',
+            'label': 'Fulfilment Prepared',
+            'timestamp': needs_list.prepared_at,
+            'actor': needs_list.prepared_by,
+            'notes': needs_list.fulfilment_notes,
+            'icon': 'bi-gear'
+        })
+    
+    if needs_list.approved_at and needs_list.approved_by:
+        timeline.append({
+            'milestone': 'Approved',
+            'label': 'Approved by Manager',
+            'timestamp': needs_list.approved_at,
+            'actor': needs_list.approved_by,
+            'notes': needs_list.approval_notes,
+            'icon': 'bi-person-check'
+        })
+    
+    if needs_list.dispatched_at:
+        dispatcher_name = needs_list.dispatched_by_user.full_name if needs_list.dispatched_by_user else 'System'
+        timeline.append({
+            'milestone': 'Dispatched',
+            'label': 'Items Dispatched',
+            'timestamp': needs_list.dispatched_at,
+            'actor': dispatcher_name,
+            'notes': needs_list.dispatch_notes,
+            'icon': 'bi-truck'
+        })
+    
+    if needs_list.received_at:
+        receiver_name = needs_list.received_by_user.full_name if needs_list.received_by_user else 'System'
+        timeline.append({
+            'milestone': 'Received',
+            'label': 'Receipt Confirmed',
+            'timestamp': needs_list.received_at,
+            'actor': receiver_name,
+            'notes': needs_list.receipt_notes,
+            'icon': 'bi-check-circle'
+        })
+    
+    if needs_list.fulfilled_at:
+        timeline.append({
+            'milestone': 'Completed',
+            'label': 'Workflow Completed',
+            'timestamp': needs_list.fulfilled_at,
+            'actor': receiver_name if needs_list.received_by_user else 'System',
+            'notes': None,
+            'icon': 'bi-check-circle-fill'
+        })
+    
+    # Sort timeline chronologically
+    timeline.sort(key=lambda x: x['timestamp'])
+    
+    # Role-specific data
+    roles = {
+        'agency': {
+            'can_download_pdf': current_user.role in [ROLE_ADMIN] or (
+                current_user.assigned_location_id and 
+                current_user.assigned_location_id == needs_list.agency_hub_id
+            ),
+            'total_received': total_dispatched_qty,
+            'dispatch_sources': list(set([hub['hub_name'] for item in items_data for hub in item['source_hubs']])),
+            'confirmed_by': needs_list.received_by_user.full_name if needs_list.received_by_user else None,
+            'confirmed_at': needs_list.received_at
+        },
+        'officer': {
+            'approved_qty': total_dispatched_qty,  # In this workflow, what was allocated was what was approved
+            'has_discrepancies': shortfall_qty > 0,
+            'shortfall_items': [item for item in items_data if item['has_shortfall']],
+            'dispatch_details': {
+                'dispatcher': needs_list.dispatched_by_user.full_name if needs_list.dispatched_by_user else None,
+                'dispatch_date': needs_list.dispatched_at,
+                'dispatch_notes': needs_list.dispatch_notes
+            }
+        },
+        'manager': {
+            'variance_summary': {
+                'requested': total_requested_qty,
+                'approved': total_dispatched_qty,  # Allocated = Approved in this workflow
+                'dispatched': total_dispatched_qty,
+                'received': total_dispatched_qty,  # Assuming received = dispatched for completed status
+                'variance': 0  # approved - dispatched
+            },
+            'full_timeline': timeline,
+            'verified_completed': needs_list.status == 'Completed' and needs_list.received_at is not None
+        }
+    }
+    
+    return {
+        'summary': {
+            'total_items': total_items,
+            'total_requested_qty': total_requested_qty,
+            'total_dispatched_qty': total_dispatched_qty,
+            'fulfillment_rate': fulfillment_rate,
+            'shortfall_qty': shortfall_qty,
+            'fulfillment_class': fulfillment_class,
+            'dispatch_date': needs_list.dispatched_at,
+            'receipt_date': needs_list.received_at,
+            'confirmed_by': needs_list.received_by_user.full_name if needs_list.received_by_user else None
+        },
+        'items': items_data,
+        'timeline': timeline,
+        'roles': roles
+    }
+
 # ---------- Needs List Permission Helpers ----------
 
 def can_view_needs_list(user, needs_list):
@@ -2100,7 +2296,17 @@ def needs_list_details(list_id):
     if current_user.role in [ROLE_ADMIN, ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER]:
         stock_map = get_stock_by_location()
     
-    return render_template("needs_list_details.html", needs_list=needs_list, user_depot=user_depot, stock_map=stock_map, main_hubs=main_hubs)
+    # Prepare completed context for enhanced Completed view
+    completed_context = None
+    if needs_list.status == 'Completed':
+        completed_context = prepare_completed_context(needs_list, current_user)
+    
+    return render_template("needs_list_details.html", 
+                         needs_list=needs_list, 
+                         user_depot=user_depot, 
+                         stock_map=stock_map, 
+                         main_hubs=main_hubs,
+                         completed_context=completed_context)
 
 @app.route("/needs-lists/<int:list_id>/submit", methods=["POST"])
 @login_required
