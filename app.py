@@ -1860,14 +1860,74 @@ def needs_list_prepare(list_id):
             flash("At least one allocation is required.", "danger")
             return redirect(url_for("needs_list_prepare", list_id=list_id))
         
-        # Update needs list status
-        needs_list.status = 'Awaiting Approval'
-        needs_list.prepared_by = current_user.full_name
-        needs_list.prepared_at = datetime.utcnow()
-        needs_list.fulfilment_notes = fulfilment_notes
-        db.session.commit()
+        # Check if user is a Logistics Manager - they can directly approve
+        is_manager = current_user.role == ROLE_LOGISTICS_MANAGER
         
-        flash(f"Fulfilment for {needs_list.list_number} prepared and submitted for manager approval.", "success")
+        if is_manager:
+            # Logistics Managers: Directly approve and execute stock transfers
+            stock_map = get_stock_by_location()
+            fulfilments = NeedsListFulfilment.query.filter_by(needs_list_id=needs_list.id).all()
+            
+            # Validate stock availability
+            for fulfilment in fulfilments:
+                available = stock_map.get((fulfilment.item_sku, fulfilment.source_hub_id), 0)
+                if available < fulfilment.allocated_qty:
+                    source_hub = Depot.query.get(fulfilment.source_hub_id)
+                    item = Item.query.get(fulfilment.item_sku)
+                    flash(f"Insufficient stock: {item.name} at {source_hub.name}. Available: {available}, Requested: {fulfilment.allocated_qty}", "danger")
+                    return redirect(url_for("needs_list_prepare", list_id=list_id))
+            
+            # Execute stock transfers
+            requesting_hub = needs_list.agency_hub
+            for fulfilment in fulfilments:
+                item = Item.query.get(fulfilment.item_sku)
+                source_hub = Depot.query.get(fulfilment.source_hub_id)
+                
+                # OUT transaction from source hub
+                out_txn = Transaction(
+                    item_sku=fulfilment.item_sku,
+                    location_id=fulfilment.source_hub_id,
+                    transaction_type="OUT",
+                    quantity=fulfilment.allocated_qty,
+                    performed_by=current_user.full_name,
+                    notes=f"Needs List Fulfilment: {needs_list.list_number} to {requesting_hub.name}",
+                    disaster_event_id=needs_list.event_id
+                )
+                db.session.add(out_txn)
+                
+                # IN transaction to requesting hub
+                in_txn = Transaction(
+                    item_sku=fulfilment.item_sku,
+                    location_id=needs_list.agency_hub_id,
+                    transaction_type="IN",
+                    quantity=fulfilment.allocated_qty,
+                    performed_by=current_user.full_name,
+                    notes=f"Needs List Fulfilment: {needs_list.list_number} from {source_hub.name}",
+                    disaster_event_id=needs_list.event_id
+                )
+                db.session.add(in_txn)
+            
+            # Update needs list status to Fulfilled
+            needs_list.status = 'Fulfilled'
+            needs_list.prepared_by = current_user.full_name
+            needs_list.prepared_at = datetime.utcnow()
+            needs_list.approved_by = current_user.full_name
+            needs_list.approved_at = datetime.utcnow()
+            needs_list.fulfilled_at = datetime.utcnow()
+            needs_list.fulfilment_notes = fulfilment_notes
+            db.session.commit()
+            
+            flash(f"Needs list {needs_list.list_number} approved and fulfilled successfully. Stock transfers completed.", "success")
+        else:
+            # Logistics Officers: Submit for manager approval
+            needs_list.status = 'Awaiting Approval'
+            needs_list.prepared_by = current_user.full_name
+            needs_list.prepared_at = datetime.utcnow()
+            needs_list.fulfilment_notes = fulfilment_notes
+            db.session.commit()
+            
+            flash(f"Fulfilment for {needs_list.list_number} prepared and submitted for manager approval.", "success")
+        
         return redirect(url_for("needs_list_details", list_id=list_id))
     
     # GET request: Show fulfilment preparation form

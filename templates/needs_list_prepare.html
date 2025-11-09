@@ -200,9 +200,15 @@
       <a href="{{ url_for('needs_lists') }}" class="btn btn-outline-secondary">
         <i class="bi bi-x-circle me-1"></i>Cancel
       </a>
-      <button type="submit" class="btn btn-primary" id="submitBtn">
-        <i class="bi bi-check-circle me-1"></i>Submit for Manager Approval
-      </button>
+      {% if current_user.role == 'LOGISTICS_MANAGER' %}
+        <button type="submit" class="btn btn-success" id="submitBtn">
+          <i class="bi bi-check-circle-fill me-1"></i>Approve & Finalize Fulfilment
+        </button>
+      {% else %}
+        <button type="submit" class="btn btn-primary" id="submitBtn">
+          <i class="bi bi-check-circle me-1"></i>Submit for Manager Approval
+        </button>
+      {% endif %}
     </div>
   </form>
 </div>
