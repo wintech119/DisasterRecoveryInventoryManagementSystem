@@ -183,39 +183,106 @@
             <h6 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Workflow</h6>
           </div>
           <div class="card-body p-3">
-            <div class="workflow-steps">
-              <div class="workflow-step {% if needs_list.status in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval', 'Fulfilled'] %}completed{% endif %}">
-                <div class="step-icon"><i class="bi bi-check-circle-fill"></i></div>
-                <div class="step-content">
-                  <strong>Submitted</strong>
-                  <p class="mb-0 small text-muted">{{ needs_list.agency_hub.name }}</p>
+            {% if user_depot and user_depot.hub_type in ['AGENCY', 'SUB'] and user_depot.id == needs_list.agency_hub_id %}
+              {# AGENCY/SUB Hub View - Simple workflow from their perspective #}
+              <div class="workflow-steps">
+                <div class="workflow-step {% if needs_list.status == 'Draft' %}active{% else %}completed{% endif %}">
+                  <div class="step-icon"><i class="bi bi-{% if needs_list.status == 'Draft' %}pencil-square{% else %}check-circle-fill{% endif %}"></i></div>
+                  <div class="step-content">
+                    <strong>1. Create Request</strong>
+                    <p class="mb-0 small text-muted">Add items you need</p>
+                  </div>
+                </div>
+                
+                <div class="workflow-step {% if needs_list.status in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval', 'Fulfilled'] %}completed{% endif %}">
+                  <div class="step-icon"><i class="bi bi-{% if needs_list.status in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval', 'Fulfilled'] %}check-circle-fill{% else %}send{% endif %}"></i></div>
+                  <div class="step-content">
+                    <strong>2. Submit to ODPEM</strong>
+                    <p class="mb-0 small text-muted">Send request for review</p>
+                  </div>
+                </div>
+                
+                <div class="workflow-step {% if needs_list.status in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval'] %}active{% elif needs_list.status == 'Fulfilled' %}completed{% endif %}">
+                  <div class="step-icon"><i class="bi bi-{% if needs_list.status == 'Fulfilled' %}check-circle-fill{% elif needs_list.status in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval'] %}hourglass-split{% else %}clock{% endif %}"></i></div>
+                  <div class="step-content">
+                    <strong>3. ODPEM Processing</strong>
+                    <p class="mb-0 small text-muted">
+                      {% if needs_list.status in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval'] %}
+                        In progress...
+                      {% else %}
+                        Awaiting review
+                      {% endif %}
+                    </p>
+                  </div>
+                </div>
+                
+                <div class="workflow-step {% if needs_list.status == 'Fulfilled' %}completed{% endif %}">
+                  <div class="step-icon"><i class="bi bi-{% if needs_list.status == 'Fulfilled' %}check-circle-fill{% else %}box-seam{% endif %}"></i></div>
+                  <div class="step-content">
+                    <strong>4. Receive Items</strong>
+                    <p class="mb-0 small text-muted">
+                      {% if needs_list.status == 'Fulfilled' %}
+                        Items at your hub
+                      {% else %}
+                        Pending
+                      {% endif %}
+                    </p>
+                  </div>
                 </div>
               </div>
               
-              <div class="workflow-step {% if needs_list.status == 'Submitted' %}active{% elif needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval', 'Fulfilled'] %}completed{% endif %}">
-                <div class="step-icon"><i class="bi bi-gear-fill"></i></div>
-                <div class="step-content">
-                  <strong>Prepare</strong>
-                  <p class="mb-0 small text-muted">Allocate stock</p>
-                </div>
-              </div>
+              <hr class="my-3">
               
-              <div class="workflow-step {% if needs_list.status == 'Awaiting Approval' %}active{% elif needs_list.status == 'Fulfilled' %}completed{% endif %}">
-                <div class="step-icon"><i class="bi bi-person-check"></i></div>
-                <div class="step-content">
-                  <strong>Approval</strong>
-                  <p class="mb-0 small text-muted">Manager review</p>
+              <div class="alert alert-info py-2 px-3 mb-0 small">
+                <i class="bi bi-info-circle me-1"></i>
+                {% if needs_list.status == 'Draft' %}
+                  Review your request and submit when ready.
+                {% elif needs_list.status == 'Submitted' %}
+                  Your request is being reviewed by ODPEM logistics team.
+                {% elif needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval'] %}
+                  ODPEM is processing your request and allocating stock.
+                {% elif needs_list.status == 'Fulfilled' %}
+                  Your items have been transferred to your hub!
+                {% elif needs_list.status == 'Rejected' %}
+                  Request was not approved. Please review feedback below.
+                {% endif %}
+              </div>
+            {% else %}
+              {# ODPEM Staff View - Internal workflow with details #}
+              <div class="workflow-steps">
+                <div class="workflow-step {% if needs_list.status in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval', 'Fulfilled'] %}completed{% endif %}">
+                  <div class="step-icon"><i class="bi bi-check-circle-fill"></i></div>
+                  <div class="step-content">
+                    <strong>Submitted</strong>
+                    <p class="mb-0 small text-muted">{{ needs_list.agency_hub.name }}</p>
+                  </div>
+                </div>
+                
+                <div class="workflow-step {% if needs_list.status == 'Submitted' %}active{% elif needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval', 'Fulfilled'] %}completed{% endif %}">
+                  <div class="step-icon"><i class="bi bi-gear-fill"></i></div>
+                  <div class="step-content">
+                    <strong>Prepare</strong>
+                    <p class="mb-0 small text-muted">Allocate stock</p>
+                  </div>
+                </div>
+                
+                <div class="workflow-step {% if needs_list.status == 'Awaiting Approval' %}active{% elif needs_list.status == 'Fulfilled' %}completed{% endif %}">
+                  <div class="step-icon"><i class="bi bi-person-check"></i></div>
+                  <div class="step-content">
+                    <strong>Approval</strong>
+                    <p class="mb-0 small text-muted">Manager review</p>
+                  </div>
+                </div>
+                
+                <div class="workflow-step {% if needs_list.status == 'Fulfilled' %}completed{% endif %}">
+                  <div class="step-icon"><i class="bi bi-check-circle"></i></div>
+                  <div class="step-content">
+                    <strong>Execute</strong>
+                    <p class="mb-0 small text-muted">Transfer stock</p>
+                  </div>
                 </div>
               </div>
-              
-              <div class="workflow-step {% if needs_list.status == 'Fulfilled' %}completed{% endif %}">
-                <div class="step-icon"><i class="bi bi-check-circle"></i></div>
-                <div class="step-content">
-                  <strong>Execute</strong>
-                  <p class="mb-0 small text-muted">Transfer stock</p>
-                </div>
-              </div>
-            </div>
+            {% endif %}
           </div>
         </div>
 
