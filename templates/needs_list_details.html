@@ -428,7 +428,13 @@
           </div>
         {% endif %}
 
-        {% if current_user.role in ['LOGISTICS_OFFICER', 'LOGISTICS_MANAGER'] and needs_list.status in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval'] %}
+        {% if current_user.role == 'LOGISTICS_OFFICER' and needs_list.status in ['Submitted', 'Fulfilment Prepared'] %}
+          <div class="d-grid gap-2">
+            <a href="{{ url_for('needs_list_prepare', list_id=needs_list.id) }}" class="btn btn-primary">
+              <i class="bi bi-box-seam me-1"></i>{% if needs_list.status == 'Submitted' %}Prepare{% else %}Edit{% endif %} Fulfilment
+            </a>
+          </div>
+        {% elif current_user.role == 'LOGISTICS_MANAGER' and needs_list.status in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval'] %}
           <div class="d-grid gap-2">
             <a href="{{ url_for('needs_list_prepare', list_id=needs_list.id) }}" class="btn btn-primary">
               <i class="bi bi-box-seam me-1"></i>{% if needs_list.status == 'Submitted' %}Prepare{% else %}Edit{% endif %} Fulfilment
