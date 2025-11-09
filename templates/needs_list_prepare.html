@@ -85,29 +85,50 @@
           {% set item_index = loop.index0 %}
           <div class="card mb-3 shadow-sm item-card" data-item-index="{{ item_index }}" data-requested="{{ item_entry.requested_qty }}">
             <div class="card-header bg-white">
-              <div class="row align-items-center">
+              <div class="row align-items-center mb-3">
                 <div class="col-md-6">
                   <h5 class="mb-1">{{ item_entry.item.name }}</h5>
                   <small class="text-muted">SKU: {{ item_entry.item.sku }} • Unit: {{ item_entry.item.unit }}</small>
                 </div>
                 <div class="col-md-6 text-md-end">
-                  <div class="d-inline-flex align-items-center gap-3">
+                  <span class="badge status-badge" id="status-{{ item_index }}">Unallocated</span>
+                </div>
+              </div>
+              
+              <!-- Progress Bar -->
+              <div class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <div class="d-flex gap-4">
                     <div>
-                      <small class="text-muted d-block">Requested</small>
-                      <strong class="text-primary">{{ item_entry.requested_qty }}</strong>
+                      <small class="text-muted">Requested:</small>
+                      <strong class="text-primary ms-1">{{ item_entry.requested_qty }}</strong>
                     </div>
                     <div>
-                      <small class="text-muted d-block">Allocated</small>
-                      <strong class="allocated-total" id="allocated-{{ item_index }}">0</strong>
+                      <small class="text-muted">Allocated:</small>
+                      <strong class="allocated-total ms-1" id="allocated-{{ item_index }}">0</strong>
                     </div>
                     <div>
-                      <small class="text-muted d-block">Remaining</small>
-                      <strong class="remaining" id="remaining-{{ item_index }}">{{ item_entry.requested_qty }}</strong>
+                      <small class="text-muted">Remaining:</small>
+                      <strong class="remaining ms-1" id="remaining-{{ item_index }}">{{ item_entry.requested_qty }}</strong>
                     </div>
-                    <span class="badge status-badge" id="status-{{ item_index }}">Unallocated</span>
+                  </div>
+                  <div>
+                    <strong class="percentage-text" id="percentage-{{ item_index }}">0%</strong>
+                  </div>
+                </div>
+                <div class="progress" style="height: 8px;">
+                  <div 
+                    class="progress-bar progress-bar-striped progress-bar-animated" 
+                    id="progress-bar-{{ item_index }}" 
+                    role="progressbar" 
+                    style="width: 0%;" 
+                    aria-valuenow="0" 
+                    aria-valuemin="0" 
+                    aria-valuemax="100">
                   </div>
                 </div>
               </div>
+              
               {% if item_entry.justification %}
                 <div class="mt-2">
                   <small><i class="bi bi-info-circle me-1"></i><strong>Justification:</strong> {{ item_entry.justification }}</small>
@@ -424,10 +445,20 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       
       const remaining = requested - totalAllocated;
+      const percentage = requested > 0 ? (totalAllocated / requested) * 100 : 0;
       
       // Update display
       document.getElementById(`allocated-${itemIndex}`).textContent = totalAllocated.toFixed(0);
       document.getElementById(`remaining-${itemIndex}`).textContent = remaining.toFixed(0);
+      
+      // Update progress bar
+      const progressBar = document.getElementById(`progress-bar-${itemIndex}`);
+      const percentageText = document.getElementById(`percentage-${itemIndex}`);
+      const cappedPercentage = Math.min(percentage, 100);
+      
+      progressBar.style.width = `${cappedPercentage}%`;
+      progressBar.setAttribute('aria-valuenow', cappedPercentage);
+      percentageText.textContent = `${percentage.toFixed(0)}%`;
       
       // Update status badge and card styling
       const statusBadge = document.getElementById(`status-${itemIndex}`);
@@ -439,6 +470,8 @@ document.addEventListener('DOMContentLoaded', function() {
         statusBadge.textContent = 'Over-Allocated';
         statusBadge.className = 'badge status-badge bg-danger';
         card.classList.add('over-allocated');
+        progressBar.className = 'progress-bar bg-danger';
+        percentageText.className = 'percentage-text text-danger fw-bold';
         validationMsg.textContent = `Over-allocated by ${(totalAllocated - requested).toFixed(0)} units`;
         validationMsg.style.display = 'block';
         overAllocated++;
@@ -446,18 +479,24 @@ document.addEventListener('DOMContentLoaded', function() {
         statusBadge.textContent = 'Fully Allocated';
         statusBadge.className = 'badge status-badge bg-success';
         card.classList.add('fully-allocated');
+        progressBar.className = 'progress-bar bg-success';
+        percentageText.className = 'percentage-text text-success fw-bold';
         validationMsg.style.display = 'none';
         fullyAllocated++;
       } else if (totalAllocated > 0) {
         statusBadge.textContent = 'Partially Allocated';
         statusBadge.className = 'badge status-badge bg-warning text-dark';
         card.classList.add('partially-allocated');
+        progressBar.className = 'progress-bar bg-warning';
+        percentageText.className = 'percentage-text text-warning fw-bold';
         validationMsg.textContent = `Still need ${remaining.toFixed(0)} units`;
         validationMsg.style.display = 'block';
         partiallyAllocated++;
       } else {
         statusBadge.textContent = 'Unallocated';
         statusBadge.className = 'badge status-badge bg-secondary';
+        progressBar.className = 'progress-bar bg-secondary';
+        percentageText.className = 'percentage-text text-secondary fw-bold';
         validationMsg.style.display = 'none';
       }
       
