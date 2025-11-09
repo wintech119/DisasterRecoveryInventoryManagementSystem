@@ -1,134 +1,184 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-<div class="container-fluid px-4">
+<div class="container-fluid px-4 py-4">
   <!-- Header -->
   <div class="mb-4">
     <h2 class="mb-1">Dashboard</h2>
     <p class="text-muted mb-0">Comprehensive overview of disaster relief operations</p>
   </div>
 
-  <!-- Key Metrics -->
-  <div class="row g-3 mb-4">
-    <div class="col-xl-3 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between">
-            <div class="flex-grow-1">
-              <p class="text-muted mb-1 small">Total Hubs</p>
-              <h3 class="mb-0">{{ locations_full|length }}</h3>
-              <small class="text-success"><i class="bi bi-geo-alt me-1"></i>{{ locations_full|selectattr('status', 'equalto', 'Active')|list|length }} Active</small>
-            </div>
-            <div class="icon-box bg-primary bg-opacity-10 text-primary">
-              <i class="bi bi-building"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between">
-            <div class="flex-grow-1">
-              <p class="text-muted mb-1 small">Total Stock</p>
-              <h3 class="mb-0">{{ "{:,}".format(total_in_stock) }}</h3>
-              <small class="text-muted"><i class="bi bi-box me-1"></i>{{ total_items }} Items</small>
-            </div>
-            <div class="icon-box bg-success bg-opacity-10 text-success">
-              <i class="bi bi-boxes"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between">
-            <div class="flex-grow-1">
-              <p class="text-muted mb-1 small">Active Needs Lists</p>
-              <h3 class="mb-0">{{ needs_lists_stats.pending + needs_lists_stats.in_progress }}</h3>
-              <small class="text-warning"><i class="bi bi-clock me-1"></i>{{ needs_lists_stats.pending }} Pending</small>
-            </div>
-            <div class="icon-box bg-warning bg-opacity-10 text-warning">
-              <i class="bi bi-clipboard-check"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-xl-3 col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between">
-            <div class="flex-grow-1">
-              <p class="text-muted mb-1 small">Low Stock Alerts</p>
-              <h3 class="mb-0">{{ low_stock_full|length }}</h3>
-              <small class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>Needs Attention</small>
-            </div>
-            <div class="icon-box bg-danger bg-opacity-10 text-danger">
-              <i class="bi bi-exclamation-circle"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="row g-3 mb-4">
-    <!-- Operational Insights -->
-    <div class="col-lg-8">
-      <div class="row g-3 mb-3">
-        <!-- Hubs Overview -->
-        <div class="col-md-4">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body p-3">
-              <h6 class="card-title mb-3"><i class="bi bi-building me-2"></i>Hubs Overview</h6>
-              <div class="d-flex flex-column gap-2">
-                {% for hub_type, count in hubs_by_type.items() %}
-                  <div class="d-flex justify-content-between">
-                    <span class="text-muted small">{{ hub_type }}</span>
-                    <strong>{{ count }}</strong>
-                  </div>
-                {% endfor %}
+  <div class="row g-4">
+    <!-- Main Content Area -->
+    <div class="col-lg-9">
+      <!-- Top Row: Hero Cards (Key Metrics) -->
+      <div class="row g-4 mb-4">
+        <div class="col-xl-3 col-md-6">
+          <div class="card border-0 shadow-sm h-100 hero-card">
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="flex-grow-1">
+                  <p class="text-muted mb-1 fw-medium small text-uppercase">Total Hubs</p>
+                  <h2 class="mb-2 fw-bold display-6">{{ locations_full|length }}</h2>
+                  <small class="text-success">
+                    <i class="bi bi-check-circle-fill me-1"></i>
+                    {{ locations_full|selectattr('status', 'equalto', 'Active')|list|length }} Active
+                  </small>
+                </div>
+                <div class="icon-box bg-primary bg-gradient">
+                  <i class="bi bi-building"></i>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Top Categories -->
-        <div class="col-md-4">
+        <div class="col-xl-3 col-md-6">
+          <div class="card border-0 shadow-sm h-100 hero-card">
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="flex-grow-1">
+                  <p class="text-muted mb-1 fw-medium small text-uppercase">Units in Stock</p>
+                  <h2 class="mb-2 fw-bold display-6">{{ "{:,}".format(total_in_stock) }}</h2>
+                  <small class="text-muted">
+                    <i class="bi bi-box-seam me-1"></i>
+                    {{ total_items }} Items
+                  </small>
+                </div>
+                <div class="icon-box bg-success bg-gradient">
+                  <i class="bi bi-boxes"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+          <div class="card border-0 shadow-sm h-100 hero-card">
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="flex-grow-1">
+                  <p class="text-muted mb-1 fw-medium small text-uppercase">Active Needs Lists</p>
+                  <h2 class="mb-2 fw-bold display-6">{{ needs_lists_stats.pending + needs_lists_stats.in_progress }}</h2>
+                  <small class="text-warning">
+                    <i class="bi bi-clock-fill me-1"></i>
+                    {{ needs_lists_stats.pending }} Pending
+                  </small>
+                </div>
+                <div class="icon-box bg-warning bg-gradient">
+                  <i class="bi bi-clipboard-check"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+          <div class="card border-0 shadow-sm h-100 hero-card">
+            <div class="card-body">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="flex-grow-1">
+                  <p class="text-muted mb-1 fw-medium small text-uppercase">Low Stock Alerts</p>
+                  <h2 class="mb-2 fw-bold display-6">{{ low_stock_full|length }}</h2>
+                  <small class="text-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    Needs Attention
+                  </small>
+                </div>
+                <div class="icon-box bg-danger bg-gradient">
+                  <i class="bi bi-exclamation-circle"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Middle Section: Insight Panels (Charts) -->
+      <div class="row g-4 mb-4">
+        <!-- Left: Stock Distribution by Category -->
+        <div class="col-lg-6">
           <div class="card border-0 shadow-sm h-100">
-            <div class="card-body p-3">
-              <h6 class="card-title mb-3"><i class="bi bi-grid me-2"></i>Top Categories</h6>
-              <div class="d-flex flex-column gap-2">
-                {% for category in category_labels[:3] %}
-                  <div class="d-flex justify-content-between">
-                    <span class="text-muted small">{{ category }}</span>
-                    <span class="badge bg-success">{{ category_data[loop.index0] }}</span>
+            <div class="card-header bg-white border-0 pt-4 pb-0">
+              <h5 class="mb-1 fw-semibold">
+                <i class="bi bi-pie-chart me-2 text-primary"></i>
+                Stock Distribution
+              </h5>
+              <p class="text-muted small mb-0">Inventory breakdown by category</p>
+            </div>
+            <div class="card-body">
+              <canvas id="stockCategoryChart" height="280"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Fulfillment Progress Over Time -->
+        <div class="col-lg-6">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 pt-4 pb-0">
+              <h5 class="mb-1 fw-semibold">
+                <i class="bi bi-graph-up me-2 text-success"></i>
+                Fulfillment Trends
+              </h5>
+              <p class="text-muted small mb-0">Needs list completions (Last 7 days)</p>
+            </div>
+            <div class="card-body">
+              <canvas id="fulfillmentChart" height="280"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lower Section: Activity Feed (Full Width) -->
+      <div class="row g-4">
+        <div class="col-12">
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 pt-4 pb-3 d-flex justify-content-between align-items-center">
+              <div>
+                <h5 class="mb-1 fw-semibold">
+                  <i class="bi bi-activity me-2 text-info"></i>
+                  Recent Activity
+                </h5>
+                <p class="text-muted small mb-0">Latest transactions and operations</p>
+              </div>
+              <a href="{{ url_for('transactions') }}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-arrow-right me-1"></i>View All
+              </a>
+            </div>
+            <div class="card-body p-0">
+              <div class="activity-feed">
+                {% for t in recent_preview %}
+                  <div class="activity-item" tabindex="0" role="button">
+                    <div class="activity-icon bg-{{ 'success' if t.ttype == 'IN' else 'danger' }} bg-opacity-10 text-{{ 'success' if t.ttype == 'IN' else 'danger' }}">
+                      <i class="bi bi-{{ 'arrow-down-circle' if t.ttype == 'IN' else 'arrow-up-circle' }}"></i>
+                    </div>
+                    <div class="activity-content flex-grow-1">
+                      <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                          <p class="mb-1">
+                            <span class="badge bg-{{ 'success' if t.ttype == 'IN' else 'danger' }} me-2">{{ t.ttype }}</span>
+                            <strong>{{ t.item.name }}</strong>
+                          </p>
+                          <small class="text-muted">
+                            <i class="bi bi-box me-1"></i>{{ t.qty }} {{ t.item.unit }}
+                            <span class="mx-2">•</span>
+                            <i class="bi bi-geo-alt me-1"></i>{{ t.location.name }}
+                            {% if t.created_by %}
+                              <span class="mx-2">•</span>
+                              <i class="bi bi-person me-1"></i>{{ t.created_by }}
+                            {% endif %}
+                          </small>
+                        </div>
+                        <small class="text-muted text-nowrap ms-3">
+                          <i class="bi bi-clock me-1"></i>{{ t.created_at.strftime("%b %d, %H:%M") }}
+                        </small>
+                      </div>
+                    </div>
                   </div>
                 {% else %}
-                  <p class="text-muted small mb-0">No categories</p>
-                {% endfor %}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Needs Lists Status -->
-        <div class="col-md-4">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-body p-3">
-              <h6 class="card-title mb-3"><i class="bi bi-clipboard-check me-2"></i>Needs Lists</h6>
-              <div class="d-flex flex-column gap-2">
-                {% for status, count in needs_lists_chart_data.items() %}
-                  <div class="d-flex justify-content-between">
-                    <span class="text-muted small">{{ status }}</span>
-                    <strong>{{ count }}</strong>
+                  <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox" style="font-size: 3rem; opacity: 0.3;"></i>
+                    <p class="mb-0 mt-3">No recent activity</p>
                   </div>
                 {% endfor %}
               </div>
@@ -136,84 +186,106 @@
           </div>
         </div>
       </div>
-
-      <!-- Transaction Activity -->
-      <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white">
-          <h6 class="mb-0"><i class="bi bi-activity me-2"></i>Transaction Activity (Last 30 Days)</h6>
-        </div>
-        <div class="card-body">
-          <div class="row text-center g-3">
-            <div class="col-6">
-              <div class="border-end">
-                <p class="text-muted small mb-1">Intakes</p>
-                <h4 class="text-success mb-0">{{ "{:,}".format(recent_intakes) }}</h4>
-                <small class="text-muted">of {{ "{:,}".format(total_intakes) }} total</small>
-              </div>
-            </div>
-            <div class="col-6">
-              <p class="text-muted small mb-1">Distributions</p>
-              <h4 class="text-danger mb-0">{{ "{:,}".format(recent_distributions) }}</h4>
-              <small class="text-muted">of {{ "{:,}".format(total_distributions) }} total</small>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
-    <!-- Activity Feed & Quick Actions -->
-    <div class="col-lg-4">
+    <!-- Right Sidebar: Quick Actions & Status -->
+    <div class="col-lg-3">
       <!-- Quick Actions -->
       {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
-      <div class="card border-0 shadow-sm mb-3">
-        <div class="card-header bg-primary text-white">
-          <h6 class="mb-0"><i class="bi bi-lightning me-2"></i>Quick Actions</h6>
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-primary text-white border-0 py-3">
+          <h6 class="mb-0 fw-semibold">
+            <i class="bi bi-lightning-fill me-2"></i>Quick Actions
+          </h6>
         </div>
-        <div class="card-body p-2">
+        <div class="card-body p-3">
           <div class="d-grid gap-2">
             {% if current_user.role in ['ADMIN', 'LOGISTICS_OFFICER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF'] %}
-              <a href="{{ url_for('intake') }}" class="btn btn-outline-success btn-sm text-start">
+              <a href="{{ url_for('intake') }}" class="btn btn-outline-success text-start" tabindex="0">
                 <i class="bi bi-box-arrow-in-down me-2"></i>Record Intake
               </a>
-              <a href="{{ url_for('distribute') }}" class="btn btn-outline-danger btn-sm text-start">
+              <a href="{{ url_for('distribute') }}" class="btn btn-outline-danger text-start" tabindex="0">
                 <i class="bi bi-box-arrow-up me-2"></i>Record Distribution
               </a>
             {% endif %}
             {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER'] %}
-              <a href="{{ url_for('depots') }}" class="btn btn-outline-primary btn-sm text-start">
+              <a href="{{ url_for('depots') }}" class="btn btn-outline-primary text-start" tabindex="0">
                 <i class="bi bi-building-add me-2"></i>Manage Hubs
               </a>
             {% endif %}
-            <a href="{{ url_for('transactions') }}" class="btn btn-outline-secondary btn-sm text-start">
-              <i class="bi bi-clock-history me-2"></i>View History
+            <a href="{{ url_for('report_stock') }}" class="btn btn-outline-info text-start" tabindex="0">
+              <i class="bi bi-file-earmark-bar-graph me-2"></i>Export Report
             </a>
           </div>
         </div>
       </div>
       {% endif %}
 
-      <!-- Recent Activity -->
-      <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Recent Activity</h6>
-          <a href="{{ url_for('transactions') }}" class="btn btn-sm btn-link p-0">View All</a>
+      <!-- Hub Status Overview -->
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0 pt-3 pb-2">
+          <h6 class="mb-0 fw-semibold">
+            <i class="bi bi-building me-2 text-primary"></i>Hub Status
+          </h6>
         </div>
-        <div class="card-body p-0">
-          <div class="activity-feed">
-            {% for t in recent_preview %}
-              <div class="activity-item">
-                <div class="activity-icon bg-{{ 'success' if t.ttype == 'IN' else 'danger' }} bg-opacity-10 text-{{ 'success' if t.ttype == 'IN' else 'danger' }}">
-                  <i class="bi bi-{{ 'arrow-down-circle' if t.ttype == 'IN' else 'arrow-up-circle' }}"></i>
-                </div>
-                <div class="activity-content">
-                  <p class="mb-0 small"><strong>{{ t.ttype }}</strong>: {{ t.item.name[:30] }}{% if t.item.name|length > 30 %}...{% endif %}</p>
-                  <small class="text-muted">{{ t.qty }} {{ t.item.unit }} • {{ t.created_at.strftime("%b %d, %H:%M") }}</small>
-                </div>
+        <div class="card-body p-3">
+          <div class="d-flex flex-column gap-3">
+            {% for hub_type, count in hubs_by_type.items() %}
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted small text-uppercase">{{ hub_type }}</span>
+                <span class="badge bg-primary bg-gradient px-3 py-2">{{ count }}</span>
               </div>
-            {% else %}
-              <div class="text-center py-4 text-muted">
-                <i class="bi bi-inbox" style="font-size: 2rem;"></i>
-                <p class="mb-0 mt-2">No recent activity</p>
+            {% endfor %}
+            <hr class="my-1">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="small fw-semibold">Active Hubs</span>
+              <span class="badge bg-success px-3 py-2">{{ locations_full|selectattr('status', 'equalto', 'Active')|list|length }}</span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="small fw-semibold">Inactive Hubs</span>
+              <span class="badge bg-secondary px-3 py-2">{{ locations_full|selectattr('status', 'equalto', 'Inactive')|list|length }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending Approvals Summary -->
+      {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER'] %}
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-0 pt-3 pb-2">
+          <h6 class="mb-0 fw-semibold">
+            <i class="bi bi-clipboard-check me-2 text-warning"></i>Pending Approvals
+          </h6>
+        </div>
+        <div class="card-body p-3">
+          <div class="d-flex flex-column gap-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="text-muted small">Needs Lists</span>
+              <span class="badge bg-warning text-dark px-3 py-2">{{ needs_lists_stats.pending }}</span>
+            </div>
+            {% if needs_lists_stats.pending > 0 %}
+              <a href="{{ url_for('logistics_manager_needs_lists') }}" class="btn btn-sm btn-warning w-100">
+                <i class="bi bi-eye me-1"></i>Review Needs Lists
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Needs List Status Breakdown -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-0 pt-3 pb-2">
+          <h6 class="mb-0 fw-semibold">
+            <i class="bi bi-list-check me-2 text-info"></i>Needs Lists
+          </h6>
+        </div>
+        <div class="card-body p-3">
+          <div class="d-flex flex-column gap-2">
+            {% for status, count in needs_lists_chart_data.items() %}
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="text-muted small">{{ status }}</span>
+                <span class="badge bg-light text-dark border">{{ count }}</span>
               </div>
             {% endfor %}
           </div>
@@ -221,178 +293,232 @@
       </div>
     </div>
   </div>
-
-  <!-- Alerts & Lists -->
-  <div class="row g-3">
-    <!-- Low Stock Alerts -->
-    {% if low_stock_preview %}
-    <div class="col-lg-6">
-      <div class="card border-0 shadow-sm">
-        <div class="card-header bg-warning bg-opacity-10">
-          <h6 class="mb-0 text-warning"><i class="bi bi-exclamation-triangle me-2"></i>Low Stock Alerts</h6>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover table-sm mb-0">
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Depot</th>
-                  <th class="text-end">Stock</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for item, depot, stock in low_stock_preview %}
-                  <tr>
-                    <td><strong>{{ item.name }}</strong></td>
-                    <td><small>{{ depot.name }}</small></td>
-                    <td class="text-end text-danger"><strong>{{ stock }}</strong> <small class="text-muted">{{ item.unit }}</small></td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% if low_stock_full|length > 5 %}
-            <div class="card-footer bg-white text-center py-2">
-              <a href="{{ url_for('items') }}" class="btn btn-sm btn-link">View All ({{ low_stock_full|length }})</a>
-            </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-    <!-- Expiring Items -->
-    {% if expiring_items_preview %}
-    <div class="col-lg-6">
-      <div class="card border-0 shadow-sm">
-        <div class="card-header bg-danger bg-opacity-10">
-          <h6 class="mb-0 text-danger"><i class="bi bi-calendar-x me-2"></i>Expiring Soon</h6>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover table-sm mb-0">
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Expiry Date</th>
-                  <th class="text-end">Days Left</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for exp_item in expiring_items_preview %}
-                  <tr class="{% if exp_item.urgency == 'critical' %}table-danger{% elif exp_item.urgency == 'warning' %}table-warning{% endif %}">
-                    <td><strong>{{ exp_item.item.name }}</strong></td>
-                    <td><small>{{ exp_item.transaction.expiry_date.strftime("%Y-%m-%d") }}</small></td>
-                    <td class="text-end">
-                      <span class="badge bg-{% if exp_item.urgency == 'critical' %}danger{% else %}warning{% endif %}">
-                        {{ exp_item.days_remaining }} days
-                      </span>
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% if expiring_items_full|length > 5 %}
-            <div class="card-footer bg-white text-center py-2">
-              <a href="{{ url_for('transactions') }}" class="btn btn-sm btn-link">View All ({{ expiring_items_full|length }})</a>
-            </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-    <!-- Stock by Category -->
-    <div class="col-lg-12">
-      <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <h6 class="mb-0"><i class="bi bi-grid me-2"></i>Inventory by Category</h6>
-          <a href="{{ url_for('items') }}" class="btn btn-sm btn-link p-0">Manage Inventory</a>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th class="text-center">Items</th>
-                  <th class="text-end">Total Units</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for category, stats in stock_by_category_preview %}
-                  <tr>
-                    <td><strong>{{ category }}</strong></td>
-                    <td class="text-center">{{ stats['items']|length }}</td>
-                    <td class="text-end">{{ "{:,}".format(stats['total_units']) }}</td>
-                  </tr>
-                {% else %}
-                  <tr><td colspan="3" class="text-center py-3 text-muted">No inventory data available</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% if stock_by_category_full|length > 5 %}
-            <div class="card-footer bg-white text-center py-2">
-              <button class="btn btn-sm btn-link" data-bs-toggle="collapse" data-bs-target="#moreCategories">
-                Show More
-              </button>
-            </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <style>
+  /* Hero Cards */
+  .hero-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .hero-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1) !important;
+  }
+
   .icon-box {
-    width: 56px;
-    height: 56px;
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+  }
+
+  /* Activity Feed */
+  .activity-feed {
+    max-height: 500px;
+    overflow-y: auto;
+  }
+
+  .activity-item {
+    display: flex;
+    gap: 16px;
+    padding: 16px 24px;
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+  }
+
+  .activity-item:hover,
+  .activity-item:focus {
+    background-color: #f8f9fa;
+    outline: none;
+  }
+
+  .activity-item:last-child {
+    border-bottom: none;
+  }
+
+  .activity-icon {
+    width: 48px;
+    height: 48px;
     border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.75rem;
-  }
-  
-  .activity-feed {
-    max-height: 400px;
-    overflow-y: auto;
-  }
-  
-  .activity-item {
-    display: flex;
-    gap: 12px;
-    padding: 12px 16px;
-    border-bottom: 1px solid #f0f0f0;
-    transition: background-color 0.2s;
-  }
-  
-  .activity-item:hover {
-    background-color: #f8f9fa;
-  }
-  
-  .activity-item:last-child {
-    border-bottom: none;
-  }
-  
-  .activity-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     flex-shrink: 0;
-    font-size: 1.25rem;
+    font-size: 1.5rem;
   }
-  
+
   .activity-content {
-    flex-grow: 1;
+    min-width: 0;
+  }
+
+  /* Cards */
+  .card {
+    transition: box-shadow 0.2s ease;
+  }
+
+  .card-header {
+    padding: 1rem 1.5rem;
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .icon-box {
+      width: 52px;
+      height: 52px;
+      font-size: 1.5rem;
+    }
+
+    .display-6 {
+      font-size: 1.75rem;
+    }
+
+    .activity-item {
+      padding: 12px 16px;
+    }
+  }
+
+  /* Chart containers */
+  canvas {
+    max-height: 280px;
   }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Stock Distribution by Category - Donut Chart
+  const categoryCtx = document.getElementById('stockCategoryChart');
+  if (categoryCtx) {
+    const categoryLabels = {{ category_labels|tojson }};
+    const categoryData = {{ category_data|tojson }};
+    
+    new Chart(categoryCtx, {
+      type: 'doughnut',
+      data: {
+        labels: categoryLabels,
+        datasets: [{
+          data: categoryData,
+          backgroundColor: [
+            'rgba(13, 110, 253, 0.8)',   // Primary
+            'rgba(25, 135, 84, 0.8)',    // Success
+            'rgba(255, 193, 7, 0.8)',    // Warning
+            'rgba(220, 53, 69, 0.8)',    // Danger
+            'rgba(13, 202, 240, 0.8)',   // Info
+            'rgba(108, 117, 125, 0.8)',  // Secondary
+            'rgba(111, 66, 193, 0.8)',   // Purple
+            'rgba(214, 51, 132, 0.8)'    // Pink
+          ],
+          borderWidth: 0,
+          hoverOffset: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              padding: 15,
+              font: {
+                size: 12
+              },
+              usePointStyle: true,
+              pointStyle: 'circle'
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const label = context.label || '';
+                const value = context.parsed || 0;
+                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                const percentage = ((value / total) * 100).toFixed(1);
+                return `${label}: ${value.toLocaleString()} units (${percentage}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Fulfillment Progress - Line Chart
+  const fulfillmentCtx = document.getElementById('fulfillmentChart');
+  if (fulfillmentCtx) {
+    const fulfillmentLabels = {{ fulfillment_labels|tojson }};
+    const fulfillmentData = {{ fulfillment_data|tojson }};
+    
+    new Chart(fulfillmentCtx, {
+      type: 'bar',
+      data: {
+        labels: fulfillmentLabels,
+        datasets: [{
+          label: 'Completed Needs Lists',
+          data: fulfillmentData,
+          backgroundColor: 'rgba(25, 135, 84, 0.8)',
+          borderColor: 'rgba(25, 135, 84, 1)',
+          borderWidth: 2,
+          borderRadius: 6,
+          hoverBackgroundColor: 'rgba(25, 135, 84, 1)'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              stepSize: 1,
+              font: {
+                size: 11
+              }
+            },
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
+            }
+          },
+          x: {
+            ticks: {
+              font: {
+                size: 11
+              }
+            },
+            grid: {
+              display: false
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            padding: 12,
+            titleFont: {
+              size: 13
+            },
+            bodyFont: {
+              size: 12
+            },
+            callbacks: {
+              label: function(context) {
+                return `Completed: ${context.parsed.y} needs list${context.parsed.y !== 1 ? 's' : ''}`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+});
+</script>
 {% endblock %}

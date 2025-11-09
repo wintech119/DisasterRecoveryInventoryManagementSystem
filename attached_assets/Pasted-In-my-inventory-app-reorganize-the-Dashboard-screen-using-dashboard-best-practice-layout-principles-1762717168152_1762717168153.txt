@@ -1,0 +1,45 @@
+In my inventory app, reorganize the Dashboard screen using dashboard best-practice layout principles.
+
+Layout Structure
+
+Top Row (Hero Cards): Display 3-4 key metrics in large, prominent cards — e.g., Total Hubs, Units in Stock, Active Needs Lists, Pending Approvals. Use consistent iconography, color accents, and counters for visual clarity.
+
+Middle Section (Insight Panels):
+
+Left half: a card with a donut or bar chart showing stock distribution across categories (Food & Water, Hygiene & Sanitization, etc.).
+
+Right half: a card with a line or bar chart showing fulfilment progress over time (e.g., last 7 days).
+
+Lower Section (Activity Feed): A full-width card containing a scrollable or paginated list of recent transactions and events (intake, distribution, approvals). Each list item uses badges or icons and an optional timestamp.
+
+Sidebar/Right Panel (Quick Actions & Status): If screen width allows, include a narrow right-hand panel with:
+
+Quick action buttons (“Create Needs List,” “Add Hub,” “Export Report”)
+
+Hub Status overview (Active vs Inactive counts)
+
+Pending approvals summary (with links)
+
+Design / Spacing / Usability
+
+Use a grid system (e.g., Bootstrap 5’s row/col) to ensure cards align and scale gracefully.
+
+Maintain white space around cards to avoid visual clutter; aim for 24-32 px gutters between columns and rows.
+
+Keep typography clear: Card titles use a slightly larger font; numbers use bold and larger size for emphasis.
+
+Use color and icon accents consistently but sparingly — make the data stand out, not the decoration.
+
+Ensure responsiveness: On tablet/smaller screens cards stack vertically; charts recalibrate to fit.
+
+Make hover states and tooltips available for interactive elements; ensure keyboard accessibility.
+
+Data & Integration
+
+Reuse existing metric queries and APIs; update only UI layout and chart bindings.
+
+Ensure all cards and charts reflect live or near-real-time data.
+
+Use lightweight chart library (e.g., Chart.js) for rendering; ensure fast load even with multiple panels.
+
+Update the dashboard template (dashboard.html) and associated CSS/JS so the layout follows these best-practice zones and flows smoothly for users ranging from Supervisors to Logistics Managers.

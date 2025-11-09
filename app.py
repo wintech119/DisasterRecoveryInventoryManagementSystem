@@ -931,6 +931,24 @@ def dashboard():
     # Total distributors (this was being queried but not used)
     total_distributors = Depot.query.filter_by(hub_type='AGENCY').count()
     
+    # Fulfillment progress over last 7 days
+    fulfillment_labels = []
+    fulfillment_data = []
+    for i in range(6, -1, -1):  # Last 7 days in chronological order
+        day = today - timedelta(days=i)
+        day_start = datetime.combine(day, datetime.min.time())
+        day_end = datetime.combine(day, datetime.max.time())
+        
+        # Count needs lists completed on this day
+        completed_count = NeedsList.query.filter(
+            NeedsList.status == 'Completed',
+            NeedsList.fulfilled_at >= day_start,
+            NeedsList.fulfilled_at <= day_end
+        ).count()
+        
+        fulfillment_labels.append(day.strftime("%b %d"))
+        fulfillment_data.append(completed_count)
+    
     return render_template("dashboard.html",
                            total_items=total_items,
                            total_in_stock=total_in_stock,
@@ -961,7 +979,9 @@ def dashboard():
                            category_labels=category_labels,
                            category_data=category_data,
                            needs_lists_stats=needs_lists_stats,
-                           needs_lists_chart_data=needs_lists_chart_data)
+                           needs_lists_chart_data=needs_lists_chart_data,
+                           fulfillment_labels=fulfillment_labels,
+                           fulfillment_data=fulfillment_data)
 
 @app.route("/items")
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF, ROLE_AUDITOR, ROLE_EXECUTIVE)
