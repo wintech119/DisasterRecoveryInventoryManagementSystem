@@ -925,6 +925,13 @@ def transactions():
     # Build the query
     query = Transaction.query
     
+    # AGENCY hub users should only see transactions for their own hub
+    if current_user.assigned_location_id:
+        user_depot = Depot.query.get(current_user.assigned_location_id)
+        if user_depot and user_depot.hub_type == 'AGENCY':
+            # Filter to only show transactions for this AGENCY hub
+            query = query.filter(Transaction.location_id == current_user.assigned_location_id)
+    
     # Apply sorting based on parameters
     if sort_by == "created_at":
         sort_column = Transaction.created_at
