@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Disaster Relief Inventory Management System (DRIMS)</title>
+  <title>{% block title %}DRIMS - Disaster Relief Inventory Management System{% endblock %}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
@@ -12,173 +12,500 @@
       --goj-gold: #FDB913;
       --goj-black: #000000;
       --goj-light-green: #E8F5E9;
+      --sidebar-width: 260px;
+      --sidebar-collapsed-width: 70px;
+      --header-height: 60px;
     }
-    .navbar-goj {
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f5f7fa;
+      overflow-x: hidden;
+    }
+    
+    /* Top Header */
+    .top-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: var(--header-height);
       background: linear-gradient(135deg, var(--goj-green) 0%, #007A2E 100%);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      color: white;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      z-index: 1000;
     }
-    .navbar-brand {
+    
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       font-weight: 700;
-      font-size: 1.3rem;
+      font-size: 1.2rem;
+      color: white;
+      text-decoration: none;
     }
-    .navbar-brand img {
-      height: 40px;
-      margin-right: 10px;
+    
+    .header-brand img {
+      height: 35px;
     }
-    .nav-link {
-      font-weight: 500;
+    
+    .header-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 15px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      cursor: pointer;
       transition: all 0.3s;
     }
-    .nav-link:hover {
-      background-color: rgba(255,255,255,0.1);
-      border-radius: 5px;
+    
+    .user-profile:hover {
+      background: rgba(255,255,255,0.2);
     }
-    .btn-primary {
-      background-color: var(--goj-green);
-      border-color: var(--goj-green);
-    }
-    .btn-primary:hover {
-      background-color: #007A2E;
-      border-color: #007A2E;
-    }
-    .card {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    
+    .sidebar-toggle {
+      background: none;
       border: none;
-      border-radius: 10px;
+      color: white;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 5px 10px;
+      border-radius: 5px;
+      transition: all 0.3s;
     }
+    
+    .sidebar-toggle:hover {
+      background: rgba(255,255,255,0.1);
+    }
+    
+    /* Left Sidebar */
+    .sidebar {
+      position: fixed;
+      top: var(--header-height);
+      left: 0;
+      width: var(--sidebar-width);
+      height: calc(100vh - var(--header-height));
+      background: white;
+      box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+      overflow-y: auto;
+      overflow-x: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 999;
+    }
+    
+    .sidebar.collapsed {
+      width: var(--sidebar-collapsed-width);
+    }
+    
+    .sidebar::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    .sidebar::-webkit-scrollbar-thumb {
+      background: #ddd;
+      border-radius: 3px;
+    }
+    
+    .nav-section {
+      padding: 20px 0;
+    }
+    
+    .nav-section-title {
+      padding: 0 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    
+    .sidebar.collapsed .nav-section-title {
+      opacity: 0;
+      height: 0;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .nav-item-link {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      color: #4b5563;
+      text-decoration: none;
+      transition: all 0.2s;
+      position: relative;
+      gap: 12px;
+      white-space: nowrap;
+    }
+    
+    .nav-item-link i {
+      font-size: 1.2rem;
+      width: 24px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    
+    .nav-item-link .nav-label {
+      flex: 1;
+      font-weight: 500;
+      font-size: 0.9rem;
+    }
+    
+    .sidebar.collapsed .nav-label {
+      opacity: 0;
+      width: 0;
+      overflow: hidden;
+    }
+    
+    .nav-item-link:hover {
+      background: var(--goj-light-green);
+      color: var(--goj-green);
+    }
+    
+    .nav-item-link.active {
+      background: var(--goj-light-green);
+      color: var(--goj-green);
+      font-weight: 600;
+    }
+    
+    .nav-item-link.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: var(--goj-green);
+    }
+    
+    /* Main Content */
+    .main-content {
+      margin-left: var(--sidebar-width);
+      margin-top: var(--header-height);
+      padding: 30px;
+      min-height: calc(100vh - var(--header-height));
+      transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .sidebar.collapsed ~ .main-content {
+      margin-left: var(--sidebar-collapsed-width);
+    }
+    
+    /* Cards */
+    .card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      margin-bottom: 24px;
+    }
+    
     .card-header {
       background-color: var(--goj-light-green);
       border-bottom: 2px solid var(--goj-green);
       font-weight: 600;
-      border-radius: 10px 10px 0 0 !important;
+      border-radius: 12px 12px 0 0 !important;
+      padding: 16px 20px;
     }
+    
+    /* Buttons */
+    .btn-primary {
+      background-color: var(--goj-green);
+      border-color: var(--goj-green);
+      font-weight: 500;
+      padding: 10px 20px;
+      border-radius: 8px;
+    }
+    
+    .btn-primary:hover {
+      background-color: #007A2E;
+      border-color: #007A2E;
+    }
+    
     .badge {
       font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
     }
-    h3, h4 {
+    
+    h1, h2, h3, h4 {
       color: var(--goj-green);
       font-weight: 700;
     }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: var(--sidebar-collapsed-width);
+      }
+      
+      .sidebar .nav-label {
+        opacity: 0;
+        width: 0;
+      }
+      
+      .sidebar .nav-section-title {
+        opacity: 0;
+        height: 0;
+        padding: 0;
+        margin: 0;
+      }
+      
+      .main-content {
+        margin-left: var(--sidebar-collapsed-width);
+        padding: 20px;
+      }
+      
+      .header-brand span {
+        display: none;
+      }
+    }
+    
+    @media (max-width: 576px) {
+      .main-content {
+        padding: 15px;
+      }
+    }
+    
+    /* Accessibility */
+    .nav-item-link:focus {
+      outline: 2px solid var(--goj-green);
+      outline-offset: -2px;
+    }
+    
+    .sidebar-toggle:focus {
+      outline: 2px solid white;
+      outline-offset: 2px;
+    }
+    
+    /* Dropdown */
+    .dropdown-menu {
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border: none;
+    }
   </style>
 </head>
-<body style="background-color: #f8f9fa;">
-<nav class="navbar navbar-expand-lg navbar-dark navbar-goj mb-4">
-  <div class="container-fluid">
-    <a class="navbar-brand d-flex align-items-center" href="{{ url_for('dashboard') }}">
-      <img src="{{ url_for('static', filename='images/odpem_logo.png') }}" alt="ODPEM" style="height: 35px; margin-right: 8px;">
-      <img src="{{ url_for('static', filename='images/jamaica_coat_of_arms.png') }}" alt="Jamaica Coat of Arms" style="height: 40px; margin-right: 10px;">
-      <span>DRIMS</span>
-    </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
-        {% if current_user.is_authenticated %}
-          {# Check if user is from AGENCY hub for restricted menu #}
-          {% set is_agency_user = current_user.assigned_location and current_user.assigned_location.hub_type == 'AGENCY' %}
+<body>
+  {% if current_user.is_authenticated %}
+    <!-- Top Header -->
+    <div class="top-header">
+      <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle sidebar">
+        <i class="bi bi-list"></i>
+      </button>
+      <a href="{{ url_for('dashboard') }}" class="header-brand ms-3">
+        <img src="{{ url_for('static', filename='images/odpem_logo.png') }}" alt="ODPEM Logo">
+        <img src="{{ url_for('static', filename='images/jamaica_coat_of_arms.png') }}" alt="Jamaica Coat of Arms" style="height: 40px;">
+        <span>DRIMS</span>
+      </a>
+      
+      <div class="header-actions">
+        <div class="dropdown">
+          <div class="user-profile" data-bs-toggle="dropdown" aria-expanded="false" role="button" tabindex="0">
+            <i class="bi bi-person-circle" style="font-size: 1.5rem;"></i>
+            <div class="d-none d-md-block">
+              <div style="font-size: 0.9rem; font-weight: 600;">{{ current_user.full_name }}</div>
+              <div style="font-size: 0.75rem; opacity: 0.9;">{{ current_user.role.replace('_', ' ').title() }}</div>
+            </div>
+          </div>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><h6 class="dropdown-header">{{ current_user.email }}</h6></li>
+            <li><span class="dropdown-item-text"><small><i class="bi bi-shield-check me-1"></i>{{ current_user.role.replace('_', ' ').title() }}</small></span></li>
+            {% if current_user.assigned_location %}
+              <li><span class="dropdown-item-text"><small><i class="bi bi-geo-alt me-1"></i>{{ current_user.assigned_location.name }}</small></span></li>
+            {% endif %}
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-1"></i>Logout</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Left Sidebar -->
+    {% set is_agency_user = current_user.assigned_location and current_user.assigned_location.hub_type == 'AGENCY' %}
+    <nav class="sidebar" id="sidebar" role="navigation" aria-label="Main navigation">
+      {% if is_agency_user %}
+        <!-- AGENCY Hub Menu -->
+        <div class="nav-section">
+          <div class="nav-section-title">Menu</div>
+          <a href="{{ url_for('dashboard') }}" class="nav-item-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+            <i class="bi bi-speedometer2"></i>
+            <span class="nav-label">Dashboard</span>
+          </a>
+          <a href="{{ url_for('needs_lists') }}" class="nav-item-link {% if 'needs' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-clipboard-check"></i>
+            <span class="nav-label">Needs Lists</span>
+          </a>
+          <a href="{{ url_for('packages') }}" class="nav-item-link {% if 'package' in request.endpoint %}active{% endif %}">
+            <i class="bi bi-box-seam-fill"></i>
+            <span class="nav-label">Packages</span>
+          </a>
+          <a href="{{ url_for('transactions') }}" class="nav-item-link {% if request.endpoint == 'transactions' %}active{% endif %}">
+            <i class="bi bi-clock-history"></i>
+            <span class="nav-label">History</span>
+          </a>
+        </div>
+      {% else %}
+        <!-- ODPEM Full Menu -->
+        <div class="nav-section">
+          <div class="nav-section-title">Main</div>
+          <a href="{{ url_for('dashboard') }}" class="nav-item-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+            <i class="bi bi-speedometer2"></i>
+            <span class="nav-label">Dashboard</span>
+          </a>
           
-          {# AGENCY hub users get simplified menu #}
-          {% if is_agency_user %}
-            {# Needs Lists - AGENCY users can create and submit requests #}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('needs_lists') }}"><i class="bi bi-clipboard-check me-1"></i>Needs Lists</a></li>
-            
-            {# Packages - AGENCY users can view received packages #}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('packages') }}"><i class="bi bi-box-seam-fill me-1"></i>Packages</a></li>
-            
-            {# History - AGENCY users can view their hub's transaction history #}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions') }}"><i class="bi bi-list-ul me-1"></i>History</a></li>
-          
-          {# ODPEM users (MAIN/SUB hubs) and non-hub users get full menu #}
-          {% else %}
-            {# Items - visible to most roles except AGENCY users #}
-            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF', 'AUDITOR', 'EXECUTIVE'] %}
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('items') }}"><i class="bi bi-box-seam me-1"></i>Inventory</a></li>
-            {% endif %}
-            
-            {# Depots - visible to logistics staff and warehouse staff (ODPEM only) #}
-            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('depots') }}"><i class="bi bi-geo-alt me-1"></i>Depots</a></li>
-            {% endif %}
-            
-            {# Needs Lists - visible to SUB hubs and Logistics Officers/Managers #}
-            {% if current_user.role in ['LOGISTICS_OFFICER', 'LOGISTICS_MANAGER'] or (current_user.assigned_location and current_user.assigned_location.hub_type == 'SUB') %}
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('needs_lists') }}"><i class="bi bi-clipboard-check me-1"></i>Needs Lists</a></li>
-            {% endif %}
-            
-            {# Distribution Packages - visible to logistics staff and warehouse staff (ODPEM only) #}
-            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('packages') }}"><i class="bi bi-box-seam-fill me-1"></i>Packages</a></li>
-            {% endif %}
-            
-            {# Stock Transfer - visible to logistics staff and warehouse staff (ODPEM only) #}
-            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('stock_transfer') }}"><i class="bi bi-arrow-left-right me-1"></i>Transfer</a></li>
-              {# Transfer Approval Queue - only for MAIN hub users #}
-              {% if current_user.assigned_location %}
-                {% set user_depot = current_user.assigned_location %}
-                {% if user_depot.hub_type == 'MAIN' %}
-                  <li class="nav-item"><a class="nav-link" href="{{ url_for('transfer_requests') }}"><i class="bi bi-check-circle me-1"></i>Approvals</a></li>
-                {% endif %}
-              {% endif %}
-            {% endif %}
-            
-            {# Events - visible to logistics staff (ODPEM only) #}
-            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER'] %}
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('disaster_events') }}"><i class="bi bi-exclamation-triangle me-1"></i>Events</a></li>
-            {% endif %}
-            
-            {# User Management - visible to ADMIN only #}
-            {% if current_user.role == 'ADMIN' %}
-              <li class="nav-item"><a class="nav-link" href="{{ url_for('users') }}"><i class="bi bi-people-fill me-1"></i>Users</a></li>
-            {% endif %}
-            
-            {# Intake - visible to warehouse staff and logistics staff (ODPEM only) #}
-            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
-              <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('intake') }}"><i class="bi bi-arrow-down-circle me-1"></i>Intake</a></li>
-            {% endif %}
-            
-            {# Distribute - visible to warehouse staff, field personnel, and logistics staff (ODPEM only) #}
-            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF', 'FIELD_PERSONNEL'] %}
-              <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('distribute') }}"><i class="bi bi-arrow-up-circle me-1"></i>Distribute</a></li>
-            {% endif %}
-            
-            {# History and Reports - visible to all ODPEM users #}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions') }}"><i class="bi bi-list-ul me-1"></i>History</a></li>
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('report_stock') }}"><i class="bi bi-clipboard-data me-1"></i>Reports</a></li>
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF', 'AUDITOR', 'EXECUTIVE'] %}
+            <a href="{{ url_for('items') }}" class="nav-item-link {% if request.endpoint == 'items' %}active{% endif %}">
+              <i class="bi bi-box-seam"></i>
+              <span class="nav-label">Inventory</span>
+            </a>
           {% endif %}
           
-          {# User dropdown #}
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="bi bi-person-circle me-1"></i>{{ current_user.full_name }}
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
+            <a href="{{ url_for('depots') }}" class="nav-item-link {% if request.endpoint == 'depots' %}active{% endif %}">
+              <i class="bi bi-geo-alt"></i>
+              <span class="nav-label">Hubs</span>
             </a>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-              <li><h6 class="dropdown-header">{{ current_user.email }}</h6></li>
-              <li><span class="dropdown-item-text"><small><i class="bi bi-shield-check me-1"></i>{{ current_user.role.replace('_', ' ').title() }}</small></span></li>
-              <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-1"></i>Logout</a></li>
-            </ul>
-          </li>
-        {% endif %}
-      </ul>
-    </div>
-  </div>
-</nav>
-
-<main class="container">
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          {% endif %}
         </div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
-  {% block content %}{% endblock %}
-</main>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+        
+        <div class="nav-section">
+          <div class="nav-section-title">Operations</div>
+          
+          {% if current_user.role in ['LOGISTICS_OFFICER', 'LOGISTICS_MANAGER'] or (current_user.assigned_location and current_user.assigned_location.hub_type == 'SUB') %}
+            <a href="{{ url_for('needs_lists') }}" class="nav-item-link {% if 'needs' in request.endpoint %}active{% endif %}">
+              <i class="bi bi-clipboard-check"></i>
+              <span class="nav-label">Needs Lists</span>
+            </a>
+          {% endif %}
+          
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
+            <a href="{{ url_for('packages') }}" class="nav-item-link {% if 'package' in request.endpoint %}active{% endif %}">
+              <i class="bi bi-box-seam-fill"></i>
+              <span class="nav-label">Packages</span>
+            </a>
+            
+            <a href="{{ url_for('intake') }}" class="nav-item-link {% if request.endpoint == 'intake' %}active{% endif %}">
+              <i class="bi bi-arrow-down-circle"></i>
+              <span class="nav-label">Intake</span>
+            </a>
+          {% endif %}
+          
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF', 'FIELD_PERSONNEL'] %}
+            <a href="{{ url_for('distribute') }}" class="nav-item-link {% if request.endpoint == 'distribute' %}active{% endif %}">
+              <i class="bi bi-arrow-up-circle"></i>
+              <span class="nav-label">Distribute</span>
+            </a>
+          {% endif %}
+          
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
+            <a href="{{ url_for('stock_transfer') }}" class="nav-item-link {% if request.endpoint == 'stock_transfer' %}active{% endif %}">
+              <i class="bi bi-arrow-left-right"></i>
+              <span class="nav-label">Transfers</span>
+            </a>
+          {% endif %}
+          
+          {% if current_user.assigned_location and current_user.assigned_location.hub_type == 'MAIN' %}
+            <a href="{{ url_for('transfer_requests') }}" class="nav-item-link {% if request.endpoint == 'transfer_requests' %}active{% endif %}">
+              <i class="bi bi-check-circle"></i>
+              <span class="nav-label">Approvals</span>
+            </a>
+          {% endif %}
+          
+          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER'] %}
+            <a href="{{ url_for('disaster_events') }}" class="nav-item-link {% if request.endpoint == 'disaster_events' %}active{% endif %}">
+              <i class="bi bi-exclamation-triangle"></i>
+              <span class="nav-label">Events</span>
+            </a>
+          {% endif %}
+        </div>
+        
+        <div class="nav-section">
+          <div class="nav-section-title">Reports</div>
+          <a href="{{ url_for('transactions') }}" class="nav-item-link {% if request.endpoint == 'transactions' %}active{% endif %}">
+            <i class="bi bi-clock-history"></i>
+            <span class="nav-label">History</span>
+          </a>
+          <a href="{{ url_for('report_stock') }}" class="nav-item-link {% if request.endpoint == 'report_stock' %}active{% endif %}">
+            <i class="bi bi-clipboard-data"></i>
+            <span class="nav-label">Reports</span>
+          </a>
+        </div>
+        
+        {% if current_user.role == 'ADMIN' %}
+          <div class="nav-section">
+            <div class="nav-section-title">Admin</div>
+            <a href="{{ url_for('users') }}" class="nav-item-link {% if request.endpoint == 'users' %}active{% endif %}">
+              <i class="bi bi-people-fill"></i>
+              <span class="nav-label">Users</span>
+            </a>
+          </div>
+        {% endif %}
+      {% endif %}
+    </nav>
+  {% endif %}
+  
+  <!-- Main Content -->
+  <main class="main-content" id="mainContent">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('collapsed');
+      
+      // Save state in localStorage
+      const isCollapsed = sidebar.classList.contains('collapsed');
+      localStorage.setItem('sidebarCollapsed', isCollapsed);
+    }
+    
+    // Restore sidebar state on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+      if (isCollapsed) {
+        document.getElementById('sidebar').classList.add('collapsed');
+      }
+      
+      // Keyboard accessibility for sidebar toggle
+      document.querySelector('.sidebar-toggle').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggleSidebar();
+        }
+      });
+    });
+  </script>
 </body>
 </html>
