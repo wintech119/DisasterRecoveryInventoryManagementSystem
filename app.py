@@ -511,6 +511,10 @@ def can_prepare_fulfilment(user, needs_list):
     if user.role not in [ROLE_ADMIN, ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER]:
         return (False, "Only logistics staff can prepare fulfilments.")
     
+    # Logistics Officers cannot edit once submitted for approval
+    if user.role == ROLE_LOGISTICS_OFFICER and needs_list.status == 'Awaiting Approval':
+        return (False, "Cannot edit fulfilment after submitting for approval. Please contact a Logistics Manager.")
+    
     return (True, None)
 
 def can_approve_fulfilment(user, needs_list):
