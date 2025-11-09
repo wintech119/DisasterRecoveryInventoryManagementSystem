@@ -1,0 +1,71 @@
+In my DRIMS Flask app, improve the “Prepare Fulfilment – NL-000001” page so it scales cleanly for large Needs Lists (20–30+ items) without looking congested, while remaining fast, intuitive, and visually clean. Keep all existing fulfilment logic, but redesign the UI and layout for usability and scalability.
+
+Layout & Spacing
+
+Use a responsive, full-width layout with good spacing and alignment so the page makes efficient use of horizontal space on desktop.
+
+Keep a clean card or panel at the top showing: Needs List ID, requesting Hub, status, and key summary metrics (total requested, total allocated, remaining).
+
+Place the items table in a dedicated scrollable area with a fixed/sticky header so column titles remain visible when scrolling through many items.
+
+Ensure the design feels uncluttered: proper padding, consistent row height, readable font sizes, and no cramped inputs.
+
+Table & Interaction for Many Items
+
+For each item row, include:
+
+Item description
+
+Requested quantity
+
+One or more allocation input fields (per source Hub)
+
+Live Allocated total (auto-calculated)
+
+Remaining (Requested − Allocated)
+
+Status badge: Unallocated / Partially Allocated / Fully Allocated / Over-Allocated
+
+Make the table scalable and easy to scan when there are many items by:
+
+Using clear column widths and truncation with tooltips where needed.
+
+Supporting search/filter by item name and category at the top of the table.
+
+Optionally allowing “show 10 / 25 / 50 items per page” or virtual scrolling, so 30+ items remain easy to work with.
+
+Dynamic JavaScript Behaviour
+
+All calculations (Allocated, Remaining, status, and per-Hub available stock) must update live as the user types, with no full-page reload.
+
+As allocations are entered:
+
+Update row status colors: green (fully allocated), amber (partial), red (over-allocated), neutral (unallocated).
+
+Prevent over-allocation based on live available stock per source Hub (show clear inline validation).
+
+Update the summary panel at the top in real time (total allocated, remaining, items fully allocated).
+
+Ensure the JS is modular, clean, and optimized so performance remains smooth with 20–50 items.
+
+UX & Visual Enhancements
+
+Use a modern, minimal visual style consistent with the left sidebar layout: clear typography, subtle borders, light background, and strong contrast.
+
+Add small UX touches to keep it easy with large lists:
+
+Hover highlights for rows.
+
+Tooltips or info icons for “Available from Hub”, “Remaining”, and status.
+
+A “jump to first unallocated item” or simple filter to show only items not fully allocated.
+
+Ensure the page is fully usable via keyboard (tab navigation) and looks good on typical laptop screen sizes.
+
+Integration
+
+Reuse the existing backend endpoint and data structures; only enhance the layout and frontend interactions.
+
+Keep the submit action behavior the same (submitting the prepared fulfilment for approval), but ensure it validates that there are no over-allocations before sending.
+
+Apply these changes directly to the Prepare Fulfilment template and its JS so that large Needs Lists (20–30+ items) are easy, clear, and efficient to work with.
