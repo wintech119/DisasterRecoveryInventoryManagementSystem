@@ -1,0 +1,100 @@
+In my DRIMS Flask app, fix the entire Needs List and Fulfilment workflow, including all role-based permissions, so it behaves consistently and correctly end-to-end.
+
+1. Fix Permission Bug
+
+Resolve the issue where, after a Needs List is submitted and approved, the Logistics Officer or Logistics Manager sees the error:
+"You don't have permission to view this needs list."
+
+Ensure that both roles can always view and manage Needs Lists at every relevant stage of the workflow.
+
+2. Correct Role Permissions for Needs Lists
+
+Align behavior with the intended model:
+
+Sub-Hubs & Agency Hubs
+
+Can create Needs Lists.
+
+Can edit while in Draft.
+
+Can submit Needs Lists for review/fulfilment.
+
+Can view the status and final outcome of their own Needs Lists.
+
+Logistics Officer
+
+Can view all Needs Lists from all Sub-Hubs and Agency Hubs.
+
+Can review submitted Needs Lists.
+
+Can prepare initial fulfilment (allocate quantities, select source hubs).
+
+Cannot finalize; must submit the prepared fulfilment for Logistics Manager approval.
+
+Must never see a permission error on Needs Lists they are allowed to handle.
+
+Logistics Manager
+
+Full visibility on all Needs Lists in the system.
+
+Can review and give final approval or rejection on fulfilments prepared by Logistics Officers.
+
+On approval, triggers the creation of fulfilment transactions and stock updates.
+
+Must never see a permission error for any Needs List or Fulfilment.
+
+3. Workflow & Status Consistency
+
+Ensure the Needs List and Fulfilment lifecycle is consistent:
+
+Draft → created by Sub-Hub/Agency (editable by them).
+
+Submitted → visible to Logistics Officer & Logistics Manager.
+
+Fulfilment Prepared → set by Logistics Officer.
+
+Awaiting Approval → pending Logistics Manager.
+
+Approved → set by Logistics Manager.
+
+Fulfilled → after stock movements are successfully recorded.
+
+Enforce that:
+
+Only the originating Hub can edit in Draft.
+
+Only Logistics Officers can move from Submitted → Fulfilment Prepared.
+
+Only Logistics Managers can move from Fulfilment Prepared → Approved.
+
+Only the system (based on transactions) marks Fulfilled.
+
+4. Technical Fixes
+
+Centralize permission checks in a shared helper/function (e.g., can_view_needs_list(user, needs_list) and can_edit_needs_list(user, needs_list)), and reuse this across all Needs List and Fulfilment routes.
+
+Remove or fix any incorrect logic that:
+
+Treats Logistics Officers/Managers like regular hub users.
+
+Blocks them from viewing Needs Lists after status changes.
+
+Ensure URLs like /needs-lists/<id>, /needs-lists/<id>/prepare, /needs-lists/<id>/review, etc., all respect the corrected role and status rules.
+
+5. Validation
+
+Manually test with sample accounts for:
+
+Sub-Hub user
+
+Agency Hub user
+
+Logistics Officer
+
+Logistics Manager
+
+Confirm there are no incorrect “You don't have permission” errors where access should be allowed.
+
+Confirm that users cannot access Needs Lists they should not see (e.g., one Agency viewing another’s list).
+
+Implement these changes so the Needs List + Fulfilment workflow is stable, predictable, and aligned with the defined roles, with correct permissions enforced throughout the app.
