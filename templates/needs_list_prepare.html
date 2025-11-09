@@ -173,11 +173,13 @@
                     </td>
                     <td class="align-middle">
                       <div class="status-cell">
-                        <span class="badge status-badge mb-1" id="status-{{ item_index }}">Unallocated</span>
-                        <div class="progress" style="height: 4px;">
-                          <div class="progress-bar" id="progress-bar-{{ item_index }}" style="width: 0%;"></div>
+                        <span class="badge status-badge" id="status-{{ item_index }}">Unallocated</span>
+                        <div class="progress-container">
+                          <div class="progress" style="height: 6px;">
+                            <div class="progress-bar" id="progress-bar-{{ item_index }}" style="width: 0%;"></div>
+                          </div>
+                          <small class="percentage-text mt-1" id="percentage-{{ item_index }}">0%</small>
                         </div>
-                        <small class="percentage-text" id="percentage-{{ item_index }}">0%</small>
                       </div>
                     </td>
                   </tr>
@@ -382,20 +384,40 @@
   /* Status Cell */
   .status-cell {
     min-width: 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
   }
   
   .status-badge {
     font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
+    padding: 0.35rem 0.6rem;
     display: inline-block;
     width: 100%;
+    text-align: center;
+  }
+  
+  .progress-container {
+    width: 100%;
+  }
+  
+  .progress {
+    border-radius: 3px;
+    background-color: #e9ecef;
+    overflow: hidden;
+  }
+  
+  .progress-bar {
+    transition: width 0.4s ease, background-color 0.3s ease;
+    border-radius: 3px;
   }
   
   .percentage-text {
     font-size: 0.75rem;
     font-weight: 600;
     display: block;
-    margin-top: 2px;
+    text-align: center;
+    transition: color 0.3s ease;
   }
   
   /* Workflow Steps */
