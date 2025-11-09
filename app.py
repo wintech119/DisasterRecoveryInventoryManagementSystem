@@ -201,7 +201,7 @@ class NeedsList(db.Model):
     main_hub_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)  # Legacy field, may be null
     event_id = db.Column(db.Integer, db.ForeignKey("disaster_event.id"), nullable=True)
     
-    # Status: Draft, Submitted, Fulfilment Prepared, Awaiting Approval, Approved, Fulfilled, Rejected
+    # Status: Draft, Submitted, Fulfilment Prepared, Awaiting Approval, Approved, Dispatched, Received, Completed, Rejected
     status = db.Column(db.String(50), nullable=False, default="Draft")
     priority = db.Column(db.String(20), nullable=False, default="Medium")  # Low, Medium, High, Urgent
     notes = db.Column(db.Text, nullable=True)
@@ -221,6 +221,16 @@ class NeedsList(db.Model):
     approved_at = db.Column(db.DateTime, nullable=True)
     approval_notes = db.Column(db.Text, nullable=True)  # Notes from Logistics Manager
     
+    # Dispatch tracking (Logistics Officer/Manager) - Uses FK for referential integrity
+    dispatched_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)  # User who dispatched items
+    dispatched_at = db.Column(db.DateTime, nullable=True)  # When items were dispatched
+    dispatch_notes = db.Column(db.Text, nullable=True)  # Notes from dispatcher
+    
+    # Receipt tracking (Agency Hub) - Uses FK for referential integrity
+    received_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)  # Agency user who confirmed receipt
+    received_at = db.Column(db.DateTime, nullable=True)  # When receipt was confirmed
+    receipt_notes = db.Column(db.Text, nullable=True)  # Notes from agency on receipt
+    
     # Fulfilment completion tracking
     fulfilled_at = db.Column(db.DateTime, nullable=True)
     
@@ -234,6 +244,8 @@ class NeedsList(db.Model):
     agency_hub = db.relationship("Depot", foreign_keys=[agency_hub_id])
     main_hub = db.relationship("Depot", foreign_keys=[main_hub_id])
     event = db.relationship("DisasterEvent")
+    dispatched_by_user = db.relationship("User", foreign_keys=[dispatched_by_id])
+    received_by_user = db.relationship("User", foreign_keys=[received_by_id])
     items = db.relationship("NeedsListItem", back_populates="needs_list", cascade="all, delete-orphan")
     fulfilments = db.relationship("NeedsListFulfilment", back_populates="needs_list", cascade="all, delete-orphan")
 
@@ -2873,6 +2885,79 @@ def create_user():
     print(f"\n✓ User '{full_name}' created successfully!")
     print(f"  Email: {email}")
     print(f"  Role: {role}\n")
+
+@app.cli.command("migrate-dispatch-receipt")
+def migrate_dispatch_receipt():
+    """Add dispatch and receipt tracking columns to needs_list table"""
+    from sqlalchemy import text
+    
+    print("\n=== Migrating Needs List Table for Dispatch/Receipt Workflow ===\n")
+    
+    # Check database type
+    db_url = app.config["SQLALCHEMY_DATABASE_URI"]
+    is_postgres = db_url.startswith("postgres")
+    
+    try:
+        with db.engine.connect() as conn:
+            # Check if columns already exist
+            if is_postgres:
+                result = conn.execute(text("""
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name='needs_list' AND column_name='dispatched_by_id'
+                """))
+            else:  # SQLite
+                result = conn.execute(text("PRAGMA table_info(needs_list)"))
+                columns = [row[1] for row in result.fetchall()]
+                already_exists = 'dispatched_by_id' in columns
+                
+                if already_exists:
+                    print("✓ Columns already exist. No migration needed.")
+                    return
+            
+            # Add new columns
+            print("Adding dispatch and receipt tracking columns...")
+            
+            conn.execute(text("""
+                ALTER TABLE needs_list 
+                ADD COLUMN dispatched_by_id INTEGER
+            """))
+            conn.execute(text("""
+                ALTER TABLE needs_list 
+                ADD COLUMN dispatched_at TIMESTAMP
+            """))
+            conn.execute(text("""
+                ALTER TABLE needs_list 
+                ADD COLUMN dispatch_notes TEXT
+            """))
+            conn.execute(text("""
+                ALTER TABLE needs_list 
+                ADD COLUMN received_by_id INTEGER
+            """))
+            conn.execute(text("""
+                ALTER TABLE needs_list 
+                ADD COLUMN received_at TIMESTAMP
+            """))
+            conn.execute(text("""
+                ALTER TABLE needs_list 
+                ADD COLUMN receipt_notes TEXT
+            """))
+            
+            conn.commit()
+            
+            print("✓ Migration completed successfully!")
+            print("  Added columns:")
+            print("    - dispatched_by_id (INTEGER, FK to user.id)")
+            print("    - dispatched_at (TIMESTAMP)")
+            print("    - dispatch_notes (TEXT)")
+            print("    - received_by_id (INTEGER, FK to user.id)")
+            print("    - received_at (TIMESTAMP)")
+            print("    - receipt_notes (TEXT)")
+            print("\nWorkflow: Draft → Submitted → Prepared → Awaiting Approval → Approved → Dispatched → Received → Completed\n")
+            
+    except Exception as e:
+        print(f"✗ Migration failed: {str(e)}")
+        print("  Note: If columns already exist, you can ignore this error.")
 
 @app.route("/uploads/<path:file_path>")
 @login_required

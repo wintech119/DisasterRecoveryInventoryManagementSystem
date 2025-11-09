@@ -1,0 +1,72 @@
+In my DRIMS Flask app, extend the Needs List → Fulfilment → Dispatch → Receipt workflow as follows:
+
+1. Post-Approval Dispatch
+
+After a Needs List fulfilment is approved by the Logistics Manager, update the workflow so that both:
+
+Logistics Officer and
+
+Logistics Manager
+can perform the Dispatch action for the approved items.
+
+Dispatch creates the actual stock movement records (deduct from source Hub, mark as “Dispatched to Agency Hub”) and updates the Needs List status to:
+
+Dispatched.
+
+2. Agency Hub Visibility
+
+In the Agency Hub interface:
+
+Show that their Needs List has been Approved and then Dispatched, including:
+
+Dispatched quantities
+
+Source Hub(s)
+
+Dispatch date/time
+
+This should appear clearly in their Needs List / fulfilment tracking view (their “workflow guide”).
+
+3. Agency Receipt Confirmation
+
+Allow the Agency Hub to confirm receipt once items arrive:
+
+They should have a “Confirm Receipt” action for each dispatched Needs List (or shipment).
+
+On confirmation:
+
+Mark the Needs List (or shipment) as Received.
+
+Final status for the workflow becomes Completed / Fulfilled.
+
+4. Visibility for Logistics Officer & Manager
+
+After the Agency confirms receipt:
+
+Both Logistics Officer and Logistics Manager must be able to see:
+
+That items were dispatched.
+
+That the Agency has confirmed receipt (with timestamp and user).
+
+Show this clearly in their tracking/monitoring views (e.g., Needs List details, fulfilment history, or dispatch log).
+
+5. Status & Audit Trail
+
+Implement a clear status flow for each Needs List:
+
+Draft → Submitted → Fulfilment Prepared → Awaiting Approval → Approved → Dispatched → Received → Completed.
+
+Maintain full audit logs capturing:
+
+Who approved, who dispatched, who confirmed receipt, and when.
+
+Ensure permissions:
+
+Only Logistics Officer/Manager can dispatch.
+
+Only the relevant Agency Hub can confirm receipt for its own dispatch.
+
+Logistics Officer/Manager can view all stages; Agencies can view only their own.
+
+Update the backend logic, database fields (e.g., dispatch status, receipt status, timestamps), and UI pages so this end-to-end workflow runs smoothly and clearly for all roles.
