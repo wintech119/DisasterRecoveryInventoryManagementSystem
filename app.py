@@ -2099,6 +2099,22 @@ def needs_list_submit(list_id):
         triggered_by_user=current_user
     )
     
+    # Notify Logistics Officers about new submission to prepare
+    create_notifications_for_role(
+        role=ROLE_LOGISTICS_OFFICER,
+        title="New Needs List Submitted",
+        message=f"Needs list {needs_list.list_number} from {needs_list.agency_hub.name} needs fulfillment preparation.",
+        notification_type="task_assigned",
+        link_url=f"/needs-lists/{needs_list.id}/prepare",
+        payload_data={
+            "needs_list_number": needs_list.list_number,
+            "agency_hub": needs_list.agency_hub.name,
+            "submitted_by": current_user.full_name,
+            "submitted_by_id": current_user.id
+        },
+        needs_list_id=needs_list.id
+    )
+    
     flash(f"Needs list {needs_list.list_number} submitted successfully for logistics review.", "success")
     return redirect(url_for("needs_list_details", list_id=list_id))
 
@@ -2188,6 +2204,22 @@ def needs_list_prepare(list_id):
             needs_list.prepared_at = datetime.utcnow()
             needs_list.fulfilment_notes = fulfilment_notes
             db.session.commit()
+            
+            # Notify Logistics Managers about approval needed
+            create_notifications_for_role(
+                role=ROLE_LOGISTICS_MANAGER,
+                title="Approval Needed",
+                message=f"Needs list {needs_list.list_number} from {needs_list.agency_hub.name} is ready for your approval.",
+                notification_type="approval_needed",
+                link_url=f"/logistics/needs-lists",
+                payload_data={
+                    "needs_list_number": needs_list.list_number,
+                    "agency_hub": needs_list.agency_hub.name,
+                    "prepared_by": current_user.full_name,
+                    "prepared_by_id": current_user.id
+                },
+                needs_list_id=needs_list.id
+            )
             
             flash(f"Fulfilment for {needs_list.list_number} prepared and submitted for manager approval.", "success")
         
@@ -2383,6 +2415,22 @@ def needs_list_dispatch(list_id):
         message=f"Items for needs list {needs_list.list_number} have been dispatched by {current_user.full_name}. Please confirm receipt when items arrive.",
         notification_type="dispatched",
         triggered_by_user=current_user
+    )
+    
+    # Notify Warehouse Staff about dispatch completion
+    create_notifications_for_role(
+        role=ROLE_WAREHOUSE_STAFF,
+        title="Dispatch Completed",
+        message=f"Needs list {needs_list.list_number} to {needs_list.agency_hub.name} has been dispatched.",
+        notification_type="task_assigned",
+        link_url=f"/needs-lists/{needs_list.id}",
+        payload_data={
+            "needs_list_number": needs_list.list_number,
+            "agency_hub": needs_list.agency_hub.name,
+            "dispatched_by": current_user.full_name,
+            "dispatched_by_id": current_user.id
+        },
+        needs_list_id=needs_list.id
     )
     
     flash(f"Needs list {needs_list.list_number} dispatched successfully. Stock transfers completed and {requesting_hub.name} will be notified.", "success")
