@@ -3761,6 +3761,13 @@ def serve_upload(file_path):
         flash(f"Error accessing file: {str(e)}", "error")
         return redirect(url_for("items"))
 
+# ---------- Error Handlers ----------
+
+@app.errorhandler(403)
+def forbidden(error):
+    """Handle 403 Forbidden errors with user-friendly page"""
+    return render_template("403.html"), 403
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()

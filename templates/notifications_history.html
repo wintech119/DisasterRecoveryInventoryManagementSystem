@@ -23,8 +23,13 @@
       <div class="card-body p-0">
         <div class="list-group list-group-flush">
           {% for notif in notifications %}
-            <a href="{{ notif.link_url or '#' }}" class="list-group-item list-group-item-action {% if notif.status == 'unread' %}list-group-item-light{% endif %}" 
-               style="{% if notif.status == 'unread' %}border-left: 3px solid var(--bs-primary);{% endif %}">
+            <a href="{{ notif.link_url or 'javascript:void(0)' }}" 
+               class="list-group-item list-group-item-action {% if notif.status == 'unread' %}list-group-item-light{% endif %} {% if not notif.link_url or notif.link_url == '#' %}disabled{% endif %}" 
+               style="{% if notif.status == 'unread' %}border-left: 3px solid var(--bs-primary);{% endif %} {% if notif.link_url and notif.link_url != '#' %}cursor: pointer;{% else %}cursor: not-allowed; opacity: 0.6;{% endif %} transition: all 0.2s ease;"
+               {% if notif.status == 'unread' and notif.link_url and notif.link_url != '#' %}
+               onclick="markAsReadAndNavigate({{ notif.id }}, '{{ notif.link_url }}', event)"
+               {% endif %}
+               {% if not notif.link_url or notif.link_url == '#' %}aria-disabled="true" title="No link available"{% else %}title="Click to view details"{% endif %}>
               <div class="d-flex w-100 align-items-start">
                 <!-- Icon -->
                 <div class="me-3 mt-1">
@@ -65,6 +70,9 @@
                   <small class="text-muted">
                     <i class="bi bi-clock me-1"></i>
                     {{ notif.created_at.strftime('%I:%M %p') }}
+                    {% if notif.link_url and notif.link_url != '#' %}
+                      <i class="bi bi-arrow-right-circle ms-2"></i>
+                    {% endif %}
                     {% if notif.needs_list %}
                       <span class="ms-2">
                         <i class="bi bi-link-45deg me-1"></i>
@@ -101,4 +109,56 @@
     </div>
   {% endif %}
 </div>
+
+<script>
+  // Mark notification as read and navigate
+  async function markAsReadAndNavigate(notificationId, linkUrl, event) {
+    event.preventDefault();
+    
+    if (!linkUrl || linkUrl === '#') {
+      return;
+    }
+    
+    try {
+      // Mark as read
+      await fetch(`/notifications/${notificationId}/mark-read`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      // Navigate after marking as read
+      setTimeout(() => {
+        window.location.href = linkUrl;
+      }, 100);
+      
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      // Navigate anyway
+      window.location.href = linkUrl;
+    }
+  }
+  
+  // Add hover effect styles for clickable notifications only
+  document.addEventListener('DOMContentLoaded', function() {
+    const items = document.querySelectorAll('.list-group-item-action:not(.disabled)');
+    items.forEach(item => {
+      item.addEventListener('mouseenter', function() {
+        if (!this.classList.contains('disabled')) {
+          this.style.transform = 'translateX(4px)';
+          this.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+          this.style.backgroundColor = '#f8f9fa';
+        }
+      });
+      item.addEventListener('mouseleave', function() {
+        if (!this.classList.contains('disabled')) {
+          this.style.transform = 'translateX(0)';
+          this.style.boxShadow = 'none';
+          this.style.backgroundColor = '';
+        }
+      });
+    });
+  });
+</script>
 {% endblock %}

@@ -304,6 +304,38 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       border: none;
     }
+    
+    /* Notification clickable enhancements */
+    #notificationsList .list-group-item {
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-left: 3px solid transparent;
+    }
+    
+    #notificationsList .list-group-item:hover {
+      background-color: #f8f9fa !important;
+      transform: translateX(4px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    #notificationsList .list-group-item.list-group-item-light {
+      border-left-color: var(--bs-primary);
+      background-color: #f0f7ff;
+    }
+    
+    #notificationsList .list-group-item.list-group-item-light:hover {
+      background-color: #e6f2ff !important;
+    }
+    
+    #notificationsList .list-group-item.disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    
+    #notificationsList .list-group-item.disabled:hover {
+      transform: none;
+      box-shadow: none;
+    }
   </style>
 </head>
 <body>
@@ -603,12 +635,14 @@
       listContainer.innerHTML = notifications.map(notif => {
         const config = notificationTypeConfig[notif.type] || { icon: 'bi-bell', color: 'secondary', bgColor: '#f8f9fa' };
         const isUnread = notif.status === 'unread';
+        const hasLink = notif.link_url && notif.link_url !== '#';
         
         return `
-          <a href="${notif.link_url || '#'}" 
-             class="list-group-item list-group-item-action ${isUnread ? 'list-group-item-light' : ''}" 
-             onclick="markNotificationRead(${notif.id}, event)"
-             style="${isUnread ? 'border-left: 3px solid var(--bs-primary);' : ''}">
+          <a href="${hasLink ? notif.link_url : 'javascript:void(0)'}" 
+             class="list-group-item list-group-item-action ${isUnread ? 'list-group-item-light' : ''} ${!hasLink ? 'disabled' : ''}" 
+             onclick="handleNotificationClick(${notif.id}, '${hasLink ? notif.link_url : ''}', ${isUnread}, event)"
+             ${!hasLink ? 'aria-disabled="true"' : ''}
+             title="${hasLink ? 'Click to view details' : 'No link available'}">
             <div class="d-flex w-100 align-items-start">
               <div class="me-3 mt-1">
                 <i class="bi ${config.icon} text-${config.color}" style="font-size: 1.5rem;"></i>
@@ -619,7 +653,10 @@
                   ${isUnread ? '<span class="badge bg-primary">New</span>' : ''}
                 </div>
                 <p class="mb-1 small">${notif.message}</p>
-                <small class="text-muted"><i class="bi bi-clock me-1"></i>${formatRelativeTime(notif.created_at_iso)}</small>
+                <small class="text-muted">
+                  <i class="bi bi-clock me-1"></i>${formatRelativeTime(notif.created_at_iso)}
+                  ${hasLink ? '<i class="bi bi-arrow-right-circle ms-2"></i>' : ''}
+                </small>
               </div>
             </div>
           </a>
@@ -627,8 +664,48 @@
       }).join('');
     }
 
-    // Mark a single notification as read
+    // Handle notification click with proper navigation and mark as read
+    async function handleNotificationClick(notificationId, linkUrl, isUnread, event) {
+      // Prevent default link behavior - we'll handle navigation manually
+      event.preventDefault();
+      
+      // If no link URL, do nothing
+      if (!linkUrl || linkUrl === '#') {
+        console.log('No link URL for this notification');
+        return;
+      }
+      
+      try {
+        // Mark as read if unread
+        if (isUnread) {
+          const response = await fetch(`/notifications/${notificationId}/mark-read`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            // Update UI immediately
+            await Promise.all([fetchUnreadCount(), fetchNotifications()]);
+          }
+        }
+        
+        // Navigate to the link (small delay to show visual feedback)
+        setTimeout(() => {
+          window.location.href = linkUrl;
+        }, 100);
+        
+      } catch (error) {
+        console.error('Error handling notification click:', error);
+        // Navigate anyway even if marking as read failed
+        window.location.href = linkUrl;
+      }
+    }
+    
+    // Legacy function for backward compatibility
     async function markNotificationRead(notificationId, event) {
+      // This is now just for explicit mark-as-read without navigation
       try {
         const response = await fetch(`/notifications/${notificationId}/mark-read`, {
           method: 'POST',
@@ -638,7 +715,6 @@
         });
         
         if (response.ok) {
-          // Refresh both count and list
           await Promise.all([fetchUnreadCount(), fetchNotifications()]);
         }
       } catch (error) {
