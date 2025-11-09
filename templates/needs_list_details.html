@@ -359,7 +359,7 @@
                 <tr>
                   <th style="width: 25%;">Item</th>
                   <th style="width: 10%;" class="text-center">Requested</th>
-                  {% if needs_list.status in ['Dispatched', 'Received', 'Completed'] %}
+                  {% if needs_list.status in ['Dispatched', 'Received'] %}
                     {# Execution Phase: Show dispatch/delivery info #}
                     <th style="width: 25%;">Dispatched From</th>
                     <th style="width: 10%;" class="text-center">Dispatched</th>
@@ -381,7 +381,7 @@
                 {% for item_entry in needs_list.items %}
                   {% set total_allocated = 0 %}
                   {% set item_fulfilments = [] %}
-                  {% if needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval', 'Approved', 'Dispatched', 'Received', 'Completed'] %}
+                  {% if needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval', 'Approved', 'Dispatched', 'Received'] %}
                     {% for fulfilment in needs_list.fulfilments %}
                       {% if fulfilment.item_sku == item_entry.item_sku %}
                         {% set total_allocated = total_allocated + fulfilment.allocated_qty %}
@@ -404,7 +404,7 @@
                       <strong class="text-primary">{{ item_entry.requested_qty }}</strong>
                       <small class="d-block text-muted">{{ item_entry.item.unit }}</small>
                     </td>
-                    {% if needs_list.status in ['Dispatched', 'Received', 'Completed'] %}
+                    {% if needs_list.status in ['Dispatched', 'Received'] %}
                       {# EXECUTION PHASE: Show dispatch/delivery details #}
                       <td>
                         {% if item_fulfilments %}
@@ -468,13 +468,13 @@
                     {% endif %}
                     <td class="align-middle">
                       <div class="status-cell">
-                        {% if needs_list.status in ['Dispatched', 'Received', 'Completed'] %}
+                        {% if needs_list.status in ['Dispatched', 'Received'] %}
                           {# EXECUTION PHASE: Show dispatch/delivery status #}
                           {% if total_allocated == 0 %}
                             <span class="badge bg-danger w-100 mb-1">Not Dispatched</span>
                           {% elif total_allocated >= item_entry.requested_qty %}
                             <span class="badge bg-success w-100 mb-1">
-                              {% if needs_list.status == 'Dispatched' %}In Transit{% elif needs_list.status == 'Received' %}Received{% else %}Completed{% endif %}
+                              {% if needs_list.status == 'Dispatched' %}In Transit{% elif needs_list.status == 'Received' %}Received{% endif %}
                             </span>
                           {% else %}
                             <span class="badge bg-warning text-dark w-100 mb-1">Partial Delivery</span>
@@ -489,7 +489,7 @@
                             {% elif needs_list.dispatched_at %}
                               <small class="d-block text-muted mt-1">
                                 <i class="bi bi-truck me-1"></i>{{ needs_list.dispatched_at.strftime('%b %d, %H:%M') }}
-                                {% if needs_list.dispatched_by_user %}<br>by {{ needs_list.dispatched_by_user.full_name }}{% endif %}
+                                {% if needs_list.dispatched_by_user %}<br>by {{ needs_list.dispatched_by_user.full_name %}{% endif %}
                               </small>
                             {% endif %}
                           {% endif %}
@@ -514,6 +514,9 @@
                             </div>
                             <small class="d-block text-center text-success mt-1">100%</small>
                           {% endif %}
+                        {% elif needs_list.status == 'Completed' %}
+                          {# COMPLETED: Clean simple view #}
+                          <span class="badge bg-success w-100">Completed</span>
                         {% else %}
                           {# EARLY PHASE: Draft/Submitted #}
                           <span class="badge bg-secondary">Pending Review</span>
