@@ -75,63 +75,78 @@
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto">
         {% if current_user.is_authenticated %}
-          {# Items - visible to most roles #}
-          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF', 'AUDITOR', 'EXECUTIVE'] %}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('items') }}"><i class="bi bi-box-seam me-1"></i>Inventory</a></li>
-          {% endif %}
+          {# Check if user is from AGENCY hub for restricted menu #}
+          {% set is_agency_user = current_user.assigned_location and current_user.assigned_location.hub_type == 'AGENCY' %}
           
-          {# Depots - visible to logistics staff and warehouse staff #}
-          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('depots') }}"><i class="bi bi-geo-alt me-1"></i>Depots</a></li>
-          {% endif %}
-          
-          
-          {# Needs Lists - visible to AGENCY, SUB hubs and Logistics Officers/Managers #}
-          {% if current_user.role in ['LOGISTICS_OFFICER', 'LOGISTICS_MANAGER'] or (current_user.assigned_location and current_user.assigned_location.hub_type in ['AGENCY', 'SUB']) %}
+          {# AGENCY hub users get simplified menu #}
+          {% if is_agency_user %}
+            {# Needs Lists - AGENCY users can create and submit requests #}
             <li class="nav-item"><a class="nav-link" href="{{ url_for('needs_lists') }}"><i class="bi bi-clipboard-check me-1"></i>Needs Lists</a></li>
-          {% endif %}
-          
-          {# Distribution Packages - visible to logistics staff and warehouse staff #}
-          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
+            
+            {# Packages - AGENCY users can view received packages #}
             <li class="nav-item"><a class="nav-link" href="{{ url_for('packages') }}"><i class="bi bi-box-seam-fill me-1"></i>Packages</a></li>
-          {% endif %}
+            
+            {# History - AGENCY users can view their hub's transaction history #}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions') }}"><i class="bi bi-list-ul me-1"></i>History</a></li>
           
-          {# Stock Transfer - visible to logistics staff and warehouse staff #}
-          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('stock_transfer') }}"><i class="bi bi-arrow-left-right me-1"></i>Transfer</a></li>
-            {# Transfer Approval Queue - only for MAIN hub users #}
-            {% if current_user.assigned_location %}
-              {% set user_depot = current_user.assigned_location %}
-              {% if user_depot.hub_type == 'MAIN' %}
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('transfer_requests') }}"><i class="bi bi-check-circle me-1"></i>Approvals</a></li>
+          {# ODPEM users (MAIN/SUB hubs) and non-hub users get full menu #}
+          {% else %}
+            {# Items - visible to most roles except AGENCY users #}
+            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF', 'AUDITOR', 'EXECUTIVE'] %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('items') }}"><i class="bi bi-box-seam me-1"></i>Inventory</a></li>
+            {% endif %}
+            
+            {# Depots - visible to logistics staff and warehouse staff (ODPEM only) #}
+            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('depots') }}"><i class="bi bi-geo-alt me-1"></i>Depots</a></li>
+            {% endif %}
+            
+            {# Needs Lists - visible to SUB hubs and Logistics Officers/Managers #}
+            {% if current_user.role in ['LOGISTICS_OFFICER', 'LOGISTICS_MANAGER'] or (current_user.assigned_location and current_user.assigned_location.hub_type == 'SUB') %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('needs_lists') }}"><i class="bi bi-clipboard-check me-1"></i>Needs Lists</a></li>
+            {% endif %}
+            
+            {# Distribution Packages - visible to logistics staff and warehouse staff (ODPEM only) #}
+            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('packages') }}"><i class="bi bi-box-seam-fill me-1"></i>Packages</a></li>
+            {% endif %}
+            
+            {# Stock Transfer - visible to logistics staff and warehouse staff (ODPEM only) #}
+            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('stock_transfer') }}"><i class="bi bi-arrow-left-right me-1"></i>Transfer</a></li>
+              {# Transfer Approval Queue - only for MAIN hub users #}
+              {% if current_user.assigned_location %}
+                {% set user_depot = current_user.assigned_location %}
+                {% if user_depot.hub_type == 'MAIN' %}
+                  <li class="nav-item"><a class="nav-link" href="{{ url_for('transfer_requests') }}"><i class="bi bi-check-circle me-1"></i>Approvals</a></li>
+                {% endif %}
               {% endif %}
             {% endif %}
+            
+            {# Events - visible to logistics staff (ODPEM only) #}
+            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER'] %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('disaster_events') }}"><i class="bi bi-exclamation-triangle me-1"></i>Events</a></li>
+            {% endif %}
+            
+            {# User Management - visible to ADMIN only #}
+            {% if current_user.role == 'ADMIN' %}
+              <li class="nav-item"><a class="nav-link" href="{{ url_for('users') }}"><i class="bi bi-people-fill me-1"></i>Users</a></li>
+            {% endif %}
+            
+            {# Intake - visible to warehouse staff and logistics staff (ODPEM only) #}
+            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
+              <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('intake') }}"><i class="bi bi-arrow-down-circle me-1"></i>Intake</a></li>
+            {% endif %}
+            
+            {# Distribute - visible to warehouse staff, field personnel, and logistics staff (ODPEM only) #}
+            {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF', 'FIELD_PERSONNEL'] %}
+              <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('distribute') }}"><i class="bi bi-arrow-up-circle me-1"></i>Distribute</a></li>
+            {% endif %}
+            
+            {# History and Reports - visible to all ODPEM users #}
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions') }}"><i class="bi bi-list-ul me-1"></i>History</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('report_stock') }}"><i class="bi bi-clipboard-data me-1"></i>Reports</a></li>
           {% endif %}
-          
-          
-          {# Events - visible to logistics staff #}
-          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER'] %}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('disaster_events') }}"><i class="bi bi-exclamation-triangle me-1"></i>Events</a></li>
-          {% endif %}
-          
-          {# User Management - visible to ADMIN only #}
-          {% if current_user.role == 'ADMIN' %}
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('users') }}"><i class="bi bi-people-fill me-1"></i>Users</a></li>
-          {% endif %}
-          
-          {# Intake - visible to warehouse staff and logistics staff #}
-          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF'] %}
-            <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('intake') }}"><i class="bi bi-arrow-down-circle me-1"></i>Intake</a></li>
-          {% endif %}
-          
-          {# Distribute - visible to warehouse staff, field personnel, and logistics staff #}
-          {% if current_user.role in ['ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER', 'WAREHOUSE_STAFF', 'FIELD_PERSONNEL'] %}
-            <li class="nav-item"><a class="nav-link px-3" href="{{ url_for('distribute') }}"><i class="bi bi-arrow-up-circle me-1"></i>Distribute</a></li>
-          {% endif %}
-          
-          {# History and Reports - visible to all authenticated users #}
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('transactions') }}"><i class="bi bi-list-ul me-1"></i>History</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('report_stock') }}"><i class="bi bi-clipboard-data me-1"></i>Reports</a></li>
           
           {# User dropdown #}
           <li class="nav-item dropdown">
