@@ -30,6 +30,8 @@
             <option value="ADMIN" {% if user and user.role == 'ADMIN' %}selected{% endif %}>Administrator</option>
             <option value="LOGISTICS_MANAGER" {% if user and user.role == 'LOGISTICS_MANAGER' %}selected{% endif %}>Logistics Manager</option>
             <option value="LOGISTICS_OFFICER" {% if user and user.role == 'LOGISTICS_OFFICER' %}selected{% endif %}>Logistics Officer</option>
+            <option value="WAREHOUSE_SUPERVISOR" {% if user and user.role == 'WAREHOUSE_SUPERVISOR' %}selected{% endif %}>Warehouse Supervisor</option>
+            <option value="WAREHOUSE_OFFICER" {% if user and user.role == 'WAREHOUSE_OFFICER' %}selected{% endif %}>Warehouse Officer</option>
             <option value="WAREHOUSE_STAFF" {% if user and user.role == 'WAREHOUSE_STAFF' %}selected{% endif %}>Warehouse Staff</option>
             <option value="FIELD_PERSONNEL" {% if user and user.role == 'FIELD_PERSONNEL' %}selected{% endif %}>Field Personnel</option>
             <option value="EXECUTIVE" {% if user and user.role == 'EXECUTIVE' %}selected{% endif %}>Executive</option>
@@ -46,7 +48,7 @@
               <option value="{{ loc.id }}" {% if user and user.assigned_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
             {% endfor %}
           </select>
-          <small class="form-text text-muted">Typically for Warehouse Staff</small>
+          <small class="form-text text-muted">Required for Warehouse Supervisors and Officers (must be a Sub-Hub)</small>
         </div>
       </div>
       
