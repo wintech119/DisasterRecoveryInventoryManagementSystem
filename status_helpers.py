@@ -125,20 +125,20 @@ def get_line_item_status(needs_list, item_metrics):
     if status == 'Dispatched':
         if allocated == 0:
             return LineItemStatus(
-                label="Not Dispatched",
+                label="Unfilled",
                 badge_class="text-bg-danger",
                 detail_text="No items sent"
             )
         elif allocated < requested:
             return LineItemStatus(
-                label="Partially Dispatched",
+                label="Partially Filled",
                 badge_class="text-bg-warning",
-                detail_text=f"{allocation_pct}% dispatched"
+                detail_text=f"{allocation_pct}% filled"
             )
         else:
             return LineItemStatus(
-                label="Dispatched",
-                badge_class="text-bg-info",
+                label="Filled",
+                badge_class="text-bg-success",
                 detail_text="In transit to agency"
             )
     
@@ -146,19 +146,19 @@ def get_line_item_status(needs_list, item_metrics):
     if status == 'Received':
         if allocated == 0:
             return LineItemStatus(
-                label="Not Dispatched",
+                label="Unfilled",
                 badge_class="text-bg-danger",
                 detail_text="No items received"
             )
         elif allocated < requested:
             return LineItemStatus(
-                label="Partial Delivery",
+                label="Partially Filled",
                 badge_class="text-bg-warning",
                 detail_text=f"{allocation_pct}% received"
             )
         else:
             return LineItemStatus(
-                label="Received",
+                label="Filled",
                 badge_class="text-bg-success",
                 detail_text="Full quantity received"
             )
