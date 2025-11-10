@@ -64,7 +64,7 @@
               <div class="col-md-2">
                 <div class="text-center p-3 bg-light rounded">
                   <i class="bi bi-check-circle {{ completed_context.summary.fulfillment_class }} d-block mb-2" style="font-size: 1.5rem;"></i>
-                  <small class="text-muted d-block">Fulfilled</small>
+                  <small class="text-muted d-block">Filled</small>
                   <strong class="fs-5 {{ completed_context.summary.fulfillment_class }}">{{ completed_context.summary.total_dispatched_qty }}</strong>
                   <small class="d-block text-muted">of {{ completed_context.summary.total_requested_qty }}</small>
                 </div>
@@ -245,11 +245,11 @@
                       </th>
                       <th class="text-center">
                         {% if completed_context.summary.fulfillment_rate >= 100 %}
-                          <span class="badge text-bg-success rounded-pill">Fully Fulfilled</span>
+                          <span class="badge text-bg-success rounded-pill">Filled</span>
                         {% elif completed_context.summary.fulfillment_rate > 0 %}
-                          <span class="badge text-bg-warning rounded-pill">Partially Fulfilled</span>
+                          <span class="badge text-bg-warning rounded-pill">Partially Filled</span>
                         {% else %}
-                          <span class="badge text-bg-danger rounded-pill">Not Fulfilled</span>
+                          <span class="badge text-bg-danger rounded-pill">Unfilled</span>
                         {% endif %}
                       </th>
                     </tr>
@@ -340,7 +340,7 @@
                 <div class="d-flex align-items-center">
                   <i class="bi bi-check-circle text-success me-2" style="font-size: 1.5rem;"></i>
                   <div>
-                    <small class="text-muted d-block">Fulfilled</small>
+                    <small class="text-muted d-block">Filled</small>
                     <strong>{{ summary_counts.fully_allocated }}</strong>
                   </div>
                 </div>

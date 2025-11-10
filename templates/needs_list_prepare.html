@@ -50,7 +50,7 @@
               <div class="d-flex align-items-center">
                 <i class="bi bi-check-circle text-success me-2" style="font-size: 1.5rem;"></i>
                 <div>
-                  <small class="text-muted d-block">Fulfilled</small>
+                  <small class="text-muted d-block">Filled</small>
                   <strong id="summary-fully-allocated">0</strong>
                 </div>
               </div>
@@ -66,7 +66,7 @@
             </div>
             <div class="col-md-3">
               <div class="d-flex align-items-center">
-                <i class="bi bi-exclamation-circle text-secondary me-2" style="font-size: 1.5rem;"></i>
+                <i class="bi bi-exclamation-triangle text-danger me-2" style="font-size: 1.5rem;"></i>
                 <div>
                   <small class="text-muted d-block">Unfilled</small>
                   <strong id="summary-unallocated">0</strong>
@@ -89,7 +89,7 @@
                 <option value="all">All Items</option>
                 <option value="unallocated">Unfilled Only</option>
                 <option value="partial">Partially Filled</option>
-                <option value="full">Fulfilled</option>
+                <option value="full">Filled</option>
                 <option value="over">Over-Filled</option>
               </select>
             </div>
@@ -684,7 +684,7 @@ document.addEventListener('DOMContentLoaded', function() {
         row.dataset.status = 'over';
         overAllocated++;
       } else if (totalAllocated === requested && totalAllocated > 0) {
-        statusBadge.textContent = 'Fulfilled';
+        statusBadge.textContent = 'Filled';
         statusBadge.className = 'badge status-badge bg-success';
         progressBar.className = 'progress-bar bg-success';
         percentageText.className = 'percentage-text text-success';
@@ -701,9 +701,9 @@ document.addEventListener('DOMContentLoaded', function() {
         partiallyAllocated++;
       } else {
         statusBadge.textContent = 'Unfilled';
-        statusBadge.className = 'badge status-badge bg-secondary';
-        progressBar.className = 'progress-bar bg-secondary';
-        percentageText.className = 'percentage-text text-secondary';
+        statusBadge.className = 'badge status-badge bg-danger';
+        progressBar.className = 'progress-bar bg-danger';
+        percentageText.className = 'percentage-text text-danger';
         row.dataset.status = 'unallocated';
         unallocated++;
       }

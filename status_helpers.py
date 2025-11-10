@@ -78,7 +78,7 @@ def get_line_item_status(needs_list, item_metrics):
         if allocated == 0:
             return LineItemStatus(
                 label="Unfilled",
-                badge_class="text-bg-secondary",
+                badge_class="text-bg-danger",
                 detail_text="No stock filled",
                 progress_pct=0
             )
@@ -91,9 +91,9 @@ def get_line_item_status(needs_list, item_metrics):
             )
         else:  # allocated >= requested
             return LineItemStatus(
-                label="Fulfilled",
+                label="Filled",
                 badge_class="text-bg-success",
-                detail_text="100% fulfilled",
+                detail_text="100% filled",
                 progress_pct=100
             )
     
@@ -102,7 +102,7 @@ def get_line_item_status(needs_list, item_metrics):
         if allocated == 0:
             return LineItemStatus(
                 label="Unfilled",
-                badge_class="text-bg-secondary",
+                badge_class="text-bg-danger",
                 detail_text="Awaiting dispatch",
                 progress_pct=0
             )
@@ -115,7 +115,7 @@ def get_line_item_status(needs_list, item_metrics):
             )
         else:
             return LineItemStatus(
-                label="Fulfilled",
+                label="Filled",
                 badge_class="text-bg-success",
                 detail_text="Ready for dispatch",
                 progress_pct=100
