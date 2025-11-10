@@ -435,9 +435,10 @@
                         {% if item_fulfilments %}
                           <div class="d-flex flex-column gap-1">
                             {% for fulfilment in item_fulfilments %}
-                              <div class="d-flex justify-content-between align-items-center">
-                                <small><i class="bi bi-geo-alt me-1 text-primary"></i>{{ fulfilment.source_hub.name }}</small>
-                                <span class="badge bg-success">{{ fulfilment.allocated_qty }} {{ item_entry.item.unit }}</span>
+                              <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-geo-alt text-primary flex-shrink-0" style="font-size: 0.875rem;"></i>
+                                <small class="flex-shrink-1 text-truncate fw-medium">{{ fulfilment.source_hub.name }}</small>
+                                <span class="badge bg-success flex-shrink-0">{{ fulfilment.allocated_qty }} {{ item_entry.item.unit }}</span>
                               </div>
                             {% endfor %}
                           </div>
@@ -474,9 +475,10 @@
                         {% if item_fulfilments %}
                           <div class="d-flex flex-column gap-1">
                             {% for fulfilment in item_fulfilments %}
-                              <div class="d-flex justify-content-between align-items-center">
-                                <small><i class="bi bi-geo-alt me-1"></i>{{ fulfilment.source_hub.name }}</small>
-                                <span class="badge bg-primary">{{ fulfilment.allocated_qty }}</span>
+                              <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-geo-alt text-muted flex-shrink-0" style="font-size: 0.875rem;"></i>
+                                <small class="flex-shrink-1 text-truncate fw-medium">{{ fulfilment.source_hub.name }}</small>
+                                <span class="badge bg-primary flex-shrink-0">{{ fulfilment.allocated_qty }}</span>
                               </div>
                             {% endfor %}
                           </div>
