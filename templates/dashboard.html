@@ -264,7 +264,7 @@
               <span class="badge bg-warning text-dark px-3 py-2">{{ needs_lists_stats.pending }}</span>
             </div>
             {% if needs_lists_stats.pending > 0 %}
-              <a href="{{ url_for('logistics_manager_needs_lists') }}" class="btn btn-sm btn-warning w-100">
+              <a href="{{ url_for('needs_lists') }}" class="btn btn-sm btn-warning w-100">
                 <i class="bi bi-eye me-1"></i>Review Needs Lists
               </a>
             {% endif %}
