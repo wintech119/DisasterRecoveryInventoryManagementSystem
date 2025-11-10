@@ -163,6 +163,103 @@
         <!-- Role-Specific Panels -->
         {% include '_completed_role_panels.html' %}
         
+        <!-- Fulfilment Table - All Users -->
+        {% if completed_context and completed_context['items'] %}
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom">
+              <h5 class="mb-0"><i class="bi bi-table me-2"></i>Fulfilment Summary Table</h5>
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th class="ps-4">Item Name / SKU</th>
+                      <th class="text-center">Requested Qty</th>
+                      <th class="text-center">Dispatched Qty</th>
+                      <th class="text-center">Received Qty</th>
+                      <th class="text-center">Fulfilment %</th>
+                      <th class="text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for item in completed_context['items'] %}
+                      <tr>
+                        <td class="ps-4">
+                          <div>
+                            <strong>{{ item.item_name }}</strong>
+                            <br>
+                            <small class="text-muted">SKU: {{ item.sku }}</small>
+                          </div>
+                        </td>
+                        <td class="text-center">
+                          <strong>{{ item.requested_qty }}</strong>
+                          <small class="text-muted d-block">{{ item.unit }}</small>
+                        </td>
+                        <td class="text-center">
+                          <strong>{{ item.dispatched_qty }}</strong>
+                          <small class="text-muted d-block">{{ item.unit }}</small>
+                        </td>
+                        <td class="text-center">
+                          <strong>{{ item.received_qty }}</strong>
+                          <small class="text-muted d-block">{{ item.unit }}</small>
+                        </td>
+                        <td class="text-center">
+                          <strong class="{% if item.fulfillment_pct >= 100 %}text-success{% elif item.fulfillment_pct > 0 %}text-warning{% else %}text-danger{% endif %}">
+                            {{ item.fulfillment_pct }}%
+                          </strong>
+                        </td>
+                        <td class="text-center">
+                          <span class="badge {{ item.status_badge_class }} rounded-pill" 
+                                data-bs-toggle="tooltip" 
+                                data-bs-placement="top"
+                                title="{{ item.fulfilment_status }}">
+                            {{ item.fulfilment_status }}
+                          </span>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                  <tfoot class="table-light border-top border-2">
+                    <tr>
+                      <th class="ps-4">
+                        <strong>TOTALS</strong>
+                        <small class="text-muted d-block">{{ completed_context.summary.total_items }} items</small>
+                      </th>
+                      <th class="text-center">
+                        <strong>{{ completed_context.summary.total_requested_qty }}</strong>
+                        <small class="text-muted d-block">items</small>
+                      </th>
+                      <th class="text-center">
+                        <strong>{{ completed_context.summary.total_dispatched_qty }}</strong>
+                        <small class="text-muted d-block">items</small>
+                      </th>
+                      <th class="text-center">
+                        <strong>{{ completed_context.summary.total_received_qty }}</strong>
+                        <small class="text-muted d-block">items</small>
+                      </th>
+                      <th class="text-center">
+                        <strong class="{{ completed_context.summary.fulfillment_class }}">
+                          {{ completed_context.summary.fulfillment_rate }}%
+                        </strong>
+                      </th>
+                      <th class="text-center">
+                        {% if completed_context.summary.fulfillment_rate >= 100 %}
+                          <span class="badge text-bg-success rounded-pill">Fully Fulfilled</span>
+                        {% elif completed_context.summary.fulfillment_rate > 0 %}
+                          <span class="badge text-bg-warning rounded-pill">Partially Fulfilled</span>
+                        {% else %}
+                          <span class="badge text-bg-danger rounded-pill">Not Fulfilled</span>
+                        {% endif %}
+                      </th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+        
       {% endif %}
       
       <!-- Summary Panel -->
