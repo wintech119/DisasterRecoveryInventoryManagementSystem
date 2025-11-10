@@ -2588,25 +2588,63 @@ def needs_list_details(list_id):
     if needs_list.status in ['Dispatched', 'Received']:
         dispatch_summary = compute_dispatch_summary(needs_list)
     
-    # Compute per-item metrics and status for consistent display
-    item_status_map = {}
+    # Build comprehensive line items payload with all metrics computed server-side
+    # This is the single source of truth for allocation data
+    line_items = []
+    summary_counts = {'fully_allocated': 0, 'partially_allocated': 0, 'unallocated': 0}
+    
     for item_entry in needs_list.items:
-        # Calculate allocated quantity from fulfilments
+        # Calculate allocated quantity and build fulfilments list from database
         allocated_qty = 0
+        fulfilments_list = []
+        
         for fulfilment in needs_list.fulfilments:
             if fulfilment.item_sku == item_entry.item_sku:
                 allocated_qty += fulfilment.allocated_qty
+                fulfilments_list.append({
+                    'source_hub_name': fulfilment.source_hub.name,
+                    'source_hub_id': fulfilment.source_hub_id,
+                    'allocated_qty': fulfilment.allocated_qty
+                })
+        
+        # Calculate derived metrics
+        requested_qty = item_entry.requested_qty
+        remaining_qty = max(requested_qty - allocated_qty, 0)
+        fulfillment_pct = int((allocated_qty / requested_qty * 100)) if requested_qty > 0 else 0
         
         # Build metrics dict for status helper
         item_metrics = {
-            'requested_qty': item_entry.requested_qty,
+            'requested_qty': requested_qty,
             'allocated_qty': allocated_qty,
             'dispatched_qty': allocated_qty,  # In current impl, dispatched = allocated
             'received_qty': allocated_qty if needs_list.status in ['Received', 'Completed'] else 0
         }
         
         # Get centralized status
-        item_status_map[item_entry.id] = get_line_item_status(needs_list, item_metrics)
+        item_status = get_line_item_status(needs_list, item_metrics)
+        
+        # Update summary counts based on allocation status
+        if allocated_qty == 0:
+            summary_counts['unallocated'] += 1
+        elif allocated_qty < requested_qty:
+            summary_counts['partially_allocated'] += 1
+        else:
+            summary_counts['fully_allocated'] += 1
+        
+        # Build comprehensive line item payload
+        line_items.append({
+            'id': item_entry.id,
+            'item_name': item_entry.item.name,
+            'item_sku': item_entry.item_sku,
+            'unit': item_entry.item.unit,
+            'justification': item_entry.justification,
+            'requested_qty': requested_qty,
+            'allocated_qty': allocated_qty,
+            'remaining_qty': remaining_qty,
+            'fulfillment_pct': fulfillment_pct,
+            'fulfilments': fulfilments_list,
+            'status': item_status
+        })
     
     # Get consistent header status display
     header_status = get_needs_list_status_display(needs_list)
@@ -2618,7 +2656,8 @@ def needs_list_details(list_id):
                          main_hubs=main_hubs,
                          completed_context=completed_context,
                          dispatch_summary=dispatch_summary,
-                         item_status_map=item_status_map,
+                         line_items=line_items,
+                         summary_counts=summary_counts,
                          header_status=header_status)
 
 @app.route("/needs-lists/<int:list_id>/submit", methods=["POST"])

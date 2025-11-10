@@ -340,7 +340,7 @@
                   <i class="bi bi-check-circle text-success me-2" style="font-size: 1.5rem;"></i>
                   <div>
                     <small class="text-muted d-block">Fully Allocated</small>
-                    <strong id="summary-fully">0</strong>
+                    <strong>{{ summary_counts.fully_allocated }}</strong>
                   </div>
                 </div>
               </div>
@@ -353,7 +353,7 @@
                   <i class="bi bi-hourglass-split text-warning me-2" style="font-size: 1.5rem;"></i>
                   <div>
                     <small class="text-muted d-block">Partial</small>
-                    <strong id="summary-partial">0</strong>
+                    <strong>{{ summary_counts.partially_allocated }}</strong>
                   </div>
                 </div>
               </div>
@@ -366,7 +366,7 @@
                   <i class="bi bi-exclamation-triangle text-danger me-2" style="font-size: 1.5rem;"></i>
                   <div>
                     <small class="text-muted d-block">Unallocated</small>
-                    <strong id="summary-unallocated">{{ needs_list.items|length }}</strong>
+                    <strong>{{ summary_counts.unallocated }}</strong>
                   </div>
                 </div>
               </div>
@@ -403,42 +403,31 @@
                 </tr>
               </thead>
               <tbody>
-                {% for item_entry in needs_list.items %}
-                  {% set total_allocated = 0 %}
-                  {% set item_fulfilments = [] %}
-                  {% if needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval', 'Approved', 'Dispatched', 'Received'] %}
-                    {% for fulfilment in needs_list.fulfilments %}
-                      {% if fulfilment.item_sku == item_entry.item_sku %}
-                        {% set total_allocated = total_allocated + fulfilment.allocated_qty %}
-                        {% set _ = item_fulfilments.append(fulfilment) %}
-                      {% endif %}
-                    {% endfor %}
-                  {% endif %}
-                  
-                  <tr class="item-row" data-requested="{{ item_entry.requested_qty }}" data-allocated="{{ total_allocated }}">
+                {% for line_item in line_items %}
+                  <tr>
                     <td>
                       <div class="item-info">
-                        <strong class="d-block">{{ item_entry.item.name }}</strong>
-                        <small class="text-muted">SKU: {{ item_entry.item.sku }}</small>
-                        {% if item_entry.justification %}
-                          <br><small class="text-info"><i class="bi bi-info-circle me-1"></i>{{ item_entry.justification }}</small>
+                        <strong class="d-block">{{ line_item.item_name }}</strong>
+                        <small class="text-muted">SKU: {{ line_item.item_sku }}</small>
+                        {% if line_item.justification %}
+                          <br><small class="text-info"><i class="bi bi-info-circle me-1"></i>{{ line_item.justification }}</small>
                         {% endif %}
                       </div>
                     </td>
                     <td class="text-center align-middle">
-                      <strong class="text-primary">{{ item_entry.requested_qty }}</strong>
-                      <small class="d-block text-muted">{{ item_entry.item.unit }}</small>
+                      <strong class="text-primary">{{ line_item.requested_qty }}</strong>
+                      <small class="d-block text-muted">{{ line_item.unit }}</small>
                     </td>
                     {% if needs_list.status in ['Dispatched', 'Received'] %}
                       {# EXECUTION PHASE: Show dispatch/delivery details #}
                       <td>
-                        {% if item_fulfilments %}
+                        {% if line_item.fulfilments %}
                           <div class="d-flex flex-column gap-1">
-                            {% for fulfilment in item_fulfilments %}
+                            {% for fulfilment in line_item.fulfilments %}
                               <div class="d-flex align-items-center gap-2">
                                 <i class="bi bi-geo-alt text-primary flex-shrink-0" style="font-size: 0.875rem;"></i>
-                                <small class="flex-shrink-1 text-truncate fw-medium">{{ fulfilment.source_hub.name }}</small>
-                                <span class="badge bg-success flex-shrink-0">{{ fulfilment.allocated_qty }} {{ item_entry.item.unit }}</span>
+                                <small class="flex-shrink-1 text-truncate fw-medium">{{ fulfilment.source_hub_name }}</small>
+                                <span class="badge bg-success flex-shrink-0">{{ fulfilment.allocated_qty }} {{ line_item.unit }}</span>
                               </div>
                             {% endfor %}
                           </div>
@@ -447,37 +436,36 @@
                         {% endif %}
                       </td>
                       <td class="text-center align-middle">
-                        <strong class="{% if total_allocated > item_entry.requested_qty %}text-danger{% else %}text-success{% endif %}">
-                          {{ total_allocated }}
+                        <strong class="{% if line_item.allocated_qty > line_item.requested_qty %}text-danger{% else %}text-success{% endif %}">
+                          {{ line_item.allocated_qty }}
                         </strong>
-                        <small class="d-block text-muted">{{ item_entry.item.unit }}</small>
-                        {% if total_allocated > item_entry.requested_qty %}
-                          <span class="badge bg-danger mt-1">Over +{{ total_allocated - item_entry.requested_qty }}</span>
+                        <small class="d-block text-muted">{{ line_item.unit }}</small>
+                        {% if line_item.allocated_qty > line_item.requested_qty %}
+                          <span class="badge bg-danger mt-1">Over +{{ line_item.allocated_qty - line_item.requested_qty }}</span>
                         {% endif %}
                       </td>
                       <td class="text-center align-middle">
-                        {% set fulfillment_pct = (total_allocated / item_entry.requested_qty * 100)|int if item_entry.requested_qty > 0 else 0 %}
-                        <strong>{{ total_allocated }}/{{ item_entry.requested_qty }}</strong>
+                        <strong>{{ line_item.allocated_qty }}/{{ line_item.requested_qty }}</strong>
                         <div class="progress mt-1" style="height: 6px;">
-                          <div class="progress-bar {% if fulfillment_pct >= 100 %}bg-success{% elif fulfillment_pct > 0 %}bg-warning{% else %}bg-danger{% endif %}" 
-                               style="width: {{ [fulfillment_pct, 100]|min }}%;"></div>
+                          <div class="progress-bar {% if line_item.fulfillment_pct >= 100 %}bg-success{% elif line_item.fulfillment_pct > 0 %}bg-warning{% else %}bg-danger{% endif %}" 
+                               style="width: {{ [line_item.fulfillment_pct, 100]|min }}%;"></div>
                         </div>
-                        <small class="d-block text-center mt-1 {% if fulfillment_pct >= 100 %}text-success{% elif fulfillment_pct > 0 %}text-warning{% else %}text-danger{% endif %}">
-                          {{ fulfillment_pct }}%
+                        <small class="d-block text-center mt-1 {% if line_item.fulfillment_pct >= 100 %}text-success{% elif line_item.fulfillment_pct > 0 %}text-warning{% else %}text-danger{% endif %}">
+                          {{ line_item.fulfillment_pct }}%
                         </small>
-                        {% if total_allocated < item_entry.requested_qty and total_allocated > 0 %}
-                          <small class="text-muted">Shortfall: {{ item_entry.requested_qty - total_allocated }}</small>
+                        {% if line_item.allocated_qty < line_item.requested_qty and line_item.allocated_qty > 0 %}
+                          <small class="text-muted">Shortfall: {{ line_item.remaining_qty }}</small>
                         {% endif %}
                       </td>
                     {% elif needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval', 'Approved'] %}
                       {# PLANNING PHASE: Show allocation details #}
                       <td>
-                        {% if item_fulfilments %}
+                        {% if line_item.fulfilments %}
                           <div class="d-flex flex-column gap-1">
-                            {% for fulfilment in item_fulfilments %}
+                            {% for fulfilment in line_item.fulfilments %}
                               <div class="d-flex align-items-center gap-2">
                                 <i class="bi bi-geo-alt text-muted flex-shrink-0" style="font-size: 0.875rem;"></i>
-                                <small class="flex-shrink-1 text-truncate fw-medium">{{ fulfilment.source_hub.name }}</small>
+                                <small class="flex-shrink-1 text-truncate fw-medium">{{ fulfilment.source_hub_name }}</small>
                                 <span class="badge bg-primary flex-shrink-0">{{ fulfilment.allocated_qty }}</span>
                               </div>
                             {% endfor %}
@@ -487,15 +475,15 @@
                         {% endif %}
                       </td>
                       <td class="text-center align-middle">
-                        <strong>{{ total_allocated }}</strong>
+                        <strong>{{ line_item.allocated_qty }}</strong>
                       </td>
                       <td class="text-center align-middle">
-                        <strong>{{ item_entry.requested_qty - total_allocated }}</strong>
+                        <strong>{{ line_item.remaining_qty }}</strong>
                       </td>
                     {% endif %}
                     <td class="align-middle text-center p-2">
                       <div class="status-cell">
-                        {% set item_status = item_status_map[item_entry.id] %}
+                        {% set item_status = line_item.status %}
                         {% set tooltip_text = item_status.detail_text if item_status.detail_text else 'Current status: ' + item_status.label %}
                         <span class="badge {{ item_status.badge_class }}" 
                               data-bs-toggle="tooltip" 
@@ -951,28 +939,6 @@ document.addEventListener('DOMContentLoaded', function() {
     trigger: 'hover focus',
     delay: { show: 300, hide: 100 }
   }));
-  
-  // Calculate summary stats
-  let fullyAllocated = 0;
-  let partiallyAllocated = 0;
-  let unallocated = 0;
-  
-  document.querySelectorAll('.item-row').forEach(row => {
-    const requested = parseFloat(row.dataset.requested);
-    const allocated = parseFloat(row.dataset.allocated);
-    
-    if (allocated === 0) {
-      unallocated++;
-    } else if (allocated < requested) {
-      partiallyAllocated++;
-    } else {
-      fullyAllocated++;
-    }
-  });
-  
-  document.getElementById('summary-fully').textContent = fullyAllocated;
-  document.getElementById('summary-partial').textContent = partiallyAllocated;
-  document.getElementById('summary-unallocated').textContent = unallocated;
 });
 </script>
 {% endblock %}
