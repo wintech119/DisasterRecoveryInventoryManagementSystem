@@ -315,8 +315,8 @@
                   <th>List #</th>
                   <th>Requesting Hub</th>
                   <th>Priority</th>
-                  <th>Completed</th>
-                  <th>Completed By</th>
+                  <th>Fulfilled</th>
+                  <th>Received By</th>
                   <th>Status</th>
                   <th class="text-end">Action</th>
                 </tr>
@@ -346,8 +346,8 @@
                   </td>
                   <td>
                     <small class="text-muted">
-                      {% if nl.completed_at %}
-                        {{ nl.completed_at.strftime('%Y-%m-%d %H:%M') }}
+                      {% if nl.fulfilled_at %}
+                        {{ nl.fulfilled_at.strftime('%Y-%m-%d %H:%M') }}
                       {% else %}
                         N/A
                       {% endif %}
@@ -355,8 +355,8 @@
                   </td>
                   <td>
                     <small class="text-muted">
-                      {% if nl.completed_by_user %}
-                        {{ nl.completed_by_user.full_name }}
+                      {% if nl.received_by_user %}
+                        {{ nl.received_by_user.full_name }}
                       {% else %}
                         N/A
                       {% endif %}
