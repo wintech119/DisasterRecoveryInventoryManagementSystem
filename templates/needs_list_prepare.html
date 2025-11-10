@@ -325,6 +325,28 @@
               form="fulfilmentForm"
               placeholder="Add notes..."
               {% if lock_status and lock_status.is_locked and not lock_status.is_locked_by_current_user %}disabled{% endif %}>{{ needs_list.fulfilment_notes or '' }}</textarea>
+            
+            {% if change_request %}
+            <!-- Adjustment Reason Field (Required for Change Requests) -->
+            <div class="mt-3">
+              <label class="form-label small fw-bold mb-2 text-danger">
+                <i class="bi bi-exclamation-circle me-1"></i>Adjustment Reason (Required)
+              </label>
+              <textarea 
+                class="form-control form-control-sm border-warning" 
+                name="adjustment_reason" 
+                rows="3" 
+                form="fulfilmentForm"
+                placeholder="Explain what you changed and why (e.g., 'Reallocated 50 units from Main Hub to Sub-Hub 2 due to stock availability')"
+                required
+                {% if lock_status and lock_status.is_locked and not lock_status.is_locked_by_current_user %}disabled{% endif %}></textarea>
+              <small class="text-muted d-block mt-1">
+                <i class="bi bi-info-circle me-1"></i>This reason will be shared with the warehouse team and logged in the audit trail.
+              </small>
+            </div>
+            <!-- Hidden field to track change request -->
+            <input type="hidden" name="change_request_id" value="{{ change_request.id }}" form="fulfilmentForm">
+            {% endif %}
           </div>
         </div>
 
