@@ -346,16 +346,16 @@
                     <th style="width: 25%;">Dispatched From</th>
                     <th style="width: 10%;" class="text-center">Dispatched</th>
                     <th style="width: 10%;" class="text-center">Fulfillment</th>
-                    <th style="width: 20%;">Status</th>
+                    <th style="width: 20%;" class="text-center align-middle">Status</th>
                   {% elif needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval', 'Approved'] %}
                     {# Planning Phase: Show allocation info #}
                     <th style="width: 30%;">Allocate from Hubs</th>
                     <th style="width: 10%;" class="text-center">Allocated</th>
                     <th style="width: 10%;" class="text-center">Remaining</th>
-                    <th style="width: 15%;">Status</th>
+                    <th style="width: 15%;" class="text-center align-middle">Status</th>
                   {% else %}
                     {# Draft/Submitted: Minimal view #}
-                    <th style="width: 35%;">Status</th>
+                    <th style="width: 35%;" class="text-center align-middle">Status</th>
                   {% endif %}
                 </tr>
               </thead>
