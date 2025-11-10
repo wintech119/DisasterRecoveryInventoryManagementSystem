@@ -13,6 +13,11 @@
       </button>
     </li>
     <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#drafts">
+        <i class="bi bi-pencil-square me-1"></i>Draft Fulfilments {% if draft_fulfilments %}<span class="badge text-bg-secondary">{{ draft_fulfilments|length }}</span>{% endif %}
+      </button>
+    </li>
+    <li class="nav-item">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#awaiting">
         Awaiting Approval {% if awaiting_approval %}<span class="badge bg-warning text-dark">{{ awaiting_approval|length }}</span>{% endif %}
       </button>
@@ -73,6 +78,78 @@
         <div class="alert alert-secondary text-center">
           <i class="bi bi-inbox fs-1 d-block mb-2"></i>
           <p class="mb-0">No submitted needs lists awaiting fulfilment preparation.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="tab-pane fade" id="drafts">
+      <div class="alert alert-info border-0 mb-3">
+        <i class="bi bi-info-circle me-2"></i>
+        <strong>Draft Fulfilments:</strong> In-progress allocations saved but not yet submitted for approval. You can review, edit, or approve any drafts below.
+      </div>
+      {% if draft_fulfilments %}
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>List Number</th>
+                  <th>Requesting Hub</th>
+                  <th>Priority</th>
+                  <th>Last Saved By</th>
+                  <th>Last Updated On</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for needs_list in draft_fulfilments %}
+                <tr>
+                  <td><a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}"><strong>{{ needs_list.list_number }}</strong></a></td>
+                  <td>{{ needs_list.agency_hub.name }} <small class="text-muted">({{ needs_list.agency_hub.hub_type }})</small></td>
+                  <td>
+                    {% if needs_list.priority == 'Urgent' %}<span class="badge bg-danger">Urgent</span>
+                    {% elif needs_list.priority == 'High' %}<span class="badge bg-warning text-dark">High</span>
+                    {% elif needs_list.priority == 'Medium' %}<span class="badge bg-info text-dark">Medium</span>
+                    {% else %}<span class="badge bg-secondary">Low</span>{% endif %}
+                  </td>
+                  <td>
+                    {% if needs_list.draft_saved_by %}
+                      <i class="bi bi-person-circle me-1 text-muted"></i>{{ needs_list.draft_saved_by }}
+                    {% elif needs_list.prepared_by %}
+                      <i class="bi bi-person-circle me-1 text-muted"></i>{{ needs_list.prepared_by }}
+                    {% else %}
+                      <span class="text-muted">Not yet saved</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if needs_list.draft_saved_at %}
+                      <i class="bi bi-clock me-1 text-muted"></i>{{ needs_list.draft_saved_at.strftime('%Y-%m-%d %H:%M') }}
+                    {% else %}
+                      <i class="bi bi-clock me-1 text-muted"></i>{{ needs_list.updated_at.strftime('%Y-%m-%d %H:%M') }}
+                    {% endif %}
+                  </td>
+                  <td><span class="badge text-bg-secondary"><i class="bi bi-pencil-square me-1"></i>Draft</span></td>
+                  <td>
+                    <div class="btn-group btn-group-sm" role="group">
+                      <a href="{{ url_for('needs_list_prepare', list_id=needs_list.id) }}" class="btn btn-primary">
+                        <i class="bi bi-arrow-right-circle me-1"></i>Continue Fulfilment
+                      </a>
+                      <a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-eye me-1"></i>View
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-secondary text-center">
+          <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+          <p class="mb-0">No draft fulfilments at the moment.</p>
         </div>
       {% endif %}
     </div>

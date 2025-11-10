@@ -2437,16 +2437,22 @@ def needs_lists():
     if current_user.role == ROLE_LOGISTICS_OFFICER:
         # Logistics Officer view: All submitted needs lists awaiting fulfilment preparation
         submitted_lists = NeedsList.query.filter_by(status='Submitted').order_by(NeedsList.submitted_at.desc()).all()
-        prepared_lists = NeedsList.query.filter(NeedsList.status.in_(['Fulfilment Prepared', 'Awaiting Approval'])).filter_by(prepared_by=current_user.full_name).order_by(NeedsList.prepared_at.desc()).all()
-        return render_template("logistics_officer_needs_lists.html", submitted_lists=submitted_lists, prepared_lists=prepared_lists)
+        # Draft Fulfilments: Show ALL drafts (not just their own) for visibility and collaboration
+        draft_fulfilments = NeedsList.query.filter_by(status='Fulfilment Prepared').order_by(NeedsList.updated_at.desc()).all()
+        # Their prepared lists that are awaiting approval (submitted for approval)
+        awaiting_lists = NeedsList.query.filter_by(status='Awaiting Approval').filter_by(prepared_by=current_user.full_name).order_by(NeedsList.prepared_at.desc()).all()
+        return render_template("logistics_officer_needs_lists.html", submitted_lists=submitted_lists, draft_fulfilments=draft_fulfilments, awaiting_lists=awaiting_lists)
     
     elif current_user.role == ROLE_LOGISTICS_MANAGER:
         # Logistics Manager view: Can do EVERYTHING - prepare AND approve
         submitted_lists = NeedsList.query.filter_by(status='Submitted').order_by(NeedsList.submitted_at.desc()).all()
-        awaiting_approval = NeedsList.query.filter(NeedsList.status.in_(['Fulfilment Prepared', 'Awaiting Approval'])).order_by(NeedsList.prepared_at.desc()).all()
+        # Draft Fulfilments: Show ALL drafts for review and editing
+        draft_fulfilments = NeedsList.query.filter_by(status='Fulfilment Prepared').order_by(NeedsList.updated_at.desc()).all()
+        # Awaiting Approval: Only those ready for final approval (Officer submitted them)
+        awaiting_approval = NeedsList.query.filter_by(status='Awaiting Approval').order_by(NeedsList.prepared_at.desc()).all()
         approved_lists = NeedsList.query.filter(NeedsList.status.in_(['Approved', 'Dispatched', 'Received', 'Completed'])).order_by(NeedsList.approved_at.desc()).limit(20).all()
         rejected_lists = NeedsList.query.filter_by(status='Rejected').order_by(NeedsList.updated_at.desc()).limit(20).all()
-        return render_template("logistics_manager_needs_lists.html", submitted_lists=submitted_lists, awaiting_approval=awaiting_approval, approved_lists=approved_lists, rejected_lists=rejected_lists)
+        return render_template("logistics_manager_needs_lists.html", submitted_lists=submitted_lists, draft_fulfilments=draft_fulfilments, awaiting_approval=awaiting_approval, approved_lists=approved_lists, rejected_lists=rejected_lists)
     
     # Hub-based views for AGENCY and SUB hubs
     elif user_depot and user_depot.hub_type in ['AGENCY', 'SUB']:
