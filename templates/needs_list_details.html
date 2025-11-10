@@ -866,10 +866,13 @@
                   <label class="form-label small">Dispatch Notes</label>
                   <textarea class="form-control form-control-sm" name="dispatch_notes" rows="2" placeholder="Optional dispatch notes"></textarea>
                 </div>
-                <button type="submit" class="btn btn-info btn-sm w-100">
+                <button type="submit" class="btn btn-info btn-sm w-100 mb-2">
                   <i class="bi bi-box-arrow-right me-1"></i>Dispatch Now
                 </button>
               </form>
+              <button type="button" class="btn btn-outline-warning btn-sm w-100" data-bs-toggle="modal" data-bs-target="#requestChangeModal">
+                <i class="bi bi-exclamation-triangle me-1"></i>Request Fulfilment Change
+              </button>
             </div>
           </div>
         {% elif current_user.role in ['LOGISTICS_OFFICER', 'LOGISTICS_MANAGER'] and needs_list.status == 'Approved' %}
@@ -906,6 +909,90 @@
     </div>
   </div>
 </div>
+
+<!-- Request Fulfilment Change Modal -->
+{% if current_user.role in ['WAREHOUSE_SUPERVISOR', 'WAREHOUSE_OFFICER'] and needs_list.status == 'Approved' and can_dispatch %}
+<div class="modal fade" id="requestChangeModal" tabindex="-1" aria-labelledby="requestChangeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title" id="requestChangeModalLabel">
+          <i class="bi bi-exclamation-triangle me-2"></i>Request Fulfilment Change
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="{{ url_for('fulfilment_change_request_create', list_id=needs_list.id) }}">
+        <div class="modal-body">
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Need to change the approved fulfilment?</strong>
+            <p class="mb-0 mt-1 small">Use this form to request changes from the Logistics team. Explain why adjustments are needed (e.g., insufficient stock, wrong hub assigned, quantity adjustments).</p>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label fw-bold">Needs List</label>
+            <input type="text" class="form-control" value="{{ needs_list.list_number }} - {{ needs_list.agency_hub.name }}" readonly>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label fw-bold">Current Fulfilment Items <span class="text-muted small">(Read-Only)</span></label>
+            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+              <table class="table table-sm table-bordered">
+                <thead class="table-light sticky-top">
+                  <tr>
+                    <th>Item</th>
+                    <th class="text-center">Requested</th>
+                    <th class="text-center">Allocated</th>
+                    <th>Source Hub(s)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item_entry in needs_list.items %}
+                    {% set allocated_qty = 0 %}
+                    {% set source_hubs = [] %}
+                    {% for fulfilment in needs_list.fulfilments %}
+                      {% if fulfilment.item_sku == item_entry.item_sku %}
+                        {% set allocated_qty = allocated_qty + fulfilment.allocated_qty %}
+                        {% set _ = source_hubs.append(fulfilment.source_hub.name) %}
+                      {% endif %}
+                    {% endfor %}
+                    <tr>
+                      <td>{{ item_entry.item.name }}</td>
+                      <td class="text-center">{{ item_entry.requested_qty }}</td>
+                      <td class="text-center">{{ allocated_qty }}</td>
+                      <td>{{ source_hubs|join(', ') if source_hubs else 'Not allocated' }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="requestComments" class="form-label fw-bold">
+              Reason for Change Request <span class="text-danger">*</span>
+            </label>
+            <textarea 
+              class="form-control" 
+              id="requestComments" 
+              name="request_comments" 
+              rows="5" 
+              required
+              placeholder="Please explain why you need changes to this fulfilment. Examples:&#10;- Insufficient stock for Item X at this hub&#10;- Wrong hub assigned for Item Y&#10;- Quantity needs adjustment due to real stock count&#10;- Items damaged/expired and need replacement"></textarea>
+            <div class="form-text">Be specific to help the Logistics team understand and process your request quickly.</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning">
+            <i class="bi bi-send me-1"></i>Submit Change Request
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <style>
   .status-cell {
