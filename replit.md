@@ -18,6 +18,7 @@ Key entities include Items, Depots, Donors, Beneficiaries, DisasterEvents, Needs
 The frontend uses server-side rendered HTML templates with Bootstrap 5 and Bootstrap Icons for rapid deployment, minimal client-side dependencies, accessibility, and mobile-friendliness, aligning with Government of Jamaica branding. Dashboard features include responsive design, hero cards for key metrics, insight panels with Chart.js for data visualizations (stock distribution, fulfillment trends), and an activity feed of recent transactions.
 
 ### Core Features
+-   **Agency Hub Request List Form**: Modern, accessible interface for requesting items with single header row (Items | Quantity | Justification) following international UI/UX best practices (ISO 9241-110, WCAG 2.1). Features include table-based layout with hover effects, auto-focus on new rows, accessible remove buttons with ARIA labels, sequential reindexing to prevent data loss, responsive design for mobile devices, and keyboard shortcuts (Ctrl/Cmd+Enter to submit).
 -   **Barcode Scanning**: Supports barcode scanning for efficient donation intake.
 -   **Needs List Management**: Comprehensive workflow for AGENCY and SUB hubs to request supplies, including draft editing, submission, approval, dispatch, and receipt. Features:
     -   **Concurrency Control**: Lock-based editing prevention with visual banners and automatic lock extension
