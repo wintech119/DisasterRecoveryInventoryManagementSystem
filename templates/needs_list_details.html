@@ -810,9 +810,11 @@
                   <i class="bi bi-box-arrow-right me-1"></i>Dispatch Now
                 </button>
               </form>
-              <button type="button" class="btn btn-outline-warning btn-sm w-100" data-bs-toggle="modal" data-bs-target="#requestChangeModal">
-                <i class="bi bi-exclamation-triangle me-1"></i>Request Fulfilment Change
-              </button>
+              {% if not user_depot or user_depot.hub_type != 'AGENCY' %}
+                <button type="button" class="btn btn-outline-warning btn-sm w-100" data-bs-toggle="modal" data-bs-target="#requestChangeModal">
+                  <i class="bi bi-exclamation-triangle me-1"></i>Request Fulfilment Change
+                </button>
+              {% endif %}
             </div>
           </div>
         {% elif current_user.role in ['LOGISTICS_OFFICER', 'LOGISTICS_MANAGER'] and needs_list.status == 'Approved' %}
@@ -828,8 +830,8 @@
           </div>
         {% endif %}
 
-        <!-- Change Requests Section -->
-        {% if change_requests %}
+        <!-- Change Requests Section (Not for Agency Hubs) -->
+        {% if change_requests and (not user_depot or user_depot.hub_type != 'AGENCY') %}
           <div class="card shadow-sm mb-3">
             <div class="card-header py-2" style="background-color: #ffc107;">
               <h6 class="mb-0"><i class="bi bi-exclamation-circle me-2"></i>Fulfilment Change Requests</h6>
@@ -1010,8 +1012,8 @@
   </div>
 </div>
 
-<!-- Request Fulfilment Change Modal -->
-{% if current_user.role in ['WAREHOUSE_SUPERVISOR', 'WAREHOUSE_OFFICER'] and needs_list.status == 'Approved' and can_dispatch %}
+<!-- Request Fulfilment Change Modal (Not for Agency Hubs) -->
+{% if current_user.role in ['WAREHOUSE_SUPERVISOR', 'WAREHOUSE_OFFICER'] and needs_list.status == 'Approved' and can_dispatch and (not user_depot or user_depot.hub_type != 'AGENCY') %}
 <div class="modal fade" id="requestChangeModal" tabindex="-1" aria-labelledby="requestChangeModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
