@@ -2441,7 +2441,9 @@ def needs_lists():
         draft_fulfilments = NeedsList.query.filter_by(status='Fulfilment Prepared').order_by(NeedsList.updated_at.desc()).all()
         # Their prepared lists that are awaiting approval (submitted for approval)
         awaiting_lists = NeedsList.query.filter_by(status='Awaiting Approval').filter_by(prepared_by=current_user.full_name).order_by(NeedsList.prepared_at.desc()).all()
-        return render_template("logistics_officer_needs_lists.html", submitted_lists=submitted_lists, draft_fulfilments=draft_fulfilments, awaiting_lists=awaiting_lists)
+        # Approved for Dispatch: Lists approved by Manager and ready for dispatch
+        approved_lists = NeedsList.query.filter_by(status='Approved').order_by(NeedsList.approved_at.desc()).all()
+        return render_template("logistics_officer_needs_lists.html", submitted_lists=submitted_lists, draft_fulfilments=draft_fulfilments, awaiting_lists=awaiting_lists, approved_lists=approved_lists)
     
     elif current_user.role == ROLE_LOGISTICS_MANAGER:
         # Logistics Manager view: Can do EVERYTHING - prepare AND approve

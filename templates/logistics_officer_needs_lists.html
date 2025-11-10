@@ -22,6 +22,11 @@
         Awaiting Approval {% if awaiting_lists %}<span class="badge bg-warning text-dark">{{ awaiting_lists|length }}</span>{% endif %}
       </button>
     </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#approved">
+        <i class="bi bi-check-circle me-1"></i>Approved for Dispatch {% if approved_lists %}<span class="badge bg-success">{{ approved_lists|length }}</span>{% endif %}
+      </button>
+    </li>
   </ul>
 
   <div class="tab-content">
@@ -180,6 +185,83 @@
         <div class="alert alert-secondary text-center">
           <i class="bi bi-inbox fs-1 d-block mb-2"></i>
           <p class="mb-0">None of your fulfilments are awaiting approval right now.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="tab-pane fade" id="approved">
+      <div class="alert alert-success border-0 mb-3">
+        <i class="bi bi-check-circle me-2"></i>
+        <strong>Approved for Dispatch:</strong> These fulfilments have been approved by the Logistics Manager and are ready for you to dispatch to the requesting hubs.
+      </div>
+      {% if approved_lists %}
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>List Number</th>
+                  <th>Requesting Hub</th>
+                  <th>Priority</th>
+                  <th>Items</th>
+                  <th>Approved By</th>
+                  <th>Approved On</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for needs_list in approved_lists %}
+                <tr class="table-success table-success-subtle">
+                  <td><a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}"><strong>{{ needs_list.list_number }}</strong></a></td>
+                  <td>{{ needs_list.agency_hub.name }} <small class="text-muted">({{ needs_list.agency_hub.hub_type }})</small></td>
+                  <td>
+                    {% if needs_list.priority == 'Urgent' %}<span class="badge bg-danger">Urgent</span>
+                    {% elif needs_list.priority == 'High' %}<span class="badge bg-warning text-dark">High</span>
+                    {% elif needs_list.priority == 'Medium' %}<span class="badge bg-info text-dark">Medium</span>
+                    {% else %}<span class="badge bg-secondary">Low</span>{% endif %}
+                  </td>
+                  <td>{{ needs_list.items|length }} items</td>
+                  <td>
+                    {% if needs_list.approved_by %}
+                      <i class="bi bi-person-check me-1 text-success"></i><strong>{{ needs_list.approved_by }}</strong>
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if needs_list.approved_at %}
+                      <i class="bi bi-calendar-check me-1 text-success"></i>{{ needs_list.approved_at.strftime('%b %d, %H:%M') }}
+                      <br><small class="text-muted">{{ needs_list.approved_at.strftime('%Y-%m-%d') }}</small>
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="badge bg-success">
+                      <i class="bi bi-check-circle-fill me-1"></i>Approved for Dispatch
+                    </span>
+                  </td>
+                  <td>
+                    <div class="btn-group btn-group-sm" role="group">
+                      <a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}" class="btn btn-success">
+                        <i class="bi bi-truck me-1"></i>Proceed to Dispatch
+                      </a>
+                      <a href="{{ url_for('needs_list_details', list_id=needs_list.id) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-eye me-1"></i>View Details
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% else %}
+        <div class="alert alert-secondary text-center">
+          <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+          <p class="mb-0">No approved needs lists awaiting dispatch at the moment.</p>
         </div>
       {% endif %}
     </div>
