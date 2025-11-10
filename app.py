@@ -496,8 +496,21 @@ def prepare_completed_context(needs_list, current_user):
         total_dispatched_qty += item_dispatched
         
         # Calculate item-level metrics
-        item_fulfillment_pct = int((item_dispatched / item_requested * 100)) if item_requested > 0 else 0
-        item_shortfall = max(item_requested - item_dispatched, 0)
+        # For Completed status, received_qty equals dispatched_qty (confirmed by agency)
+        item_received = item_dispatched
+        item_fulfillment_pct = int((item_received / item_requested * 100)) if item_requested > 0 else 0
+        item_shortfall = max(item_requested - item_received, 0)
+        
+        # Determine fulfilment status
+        if item_fulfillment_pct >= 100:
+            fulfilment_status = 'Fully Fulfilled'
+            status_badge_class = 'text-bg-success'
+        elif item_fulfillment_pct > 0:
+            fulfilment_status = 'Partially Fulfilled'
+            status_badge_class = 'text-bg-warning'
+        else:
+            fulfilment_status = 'Not Fulfilled'
+            status_badge_class = 'text-bg-danger'
         
         items_data.append({
             'item_name': item_entry.item.name,
@@ -505,16 +518,21 @@ def prepare_completed_context(needs_list, current_user):
             'unit': item_entry.item.unit,
             'requested_qty': item_requested,
             'dispatched_qty': item_dispatched,
+            'received_qty': item_received,
             'fulfillment_pct': item_fulfillment_pct,
             'shortfall': item_shortfall,
+            'fulfilment_status': fulfilment_status,
+            'status_badge_class': status_badge_class,
             'source_hubs': source_hubs,
             'justification': item_entry.justification,
             'has_shortfall': item_shortfall > 0
         })
     
     # Calculate overall metrics
-    fulfillment_rate = int((total_dispatched_qty / total_requested_qty * 100)) if total_requested_qty > 0 else 0
-    shortfall_qty = max(total_requested_qty - total_dispatched_qty, 0)
+    # For Completed status, total received equals total dispatched
+    total_received_qty = total_dispatched_qty
+    fulfillment_rate = int((total_received_qty / total_requested_qty * 100)) if total_requested_qty > 0 else 0
+    shortfall_qty = max(total_requested_qty - total_received_qty, 0)
     fulfillment_class = get_fulfillment_class(fulfillment_rate)
     
     # Build timeline events from NeedsList fields
@@ -635,6 +653,7 @@ def prepare_completed_context(needs_list, current_user):
             'total_items': total_items,
             'total_requested_qty': total_requested_qty,
             'total_dispatched_qty': total_dispatched_qty,
+            'total_received_qty': total_received_qty,
             'fulfillment_rate': fulfillment_rate,
             'shortfall_qty': shortfall_qty,
             'fulfillment_class': fulfillment_class,
