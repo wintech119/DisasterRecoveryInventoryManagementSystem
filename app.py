@@ -237,6 +237,10 @@ class NeedsList(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     submitted_at = db.Column(db.DateTime, nullable=True)
     
+    # Draft tracking (Both Logistics Officer and Manager can save drafts)
+    draft_saved_by = db.Column(db.String(200), nullable=True)  # User who last saved draft
+    draft_saved_at = db.Column(db.DateTime, nullable=True)  # When draft was last saved
+    
     # Fulfilment preparation tracking (Logistics Officer)
     prepared_by = db.Column(db.String(200), nullable=True)  # Logistics Officer who prepared fulfilment
     prepared_at = db.Column(db.DateTime, nullable=True)
