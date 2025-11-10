@@ -7,25 +7,7 @@
     <div>
       <h2 class="mb-1">
         <i class="bi bi-clipboard-check me-2 text-success"></i>{{ needs_list.list_number }}
-        {% if needs_list.status == 'Draft' %}
-          <span class="badge bg-secondary ms-2">Draft</span>
-        {% elif needs_list.status == 'Submitted' %}
-          <span class="badge bg-primary ms-2">Submitted</span>
-        {% elif needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval'] %}
-          <span class="badge bg-warning text-dark ms-2">{{ needs_list.status }}</span>
-        {% elif needs_list.status == 'Approved' %}
-          <span class="badge bg-success ms-2">Approved</span>
-        {% elif needs_list.status == 'Dispatched' %}
-          <span class="badge bg-info ms-2">Dispatched</span>
-        {% elif needs_list.status == 'Received' %}
-          <span class="badge bg-primary ms-2">Received</span>
-        {% elif needs_list.status == 'Completed' %}
-          <span class="badge bg-success ms-2">Completed</span>
-        {% elif needs_list.status == 'Rejected' %}
-          <span class="badge bg-danger ms-2">Rejected</span>
-        {% else %}
-          <span class="badge bg-secondary ms-2">{{ needs_list.status }}</span>
-        {% endif %}
+        <span class="badge {{ header_status.badge_class }} ms-2">{{ header_status.label }}</span>
       </h2>
       <p class="text-muted mb-0">{{ needs_list.agency_hub.name }} ({{ needs_list.agency_hub.hub_type }})</p>
     </div>
@@ -468,58 +450,15 @@
                     {% endif %}
                     <td class="align-middle">
                       <div class="status-cell">
-                        {% if needs_list.status in ['Dispatched', 'Received'] %}
-                          {# EXECUTION PHASE: Show dispatch/delivery status #}
-                          {% if total_allocated == 0 %}
-                            <span class="badge bg-danger w-100 mb-1">Not Dispatched</span>
-                          {% elif total_allocated >= item_entry.requested_qty %}
-                            <span class="badge bg-success w-100 mb-1">
-                              {% if needs_list.status == 'Dispatched' %}In Transit{% elif needs_list.status == 'Received' %}Received{% endif %}
-                            </span>
-                          {% else %}
-                            <span class="badge bg-warning text-dark w-100 mb-1">Partial Delivery</span>
-                          {% endif %}
-                          {# Show most recent event only on first row #}
-                          {% if loop.first %}
-                            {% if needs_list.received_at %}
-                              <small class="d-block text-success mt-1">
-                                <i class="bi bi-check-circle me-1"></i>{{ needs_list.received_at.strftime('%b %d, %H:%M') }}
-                                {% if needs_list.received_by_user %}<br>by {{ needs_list.received_by_user.full_name }}{% endif %}
-                              </small>
-                            {% elif needs_list.dispatched_at %}
-                              <small class="d-block text-muted mt-1">
-                                <i class="bi bi-truck me-1"></i>{{ needs_list.dispatched_at.strftime('%b %d, %H:%M') }}
-                                {% if needs_list.dispatched_by_user %}<br>by {{ needs_list.dispatched_by_user.full_name }}{% endif %}
-                              </small>
-                            {% endif %}
-                          {% endif %}
-                        {% elif needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval', 'Approved'] %}
-                          {# PLANNING PHASE: Show allocation status #}
-                          {% if total_allocated == 0 %}
-                            <span class="badge bg-secondary w-100 mb-1">Unallocated</span>
-                            <div class="progress" style="height: 4px;">
-                              <div class="progress-bar bg-secondary" style="width: 0%;"></div>
-                            </div>
-                            <small class="d-block text-center mt-1">0%</small>
-                          {% elif total_allocated < item_entry.requested_qty %}
-                            <span class="badge bg-warning text-dark w-100 mb-1">Partial</span>
-                            <div class="progress" style="height: 4px;">
-                              <div class="progress-bar bg-warning" style="width: {{ (total_allocated / item_entry.requested_qty * 100)|int }}%;"></div>
-                            </div>
-                            <small class="d-block text-center text-warning mt-1">{{ (total_allocated / item_entry.requested_qty * 100)|int }}%</small>
-                          {% else %}
-                            <span class="badge bg-success w-100 mb-1">Fully Allocated</span>
-                            <div class="progress" style="height: 4px;">
-                              <div class="progress-bar bg-success" style="width: 100%;"></div>
-                            </div>
-                            <small class="d-block text-center text-success mt-1">100%</small>
-                          {% endif %}
-                        {% elif needs_list.status == 'Completed' %}
-                          {# COMPLETED: Clean simple view #}
-                          <span class="badge bg-success w-100">Completed</span>
-                        {% else %}
-                          {# EARLY PHASE: Draft/Submitted #}
-                          <span class="badge bg-secondary">Pending Review</span>
+                        {% set item_status = item_status_map[item_entry.id] %}
+                        <span class="badge {{ item_status.badge_class }} w-100 mb-1">{{ item_status.label }}</span>
+                        {% if item_status.detail_text %}
+                          <small class="d-block text-center text-muted mt-1">{{ item_status.detail_text }}</small>
+                        {% endif %}
+                        {% if item_status.progress_pct is not none %}
+                          <div class="progress mt-1" style="height: 4px;">
+                            <div class="progress-bar" style="width: {{ item_status.progress_pct }}%;"></div>
+                          </div>
                         {% endif %}
                       </div>
                     </td>

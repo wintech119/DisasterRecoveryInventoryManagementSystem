@@ -10,6 +10,7 @@ from urllib.parse import urlparse, urljoin
 import pandas as pd
 import secrets
 from storage_service import get_storage, allowed_file, validate_file_size
+from status_helpers import get_line_item_status, get_needs_list_status_display, LineItemStatus
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
@@ -2301,12 +2302,37 @@ def needs_list_details(list_id):
     if needs_list.status == 'Completed':
         completed_context = prepare_completed_context(needs_list, current_user)
     
+    # Compute per-item metrics and status for consistent display
+    item_status_map = {}
+    for item_entry in needs_list.items:
+        # Calculate allocated quantity from fulfilments
+        allocated_qty = 0
+        for fulfilment in needs_list.fulfilments:
+            if fulfilment.item_sku == item_entry.item_sku:
+                allocated_qty += fulfilment.allocated_qty
+        
+        # Build metrics dict for status helper
+        item_metrics = {
+            'requested_qty': item_entry.requested_qty,
+            'allocated_qty': allocated_qty,
+            'dispatched_qty': allocated_qty,  # In current impl, dispatched = allocated
+            'received_qty': allocated_qty if needs_list.status in ['Received', 'Completed'] else 0
+        }
+        
+        # Get centralized status
+        item_status_map[item_entry.id] = get_line_item_status(needs_list, item_metrics)
+    
+    # Get consistent header status display
+    header_status = get_needs_list_status_display(needs_list)
+    
     return render_template("needs_list_details.html", 
                          needs_list=needs_list, 
                          user_depot=user_depot, 
                          stock_map=stock_map, 
                          main_hubs=main_hubs,
-                         completed_context=completed_context)
+                         completed_context=completed_context,
+                         item_status_map=item_status_map,
+                         header_status=header_status)
 
 @app.route("/needs-lists/<int:list_id>/submit", methods=["POST"])
 @login_required
