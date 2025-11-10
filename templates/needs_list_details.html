@@ -856,11 +856,11 @@
           </div>
         {% endif %}
 
-        {% if current_user.role in ['LOGISTICS_OFFICER', 'LOGISTICS_MANAGER'] and needs_list.status == 'Approved' %}
+        {% if current_user.role in ['ADMIN', 'WAREHOUSE_SUPERVISOR', 'WAREHOUSE_OFFICER'] and needs_list.status == 'Approved' and can_dispatch %}
           <div class="card border-info mt-3">
             <div class="card-body p-3">
               <h6 class="card-title text-info mb-2"><i class="bi bi-truck me-1"></i>Dispatch Items</h6>
-              <p class="small text-muted mb-2">Create stock transactions and notify agency hub</p>
+              <p class="small text-muted mb-2">Pick items and dispatch to {{ needs_list.agency_hub.name }}</p>
               <form method="POST" action="{{ url_for('needs_list_dispatch', list_id=needs_list.id) }}">
                 <div class="mb-2">
                   <label class="form-label small">Dispatch Notes</label>
@@ -870,6 +870,17 @@
                   <i class="bi bi-box-arrow-right me-1"></i>Dispatch Now
                 </button>
               </form>
+            </div>
+          </div>
+        {% elif current_user.role in ['LOGISTICS_OFFICER', 'LOGISTICS_MANAGER'] and needs_list.status == 'Approved' %}
+          <div class="card border-secondary mt-3">
+            <div class="card-body p-3">
+              <h6 class="card-title text-secondary mb-2"><i class="bi bi-eye me-1"></i>Monitoring</h6>
+              <p class="small text-muted mb-2">Warehouse team will dispatch items from source hubs</p>
+              <div class="alert alert-light mb-0 small">
+                <i class="bi bi-info-circle me-1"></i>
+                Dispatch is handled by warehouse supervisors/officers at the source hub.
+              </div>
             </div>
           </div>
         {% endif %}

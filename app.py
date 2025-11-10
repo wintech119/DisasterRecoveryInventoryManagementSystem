@@ -1234,6 +1234,10 @@ def logout():
 def dashboard():
     from datetime import datetime, timedelta
     
+    # Redirect warehouse users to dedicated warehouse dashboard
+    if current_user.role in [ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+        return redirect(url_for("warehouse_dashboard"))
+    
     # Block Agency hub users from accessing dashboard
     if current_user.assigned_location and current_user.assigned_location.hub_type == 'AGENCY':
         flash("This page is not available for Agency hub users.", "warning")
@@ -1456,6 +1460,84 @@ def dashboard():
                            needs_lists_chart_data=needs_lists_chart_data,
                            fulfillment_labels=fulfillment_labels,
                            fulfillment_data=fulfillment_data)
+
+@app.route("/warehouse-dashboard")
+@role_required(ROLE_ADMIN, ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER)
+def warehouse_dashboard():
+    """Dedicated dashboard for warehouse supervisors and officers at Sub-Hubs"""
+    from datetime import datetime, timedelta
+    
+    # Ensure user is assigned to a hub
+    if not current_user.assigned_location_id:
+        flash("You must be assigned to a hub to access the warehouse dashboard.", "danger")
+        return redirect(url_for("login"))
+    
+    assigned_hub = Depot.query.get(current_user.assigned_location_id)
+    if not assigned_hub or assigned_hub.hub_type != 'SUB':
+        flash("Warehouse dashboard is only available for Sub-Hub assignments.", "danger")
+        return redirect(url_for("login"))
+    
+    # Ready-to-Dispatch Queue: Approved needs lists with fulfilments from assigned hub
+    ready_to_dispatch = db.session.query(NeedsList).join(
+        NeedsListFulfilment, NeedsList.id == NeedsListFulfilment.needs_list_id
+    ).filter(
+        NeedsList.status == 'Approved',
+        NeedsListFulfilment.source_hub_id == assigned_hub.id
+    ).distinct().order_by(NeedsList.approved_at.desc()).all()
+    
+    # Recent Dispatch Activity (last 14 days)
+    fourteen_days_ago = datetime.utcnow() - timedelta(days=14)
+    recent_dispatches = db.session.query(NeedsList).join(
+        NeedsListFulfilment, NeedsList.id == NeedsListFulfilment.needs_list_id
+    ).filter(
+        NeedsList.status == 'Dispatched',
+        NeedsList.dispatched_at >= fourteen_days_ago,
+        NeedsListFulfilment.source_hub_id == assigned_hub.id
+    ).distinct().order_by(NeedsList.dispatched_at.desc()).all()
+    
+    # Hub stock snapshot
+    stock_map = get_stock_by_location()
+    items = Item.query.order_by(Item.name).all()
+    hub_stock = []
+    total_stock_value = 0
+    low_stock_count = 0
+    
+    for item in items:
+        stock = stock_map.get((item.sku, assigned_hub.id), 0)
+        if stock > 0:
+            is_low = stock < (item.min_qty or 10)
+            if is_low:
+                low_stock_count += 1
+            hub_stock.append({
+                'item': item,
+                'stock': stock,
+                'is_low': is_low
+            })
+            total_stock_value += stock
+    
+    # KPIs
+    pending_count = len(ready_to_dispatch)
+    
+    # Dispatches this month
+    now = datetime.utcnow()
+    month_start = datetime(now.year, now.month, 1)
+    dispatches_this_month = db.session.query(NeedsList).join(
+        NeedsListFulfilment, NeedsList.id == NeedsListFulfilment.needs_list_id
+    ).filter(
+        NeedsList.status.in_(['Dispatched', 'Received', 'Completed']),
+        NeedsList.dispatched_at >= month_start,
+        NeedsListFulfilment.source_hub_id == assigned_hub.id
+    ).distinct().count()
+    
+    return render_template("warehouse_dashboard.html",
+                         assigned_hub=assigned_hub,
+                         ready_to_dispatch=ready_to_dispatch,
+                         recent_dispatches=recent_dispatches,
+                         hub_stock=hub_stock[:20],  # Show top 20 items
+                         pending_count=pending_count,
+                         total_stock_value=total_stock_value,
+                         low_stock_count=low_stock_count,
+                         dispatches_this_month=dispatches_this_month)
 
 @app.route("/items")
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF, ROLE_AUDITOR, ROLE_EXECUTIVE)
@@ -2705,6 +2787,11 @@ def needs_list_details(list_id):
     # Get consistent header status display
     header_status = get_needs_list_status_display(needs_list)
     
+    # Check if current user can dispatch this needs list (for warehouse users and admins)
+    can_dispatch = False
+    if needs_list.status == 'Approved' and current_user.role in [ROLE_ADMIN, ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+        can_dispatch, _ = can_dispatch_needs_list(current_user, needs_list)
+    
     return render_template("needs_list_details.html", 
                          needs_list=needs_list, 
                          user_depot=user_depot, 
@@ -2714,7 +2801,8 @@ def needs_list_details(list_id):
                          dispatch_summary=dispatch_summary,
                          line_items=line_items,
                          summary_counts=summary_counts,
-                         header_status=header_status)
+                         header_status=header_status,
+                         can_dispatch=can_dispatch)
 
 @app.route("/needs-lists/<int:list_id>/submit", methods=["POST"])
 @login_required
@@ -3179,7 +3267,7 @@ def needs_list_reject(list_id):
 @role_required(ROLE_ADMIN, ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER)
 def needs_list_dispatch(list_id):
     """Dispatch approved needs list - Creates stock transactions and updates status to Dispatched
-    Only Warehouse Supervisors and Warehouse Officers at source Sub-Hubs can dispatch."""
+    Only Admins, Warehouse Supervisors and Warehouse Officers at source Sub-Hubs can dispatch."""
     needs_list = NeedsList.query.get_or_404(list_id)
     
     # Permission check using centralized helper
@@ -3825,6 +3913,21 @@ def user_new():
             flash("Invalid role selected.", "danger")
             return redirect(url_for("user_new"))
         
+        # Validate warehouse roles require SUB hub assignment
+        if role in [ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+            if not assigned_location_id:
+                flash("Warehouse Supervisors and Officers must be assigned to a Sub-Hub.", "danger")
+                return redirect(url_for("user_new"))
+            
+            assigned_depot = Depot.query.get(int(assigned_location_id))
+            if not assigned_depot:
+                flash("Invalid hub assignment.", "danger")
+                return redirect(url_for("user_new"))
+            
+            if assigned_depot.hub_type != 'SUB':
+                flash("Warehouse roles can only be assigned to Sub-Hubs.", "danger")
+                return redirect(url_for("user_new"))
+        
         existing = User.query.filter_by(email=email).first()
         if existing:
             flash(f"User with email '{email}' already exists.", "warning")
@@ -3869,6 +3972,21 @@ def user_edit(user_id):
         if role not in ALL_ROLES:
             flash("Invalid role selected.", "danger")
             return redirect(url_for("user_edit", user_id=user_id))
+        
+        # Validate warehouse roles require SUB hub assignment
+        if role in [ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+            if not assigned_location_id:
+                flash("Warehouse Supervisors and Officers must be assigned to a Sub-Hub.", "danger")
+                return redirect(url_for("user_edit", user_id=user_id))
+            
+            assigned_depot = Depot.query.get(int(assigned_location_id))
+            if not assigned_depot:
+                flash("Invalid hub assignment.", "danger")
+                return redirect(url_for("user_edit", user_id=user_id))
+            
+            if assigned_depot.hub_type != 'SUB':
+                flash("Warehouse roles can only be assigned to Sub-Hubs.", "danger")
+                return redirect(url_for("user_edit", user_id=user_id))
         
         existing = User.query.filter(User.email == email, User.id != user_id).first()
         if existing:
