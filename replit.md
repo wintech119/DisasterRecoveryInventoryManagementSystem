@@ -19,7 +19,10 @@ The frontend uses server-side rendered HTML templates with Bootstrap 5 and Boots
 
 ### Core Features
 -   **Barcode Scanning**: Supports barcode scanning for efficient donation intake.
--   **Needs List Management**: Comprehensive workflow for AGENCY and SUB hubs to request supplies, including draft editing, submission, approval, dispatch, and receipt. Features concurrency control for fulfillment editing and real-time stock over-allocation prevention.
+-   **Needs List Management**: Comprehensive workflow for AGENCY and SUB hubs to request supplies, including draft editing, submission, approval, dispatch, and receipt. Features:
+    -   **Concurrency Control**: Lock-based editing prevention with visual banners and automatic lock extension
+    -   **Stock Over-Allocation Prevention**: Real-time validation with auto-reset to maximum available stock and inline warnings
+    -   **Draft-Save Functionality**: Both Logistics Officers and Managers can save work-in-progress allocations without triggering workflow transitions or stock movements. Draft saves display "Fulfilment Prepared" status with grey badge, show last saved timestamp and user, extend editing lock, and support collaborative editing (Officer saves draft → Manager edits/saves → Manager approves while preserving Officer's preparation attribution)
 -   **Distribution Package Management**: Manages creation, review, and approval of distribution packages, including stock validation across multiple depots, smart allocation filtering, and real-time stock updates.
 -   **Stock Management**: Stock levels are dynamically aggregated from transaction records with validations to prevent negative stock.
 -   **Three-Tier Hub Orchestration**: Role-based system with MAIN, SUB, and AGENCY hubs, defining transfer approval workflows and visibility rules. AGENCY hub inventory is excluded from overall ODPEM displays.
