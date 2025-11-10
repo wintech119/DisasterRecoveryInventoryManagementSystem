@@ -9,7 +9,7 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Application Framework
-The system is built using Flask, leveraging SQLAlchemy ORM with a relational database design.
+The system is built using Flask, leveraging SQLAlchemy ORM with a relational database design. All timestamps are stored in UTC and displayed in Eastern Standard Time (EST/GMT-5) using the YYYY-MM-DD date format for consistency and clarity.
 
 ### Data Model
 Key entities include Items, Depots, Donors, Beneficiaries, DisasterEvents, NeedsLists, and Transactions, with a focus on double-entry transactions for auditing and stock calculation. Items feature auto-generated SKUs, standardized units, barcode support, and expiry date tracking. NeedsLists facilitate item requests from AGENCY hubs to MAIN hubs with approval workflows. Line item status labels use standardized fulfilment terminology ("Fulfilled", "Partially Filled", "Unfilled") across all workflow phases for consistency and clarity.

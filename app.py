@@ -11,6 +11,14 @@ import pandas as pd
 import secrets
 from storage_service import get_storage, allowed_file, validate_file_size
 from status_helpers import get_line_item_status, get_needs_list_status_display, LineItemStatus
+from date_utils import (
+    format_date, 
+    format_datetime, 
+    format_datetime_full, 
+    format_time,
+    format_datetime_iso_est,
+    format_relative_time
+)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
@@ -316,6 +324,14 @@ login_manager.init_app(app)
 login_manager.login_view = "login"
 login_manager.login_message = "Please log in to access this page."
 login_manager.login_message_category = "warning"
+
+# ---------- Jinja2 Template Filters for Date/Time Formatting ----------
+app.jinja_env.filters['format_date'] = format_date
+app.jinja_env.filters['format_datetime'] = format_datetime
+app.jinja_env.filters['format_datetime_full'] = format_datetime_full
+app.jinja_env.filters['format_time'] = format_time
+app.jinja_env.filters['format_datetime_iso_est'] = format_datetime_iso_est
+app.jinja_env.filters['format_relative_time'] = format_relative_time
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -1641,7 +1657,7 @@ def api_extend_lock(list_id):
         return jsonify({
             "success": True,
             "message": message,
-            "locked_at": needs_list.locked_at.isoformat() if needs_list.locked_at else None
+            "locked_at": format_datetime_iso_est(needs_list.locked_at) if needs_list.locked_at else None
         })
     else:
         return jsonify({"success": False, "message": message}), 403
@@ -1674,7 +1690,7 @@ def api_lock_status(list_id):
             "is_locked_by_current_user": lock_status['is_locked_by_current_user'],
             "can_edit": lock_status['can_edit'],
             "locked_by_name": lock_status['locked_by_user'].full_name if lock_status['locked_by_user'] else None,
-            "locked_at": lock_status['locked_at'].isoformat() if lock_status['locked_at'] else None,
+            "locked_at": format_datetime_iso_est(lock_status['locked_at']) if lock_status['locked_at'] else None,
             "lock_duration_minutes": lock_status['lock_duration_minutes'],
             "lock_message": lock_status['lock_message']
         }
@@ -3332,7 +3348,7 @@ def needs_list_confirm_receipt(list_id):
             "agency_hub": needs_list.agency_hub.name,
             "received_by": current_user.full_name,
             "received_by_id": current_user.id,
-            "completed_at": datetime.utcnow().isoformat()
+            "completed_at": format_datetime_iso_est(datetime.utcnow())
         },
         needs_list_id=needs_list.id
     )
@@ -4199,8 +4215,8 @@ def notifications_list():
             "type": notif.type,
             "status": notif.status,
             "link_url": notif.link_url,
-            "created_at": notif.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            "created_at_iso": notif.created_at.isoformat(),
+            "created_at": format_datetime_full(notif.created_at),
+            "created_at_iso": format_datetime_iso_est(notif.created_at),
         })
     
     return jsonify({
