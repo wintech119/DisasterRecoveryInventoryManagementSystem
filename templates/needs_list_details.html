@@ -96,8 +96,8 @@
                   <i class="bi bi-truck text-primary d-block mb-2" style="font-size: 1.5rem;"></i>
                   <small class="text-muted d-block">Dispatched</small>
                   {% if completed_context.summary.dispatch_date %}
-                    <strong class="d-block">{{ completed_context.summary.dispatch_date.strftime('%b %d') }}</strong>
-                    <small class="text-muted">{{ completed_context.summary.dispatch_date.strftime('%H:%M') }}</small>
+                    <strong class="d-block">{{ completed_context.summary.dispatch_date|format_date }}</strong>
+                    <small class="text-muted">{{ completed_context.summary.dispatch_date|format_time }}</small>
                   {% else %}
                     <span class="text-muted">N/A</span>
                   {% endif %}
@@ -109,8 +109,8 @@
                   <i class="bi bi-check2-circle text-success d-block mb-2" style="font-size: 1.5rem;"></i>
                   <small class="text-muted d-block">Received</small>
                   {% if completed_context.summary.receipt_date %}
-                    <strong class="d-block">{{ completed_context.summary.receipt_date.strftime('%b %d') }}</strong>
-                    <small class="text-muted">{{ completed_context.summary.receipt_date.strftime('%H:%M') }}</small>
+                    <strong class="d-block">{{ completed_context.summary.receipt_date|format_date }}</strong>
+                    <small class="text-muted">{{ completed_context.summary.receipt_date|format_time }}</small>
                   {% else %}
                     <span class="text-muted">N/A</span>
                   {% endif %}
@@ -144,7 +144,7 @@
                             <p class="mb-1 small text-muted">
                               <i class="bi bi-person me-1"></i>{{ event.actor }}
                               <span class="mx-2">•</span>
-                              <i class="bi bi-calendar me-1"></i>{{ event.timestamp.strftime('%b %d, %Y %H:%M') }}
+                              <i class="bi bi-calendar me-1"></i>{{ event.timestamp|format_datetime }}
                             </p>
                             {% if event.notes %}
                               <p class="mb-0 small text-muted"><i class="bi bi-sticky me-1"></i>{{ event.notes }}</p>
@@ -295,7 +295,7 @@
                       <i class="bi bi-check-circle me-1 text-success"></i>
                       <div>
                         <strong class="d-block">Received</strong>
-                        <span class="text-muted">{{ needs_list.received_at.strftime('%b %d, %H:%M') }}</span>
+                        <span class="text-muted">{{ needs_list.received_at|format_datetime }}</span>
                         {% if needs_list.received_by_user %}
                           <br><span class="text-muted small">by {{ needs_list.received_by_user.full_name }}</span>
                         {% endif %}
@@ -306,7 +306,7 @@
                       <i class="bi bi-truck me-1 text-primary"></i>
                       <div>
                         <strong class="d-block">Dispatched</strong>
-                        <span class="text-muted">{{ needs_list.dispatched_at.strftime('%b %d, %H:%M') }}</span>
+                        <span class="text-muted">{{ needs_list.dispatched_at|format_datetime }}</span>
                         {% if needs_list.dispatched_by_user %}
                           <br><span class="text-muted small">by {{ needs_list.dispatched_by_user.full_name }}</span>
                         {% endif %}
@@ -718,18 +718,18 @@
               </div>
               <div class="d-flex justify-content-between">
                 <span class="text-muted">Created:</span>
-                <span>{{ needs_list.created_at.strftime('%Y-%m-%d') }}</span>
+                <span>{{ needs_list.created_at|format_date }}</span>
               </div>
               {% if needs_list.submitted_at %}
                 <div class="d-flex justify-content-between">
                   <span class="text-muted">Submitted:</span>
-                  <span>{{ needs_list.submitted_at.strftime('%Y-%m-%d') }}</span>
+                  <span>{{ needs_list.submitted_at|format_date }}</span>
                 </div>
               {% endif %}
               {% if needs_list.dispatched_at %}
                 <div class="d-flex justify-content-between">
                   <span class="text-muted">Dispatched:</span>
-                  <span>{{ needs_list.dispatched_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                  <span>{{ needs_list.dispatched_at|format_datetime }}</span>
                 </div>
                 {% if needs_list.dispatched_by_user %}
                   <div class="d-flex justify-content-between">
@@ -741,7 +741,7 @@
               {% if needs_list.received_at %}
                 <div class="d-flex justify-content-between">
                   <span class="text-muted">Receipt confirmed:</span>
-                  <span>{{ needs_list.received_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                  <span>{{ needs_list.received_at|format_datetime }}</span>
                 </div>
                 {% if needs_list.received_by_user %}
                   <div class="d-flex justify-content-between">
