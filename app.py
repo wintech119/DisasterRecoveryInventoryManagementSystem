@@ -3657,6 +3657,86 @@ def needs_list_delete(list_id):
     flash(f"Needs list {list_number} deleted successfully.", "success")
     return redirect(url_for("needs_lists"))
 
+@app.route("/needs-lists/<int:list_id>/request-change", methods=["POST"])
+@role_required(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER)
+def fulfilment_change_request_create(list_id):
+    """Create a fulfilment change request - Warehouse Supervisors and Officers only"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    if needs_list.status != 'Approved':
+        flash("Change requests can only be made for approved needs lists.", "warning")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    if not current_user.assigned_location_id:
+        flash("You must be assigned to a Sub-Hub to request fulfilment changes.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    assigned_hub = Depot.query.get(current_user.assigned_location_id)
+    if not assigned_hub or assigned_hub.hub_type != 'SUB':
+        flash("Only Sub-Hub warehouse users can request fulfilment changes.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    fulfilments = NeedsListFulfilment.query.filter_by(needs_list_id=needs_list.id).all()
+    source_hub_ids = {f.source_hub_id for f in fulfilments}
+    
+    if assigned_hub.id not in source_hub_ids:
+        flash("You can only request changes for needs lists assigned to your Sub-Hub.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    request_comments = request.form.get("request_comments", "").strip()
+    
+    if not request_comments:
+        flash("Please provide a reason for the fulfilment change request.", "warning")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    change_request = FulfilmentChangeRequest(
+        needs_list_id=needs_list.id,
+        requesting_hub_id=assigned_hub.id,
+        requested_by_id=current_user.id,
+        request_comments=request_comments,
+        status="Pending Review"
+    )
+    
+    db.session.add(change_request)
+    db.session.commit()
+    
+    import json
+    
+    create_notifications_for_role(
+        role=ROLE_LOGISTICS_OFFICER,
+        title="Fulfilment Change Requested",
+        message=f"Fulfilment change requested by {current_user.full_name} at {assigned_hub.name} for needs list {needs_list.list_number}.",
+        notification_type="task_assigned",
+        link_url=f"/needs-lists/{needs_list.id}",
+        payload_data={
+            "needs_list_number": needs_list.list_number,
+            "requesting_hub": assigned_hub.name,
+            "requested_by": current_user.full_name,
+            "requested_by_id": current_user.id,
+            "change_request_id": change_request.id
+        },
+        needs_list_id=needs_list.id
+    )
+    
+    create_notifications_for_role(
+        role=ROLE_LOGISTICS_MANAGER,
+        title="Fulfilment Change Requested",
+        message=f"Fulfilment change requested by {current_user.full_name} at {assigned_hub.name} for needs list {needs_list.list_number}.",
+        notification_type="task_assigned",
+        link_url=f"/needs-lists/{needs_list.id}",
+        payload_data={
+            "needs_list_number": needs_list.list_number,
+            "requesting_hub": assigned_hub.name,
+            "requested_by": current_user.full_name,
+            "requested_by_id": current_user.id,
+            "change_request_id": change_request.id
+        },
+        needs_list_id=needs_list.id
+    )
+    
+    flash(f"Change request submitted successfully. The Logistics team will review your request.", "success")
+    return redirect(url_for("needs_list_details", list_id=list_id))
+
 @app.route("/packages/<int:package_id>/fulfill", methods=["GET", "POST"])
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def package_fulfill(package_id):
