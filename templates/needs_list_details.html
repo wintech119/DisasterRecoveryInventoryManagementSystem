@@ -387,20 +387,20 @@
                 <tr>
                   {% if needs_list.status in ['Dispatched', 'Received'] %}
                     {# Execution Phase: Show dispatch/delivery info #}
-                    <th style="width: 25%;">Item</th>
+                    <th style="width: 26%;">Item</th>
                     <th style="width: 10%;" class="text-center">Requested</th>
-                    <th style="width: 25%;">Dispatched From</th>
+                    <th style="width: 30%;">Dispatched From</th>
                     <th style="width: 10%;" class="text-center">Dispatched</th>
                     <th style="width: 10%;" class="text-center">Fulfillment</th>
-                    <th style="width: 20%;" class="text-center align-middle">Status</th>
+                    <th style="width: 14%;" class="text-center align-middle">Status</th>
                   {% elif needs_list.status in ['Fulfilment Prepared', 'Awaiting Approval', 'Approved'] %}
                     {# Planning Phase: Show allocation info #}
-                    <th style="width: 25%;">Item</th>
+                    <th style="width: 26%;">Item</th>
                     <th style="width: 10%;" class="text-center">Requested</th>
                     <th style="width: 30%;">Fill from Hubs</th>
                     <th style="width: 10%;" class="text-center">Filled</th>
                     <th style="width: 10%;" class="text-center">Unfilled</th>
-                    <th style="width: 15%;" class="text-center align-middle">Status</th>
+                    <th style="width: 14%;" class="text-center align-middle">Status</th>
                   {% else %}
                     {# Draft/Submitted: Clean two-column view (no redundant status) #}
                     <th style="width: 70%;">Item</th>
@@ -513,7 +513,7 @@
                       <td class="text-center align-middle">
                         <strong>{{ line_item.remaining_qty }}</strong>
                       </td>
-                      <td class="align-middle text-center p-2">
+                      <td class="align-middle text-center">
                         <div class="status-cell">
                           {% set item_status = line_item.status %}
                           {% set tooltip_text = item_status.detail_text if item_status.detail_text else 'Current status: ' + item_status.label %}
@@ -962,6 +962,50 @@
   
   .step-content strong {
     font-size: 0.875rem;
+  }
+  
+  /* Table Spacing */
+  .table thead th {
+    padding: 14px;
+    vertical-align: middle;
+  }
+  
+  .table tbody td {
+    padding: 14px;
+    vertical-align: middle;
+  }
+  
+  /* Responsive Table Spacing */
+  @media (max-width: 1200px) {
+    .table thead th {
+      padding: 12px;
+    }
+    
+    .table tbody td {
+      padding: 12px;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .table thead th {
+      padding: 12px;
+      font-size: 0.8rem;
+    }
+    
+    .table tbody td {
+      padding: 12px;
+      font-size: 0.8rem;
+    }
+  }
+  
+  /* Ensure Status Column Alignment */
+  .status-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-width: 120px;
   }
 </style>
 

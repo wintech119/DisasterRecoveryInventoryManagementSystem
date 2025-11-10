@@ -108,12 +108,12 @@
           <div class="table-responsive table-container">
             <table class="table table-hover mb-0" id="itemsTable" style="table-layout: fixed;">
               <colgroup>
-                <col style="width: 25%;">
-                <col style="width: 8%;">
-                <col style="width: auto; min-width: 280px;">
-                <col style="width: 8%;">
-                <col style="width: 8%;">
-                <col style="width: 16%;">
+                <col style="width: 26%;">
+                <col style="width: 10%;">
+                <col style="width: 30%;">
+                <col style="width: 10%;">
+                <col style="width: 10%;">
+                <col style="width: 14%;">
               </colgroup>
               <thead class="sticky-header">
                 <tr>
@@ -133,7 +133,7 @@
                       data-requested="{{ item_entry.requested_qty }}"
                       data-item-name="{{ item_entry.item.name|lower }}"
                       data-item-sku="{{ item_entry.item.sku|lower }}">
-                    <td class="align-middle py-3">
+                    <td class="align-middle">
                       <div class="item-info">
                         <strong class="d-block text-truncate" title="{{ item_entry.item.name }}">{{ item_entry.item.name }}</strong>
                         <small class="text-muted d-block text-truncate">SKU: {{ item_entry.item.sku }}</small>
@@ -145,11 +145,11 @@
                       </div>
                       <input type="hidden" name="item_sku_{{ item_index }}" value="{{ item_entry.item_sku }}">
                     </td>
-                    <td class="text-center align-middle py-3">
+                    <td class="text-center align-middle">
                       <strong class="text-primary d-block">{{ item_entry.requested_qty }}</strong>
                       <small class="text-muted">{{ item_entry.item.unit }}</small>
                     </td>
-                    <td class="align-middle py-3">
+                    <td class="align-middle">
                       <div class="allocation-controls">
                         {% set available_hubs = [] %}
                         {% set depot_counter = namespace(value=0) %}
@@ -199,13 +199,13 @@
                         {% endif %}
                       </div>
                     </td>
-                    <td class="text-center align-middle py-3">
+                    <td class="text-center align-middle">
                       <strong class="allocated-total d-block" id="allocated-{{ item_index }}">0</strong>
                     </td>
-                    <td class="text-center align-middle py-3">
+                    <td class="text-center align-middle">
                       <strong class="remaining d-block" id="remaining-{{ item_index }}">{{ item_entry.requested_qty }}</strong>
                     </td>
-                    <td class="align-middle py-3">
+                    <td class="align-middle">
                       <div class="d-flex flex-column align-items-center gap-2 h-100 text-center">
                         <span class="badge status-badge w-100" id="status-{{ item_index }}">Unfilled</span>
                         <div class="w-100">
@@ -359,7 +359,7 @@
     border-bottom: 2px solid #dee2e6;
     font-size: 0.875rem;
     font-weight: 600;
-    padding: 12px 8px;
+    padding: 14px;
     vertical-align: middle;
     white-space: nowrap;
   }
@@ -398,6 +398,7 @@
   .item-row td {
     font-size: 0.875rem;
     border-top: none;
+    padding: 14px;
   }
   
   /* Item Info */
@@ -527,6 +528,56 @@
   
   .step-content strong {
     font-size: 0.875rem;
+  }
+  
+  /* Responsive Table Spacing */
+  @media (max-width: 1200px) {
+    #itemsTable {
+      min-width: 1000px;
+    }
+    
+    .sticky-header th {
+      padding: 12px;
+    }
+    
+    .item-row td {
+      padding: 12px;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .table-container {
+      max-height: calc(100vh - 350px);
+    }
+    
+    .sticky-header th {
+      padding: 12px;
+      font-size: 0.8rem;
+    }
+    
+    .item-row td {
+      padding: 12px;
+      font-size: 0.8rem;
+    }
+    
+    .status-badge {
+      font-size: 0.7rem;
+      padding: 4px 8px;
+    }
+  }
+  
+  /* Ensure Status Column Alignment */
+  .status-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  
+  /* Table Cell Vertical Alignment */
+  .align-middle {
+    vertical-align: middle !important;
   }
 </style>
 
