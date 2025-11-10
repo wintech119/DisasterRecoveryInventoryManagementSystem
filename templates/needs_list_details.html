@@ -808,7 +808,8 @@
                     <div>
                       <span class="badge 
                         {% if req.status == 'Pending Review' %}bg-warning text-dark
-                        {% elif req.status == 'Approved & Updated' %}bg-success
+                        {% elif req.status == 'In Progress' %}bg-primary
+                        {% elif req.status == 'Approved & Resent' %}bg-success
                         {% elif req.status == 'Rejected' %}bg-danger
                         {% else %}bg-info{% endif %}">
                         {{ req.status }}
@@ -843,7 +844,29 @@
                     </div>
                   {% endif %}
                   
-                  {% if current_user.role in ['LOGISTICS_OFFICER', 'LOGISTICS_MANAGER'] and req.status == 'Pending Review' %}
+                  {% if current_user.role == 'LOGISTICS_MANAGER' and req.status in ['Pending Review', 'In Progress'] %}
+                    <div class="d-grid gap-2 mt-2">
+                      <a href="{{ url_for('needs_list_prepare', list_id=needs_list.id) }}" class="btn btn-sm btn-warning">
+                        <i class="bi bi-pencil-square me-1"></i>Edit Fulfilment
+                      </a>
+                      <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#responseForm{{ req.id }}">
+                        <i class="bi bi-chat-dots me-1"></i>Or Respond Without Editing
+                      </button>
+                      <div class="collapse" id="responseForm{{ req.id }}">
+                        <form method="POST" action="{{ url_for('fulfilment_change_request_process', request_id=req.id) }}" class="mt-2">
+                          <textarea class="form-control form-control-sm mb-2" name="review_comments" rows="2" placeholder="Response to warehouse team" required></textarea>
+                          <div class="btn-group w-100" role="group">
+                            <button type="submit" name="action" value="reject" class="btn btn-sm btn-danger">
+                              <i class="bi bi-x-circle me-1"></i>Reject
+                            </button>
+                            <button type="submit" name="action" value="clarify" class="btn btn-sm btn-info">
+                              <i class="bi bi-question-circle me-1"></i>Need Clarification
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  {% elif current_user.role == 'LOGISTICS_OFFICER' and req.status == 'Pending Review' %}
                     <div class="d-grid gap-2 mt-2">
                       <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#responseForm{{ req.id }}">
                         <i class="bi bi-reply me-1"></i>Respond to Request
@@ -852,9 +875,6 @@
                         <form method="POST" action="{{ url_for('fulfilment_change_request_process', request_id=req.id) }}" class="mt-2">
                           <textarea class="form-control form-control-sm mb-2" name="review_comments" rows="2" placeholder="Response to warehouse team" required></textarea>
                           <div class="btn-group w-100" role="group">
-                            <button type="submit" name="action" value="approve" class="btn btn-sm btn-success">
-                              <i class="bi bi-check-circle me-1"></i>Approve & Update
-                            </button>
                             <button type="submit" name="action" value="reject" class="btn btn-sm btn-danger">
                               <i class="bi bi-x-circle me-1"></i>Reject
                             </button>

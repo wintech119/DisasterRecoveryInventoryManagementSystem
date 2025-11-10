@@ -858,8 +858,9 @@ def can_prepare_fulfilment(user, needs_list):
     
     # Check if there's an active change request for this needs list
     active_change_request = FulfilmentChangeRequest.query.filter_by(
-        needs_list_id=needs_list.id,
-        status='Pending Review'
+        needs_list_id=needs_list.id
+    ).filter(
+        FulfilmentChangeRequest.status.in_(['Pending Review', 'In Progress'])
     ).first()
     
     # Logistics Managers can edit if:
@@ -3446,13 +3447,23 @@ def needs_list_prepare(list_id):
         return redirect(url_for("needs_list_details", list_id=list_id))
     
     # GET request: Show fulfilment preparation form
-    # Check if this is triggered by a change request
+    # Check if this is triggered by a change request (via parameter OR detect active ones)
     change_request_id = request.args.get("change_request_id", type=int)
     change_request = None
     
-    if change_request_id:
+    # If no change_request_id parameter, check for active Pending Review requests
+    if not change_request_id:
+        active_request = FulfilmentChangeRequest.query.filter_by(
+            needs_list_id=needs_list.id,
+            status='Pending Review'
+        ).first()
+        if active_request:
+            change_request = active_request
+            change_request_id = active_request.id
+    else:
         change_request = FulfilmentChangeRequest.query.get_or_404(change_request_id)
-        
+    
+    if change_request:
         # Verify the change request belongs to this needs list
         if change_request.needs_list_id != needs_list.id:
             flash("Invalid change request.", "danger")
@@ -3462,6 +3473,14 @@ def needs_list_prepare(list_id):
         if current_user.role != ROLE_LOGISTICS_MANAGER:
             flash("Only Logistics Managers can edit fulfilments via change requests.", "danger")
             return redirect(url_for("needs_list_details", list_id=list_id))
+        
+        # Transition change request to 'In Progress' when Manager opens editor
+        if change_request.status == 'Pending Review':
+            change_request.status = 'In Progress'
+            change_request.reviewed_by_id = current_user.id
+            change_request.reviewed_at = datetime.utcnow()
+            db.session.commit()
+            flash("You are now editing this fulfilment in response to a change request.", "info")
     
     # Attempt to acquire lock for editing
     success, message = acquire_lock(needs_list, current_user)
