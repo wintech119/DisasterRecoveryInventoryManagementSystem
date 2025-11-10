@@ -33,7 +33,7 @@ The frontend uses server-side rendered HTML templates with Bootstrap 5 and Boots
 -   **Three-Tier Hub Orchestration**: Role-based system with MAIN, SUB, and AGENCY hubs, defining transfer approval workflows and visibility rules. AGENCY hub inventory is excluded from overall ODPEM displays.
 -   **Stock Transfer with Approval Workflow**: Enables transfers between depots with hub-based approval rules; MAIN hub transfers are immediate, while SUB/AGENCY require MAIN hub approval.
 -   **Authentication and User Management**: Implements Flask-Login with role-based access control (RBAC) for seven user roles, secure password hashing, session management, and an ADMIN-only user management interface.
--   **Universal In-App Notification System**: Provides real-time, deep-linking notifications for workflow events across all user roles, with role-specific triggers, a bell icon with unread badge, and "mark as read" functionality.
+-   **Universal In-App Notification System**: Provides real-time, deep-linking notifications for workflow events across all user roles, with role-specific triggers, a bell icon with unread badge, and "mark as read" functionality. All notifications include proper deep links to specific needs lists (`/needs-lists/{id}` or `/needs-lists/{id}/prepare` for Officers), ensuring users can navigate directly to relevant resources from the notification panel.
 -   **File Storage**: Supports local file attachments with UUID-based filenames, designed for future cloud migration.
 -   **Data Import/Export**: Uses Pandas for CSV import and export for bulk data and integration.
 -   **Session Management**: Utilizes Flask's built-in session handling with environment variable-configured secret keys.
