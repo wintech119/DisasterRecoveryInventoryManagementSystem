@@ -846,20 +846,45 @@ def can_prepare_fulfilment(user, needs_list):
     """
     Check if user can prepare/edit fulfilment allocations.
     
+    Logistics Managers can also edit Approved/Resent for Dispatch needs lists
+    if there's an active Fulfilment Change Request.
+    
     Returns:
         tuple: (allowed: bool, error_message: str or None)
     """
-    # Must be in correct status
-    if needs_list.status not in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval']:
-        return (False, "Only submitted or prepared needs lists can be edited.")
-    
     # Only ADMIN, Logistics Officers, and Logistics Managers can prepare
     if user.role not in [ROLE_ADMIN, ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER]:
         return (False, "Only logistics staff can prepare fulfilments.")
     
-    # Logistics Officers cannot edit once submitted for approval
-    if user.role == ROLE_LOGISTICS_OFFICER and needs_list.status == 'Awaiting Approval':
-        return (False, "Cannot edit fulfilment after submitting for approval. Please contact a Logistics Manager.")
+    # Check if there's an active change request for this needs list
+    active_change_request = FulfilmentChangeRequest.query.filter_by(
+        needs_list_id=needs_list.id,
+        status='Pending Review'
+    ).first()
+    
+    # Logistics Managers can edit if:
+    # 1. Normal statuses (Submitted, Fulfilment Prepared, Awaiting Approval), OR
+    # 2. Approved/Resent for Dispatch WITH an active change request
+    if user.role == ROLE_LOGISTICS_MANAGER:
+        if needs_list.status in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval']:
+            return (True, None)
+        elif needs_list.status in ['Approved', 'Resent for Dispatch'] and active_change_request:
+            return (True, None)
+        else:
+            return (False, "This needs list is not in an editable state.")
+    
+    # Logistics Officers can only edit Submitted or Fulfilment Prepared
+    if user.role == ROLE_LOGISTICS_OFFICER:
+        if needs_list.status in ['Submitted', 'Fulfilment Prepared']:
+            return (True, None)
+        elif needs_list.status == 'Awaiting Approval':
+            return (False, "Cannot edit fulfilment after submitting for approval. Please contact a Logistics Manager.")
+        else:
+            return (False, "This needs list is not in an editable state.")
+    
+    # ADMIN fallback
+    if needs_list.status not in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval', 'Approved', 'Resent for Dispatch']:
+        return (False, "This needs list is not in an editable state.")
     
     return (True, None)
 

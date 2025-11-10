@@ -1,0 +1,52 @@
+n my DRIMS Flask app, fix the Fulfilment Change Request flow so that the Logistics Manager can correctly reopen and edit fulfilments.
+
+Requirements:
+
+Allow Re-Entry to Fulfilment Screen
+
+When a Fulfilment Change Request exists for a Needs List, the Logistics Manager must be able to:
+
+Click from the notification or Needs List table
+
+Be taken to an editable fulfilment page for that Needs List (e.g. /needs-lists/<id>/fulfilment), not a read-only view.
+
+If the Needs List is in a state like Approved, Approved for Dispatch, or Resent for Dispatch because of a valid change request, temporarily allow the Logistics Manager to re-open it in edit mode.
+
+Adjust Permissions & Status Checks
+
+Update the permission logic so that:
+
+Logistics Manager can edit fulfilment quantities when there is an active Fulfilment Change Request linked to that Needs List.
+
+Prevent blocking them with “read-only” or “no permission” checks in this scenario.
+
+Once the Logistics Manager saves the updated fulfilment and clicks “Resend to Sub-Hub”, return it to a read-only/dispatchable state for Warehouse users.
+
+Buttons & Routing
+
+On the Fulfilment Change Request detail view, include a clear “Edit Fulfilment” button for the Logistics Manager that routes to the editable fulfilment form.
+
+Ensure this route uses the same form and calculations as the original fulfilment screen (Filled, Unfilled, Partially Filled, etc.).
+
+State Handling
+
+While the Logistics Manager is editing, keep the Needs List in a clear interim status such as Fulfilment Adjustment In Progress.
+
+After clicking “Resend to Sub-Hub”:
+
+Update status to Resent for Dispatch.
+
+Lock editing again for everyone except via a new change request.
+
+Validation
+
+Test with a Logistics Manager account to confirm:
+
+They can open the fulfilment page from the change request.
+
+They can adjust quantities and save.
+
+The updated fulfilment is visible to the correct Sub-Hub warehouse users.
+
+Outcome:
+The Logistics Manager can reliably navigate back into the Fulfilment page, adjust quantities in response to Fulfilment Change Requests, and resend updated fulfilments to the correct Sub-Hub without being blocked by read-only or permission issues.
