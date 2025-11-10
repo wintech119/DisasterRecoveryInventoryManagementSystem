@@ -3001,7 +3001,7 @@ def needs_list_prepare(list_id):
                 title="Approval Needed",
                 message=f"Needs list {needs_list.list_number} from {needs_list.agency_hub.name} is ready for your approval.",
                 notification_type="approval_needed",
-                link_url=f"/logistics/needs-lists",
+                link_url=f"/needs-lists/{needs_list.id}",
                 payload_data={
                     "needs_list_number": needs_list.list_number,
                     "agency_hub": needs_list.agency_hub.name,
