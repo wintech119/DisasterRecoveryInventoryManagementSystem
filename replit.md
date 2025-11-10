@@ -30,6 +30,19 @@ Agency and SUB hub users can create needs lists in Draft status and edit them be
 -   **Gap-Resistant Parsing**: Form parsing handles non-sequential item numbering from removed rows, ensuring no data loss
 -   **Permission Enforcement**: Only the owning Agency/SUB hub can edit their Draft needs lists; editing is disabled once submitted
 
+**Fulfilment Editing Concurrency Control:**
+Prevents simultaneous editing of needs list fulfilment by multiple users (Logistics Officers/Managers). Key features include:
+-   **Locking Mechanism**: When a user accesses the fulfilment preparation page, an exclusive 15-minute lock is acquired with their user ID and timestamp
+-   **Lock Status Banner**: Clear visual indicators showing who is editing, how long they've been editing, and when the lock will expire
+-   **Disabled UI for Non-Holders**: Users who don't hold the lock see all form inputs disabled with a clear "Editing Locked by Another User" message
+-   **Auto-Release**: Locks automatically release on form submission, manual release, or after 15 minutes of inactivity
+-   **Heartbeat Mechanism**: JavaScript sends keep-alive requests every 60 seconds to extend lock for active users
+-   **Best-Effort Page Exit Release**: Uses navigator.sendBeacon API to release lock when user leaves the page
+-   **Lock Extension**: Same user can reopen the page and automatically extend their existing lock
+-   **API Endpoints**: RESTful endpoints for lock management (`/api/needs-lists/<id>/extend-lock`, `/api/needs-lists/<id>/release-lock`, `/api/needs-lists/<id>/lock-status`)
+-   **Database Fields**: Added `locked_by_id` (FK to user.id with index) and `locked_at` (timestamp) to NeedsList model for tracking
+-   **Migration Script**: `add_lock_columns_migration.py` adds lock columns to existing databases
+
 ### Distribution Package Management
 Manages the creation, review, and approval of distribution packages for AGENCY hubs. It includes stock validation against available inventory across all ODPEM locations (MAIN and SUB hubs) and supports multi-depot fulfillment with smart allocation filtering and real-time stock updates. A comprehensive audit trail tracks the package lifecycle.
 

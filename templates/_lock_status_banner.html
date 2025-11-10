@@ -1,0 +1,168 @@
+{# Lock Status Banner Component #}
+{# Displays lock status for needs list fulfilment editing #}
+{# Requires: lock_status dict from get_lock_status() helper #}
+
+{% if lock_status and lock_status.is_locked %}
+  {% if lock_status.is_locked_by_current_user %}
+    {# User is the lock holder - show success banner #}
+    <div class="alert alert-success d-flex align-items-center mb-4" role="alert">
+      <i class="bi bi-lock-fill fs-5 me-3"></i>
+      <div class="flex-grow-1">
+        <strong>You are currently editing this Needs List</strong>
+        <p class="mb-0 mt-1">
+          <small class="text-muted">
+            Editing session started {{ lock_status.lock_duration_minutes }} minute{{ 's' if lock_status.lock_duration_minutes != 1 else '' }} ago. 
+            Your lock will automatically expire after 15 minutes of inactivity.
+          </small>
+        </p>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-success" id="releaseLockBtn" 
+              onclick="releaseLock({{ needs_list.id }})">
+        <i class="bi bi-unlock me-1"></i>Release Lock
+      </button>
+    </div>
+  {% else %}
+    {# Another user holds the lock - show warning banner with read-only message #}
+    <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
+      <i class="bi bi-exclamation-triangle-fill fs-5 me-3"></i>
+      <div class="flex-grow-1">
+        <strong>This Needs List is Currently Being Edited</strong>
+        <p class="mb-0 mt-1">
+          <small class="text-dark">
+            {{ lock_status.locked_by_user.full_name if lock_status.locked_by_user else 'Another user' }} 
+            started editing this needs list {{ lock_status.lock_duration_minutes }} minute{{ 's' if lock_status.lock_duration_minutes != 1 else '' }} ago.
+            The lock will automatically expire after 15 minutes of inactivity.
+          </small>
+        </p>
+        <p class="mb-0 mt-2">
+          <small class="text-muted">
+            <i class="bi bi-info-circle me-1"></i>
+            You cannot edit this needs list while another user is working on it. Please check back later.
+          </small>
+        </p>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.location.reload()">
+        <i class="bi bi-arrow-clockwise me-1"></i>Refresh Page
+      </button>
+    </div>
+  {% endif %}
+{% endif %}
+
+{# JavaScript for lock management #}
+<script>
+// Lock management functions
+const LOCK_HEARTBEAT_INTERVAL = 60000; // 60 seconds
+const LOCK_CHECK_INTERVAL = 30000; // 30 seconds
+let heartbeatTimer = null;
+let checkLockTimer = null;
+
+// Release lock manually
+function releaseLock(needsListId) {
+  const btn = document.getElementById('releaseLockBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Releasing...';
+  }
+  
+  fetch(`/api/needs-lists/${needsListId}/release-lock`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      window.location.href = `/needs-lists/${needsListId}`;
+    } else {
+      alert('Failed to release lock: ' + data.message);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-unlock me-1"></i>Release Lock';
+      }
+    }
+  })
+  .catch(error => {
+    console.error('Error releasing lock:', error);
+    alert('An error occurred while releasing the lock.');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-unlock me-1"></i>Release Lock';
+    }
+  });
+}
+
+// Extend lock (heartbeat)
+function extendLock(needsListId) {
+  fetch(`/api/needs-lists/${needsListId}/extend-lock`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (!data.success) {
+      console.error('Failed to extend lock:', data.message);
+      // Lock expired or lost - show warning and redirect
+      if (confirm('Your editing session has expired or been lost. Click OK to reload the page.')) {
+        window.location.reload();
+      }
+    } else {
+      console.log('Lock extended successfully');
+    }
+  })
+  .catch(error => {
+    console.error('Error extending lock:', error);
+  });
+}
+
+// Check lock status periodically
+function checkLockStatus(needsListId) {
+  fetch(`/api/needs-lists/${needsListId}/lock-status`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        const lockStatus = data.lock_status;
+        
+        // If we held the lock but lost it, alert user
+        const isLockHolder = {{ 'true' if lock_status and lock_status.is_locked_by_current_user else 'false' }};
+        if (isLockHolder && (!lockStatus.is_locked || !lockStatus.is_locked_by_current_user)) {
+          if (confirm('You have lost the lock for this Needs List. Another user may be editing it. Click OK to reload the page.')) {
+            window.location.reload();
+          }
+        }
+      }
+    })
+    .catch(error => {
+      console.error('Error checking lock status:', error);
+    });
+}
+
+// Start heartbeat if user holds the lock
+{% if lock_status and lock_status.is_locked_by_current_user %}
+  const needsListId = {{ needs_list.id }};
+  
+  // Send heartbeat every 60 seconds to keep lock alive
+  heartbeatTimer = setInterval(() => {
+    extendLock(needsListId);
+  }, LOCK_HEARTBEAT_INTERVAL);
+  
+  // Check lock status every 30 seconds
+  checkLockTimer = setInterval(() => {
+    checkLockStatus(needsListId);
+  }, LOCK_CHECK_INTERVAL);
+  
+  // Release lock when user leaves the page (best effort)
+  window.addEventListener('beforeunload', () => {
+    // Use sendBeacon for reliable background request
+    navigator.sendBeacon(`/api/needs-lists/${needsListId}/release-lock`);
+  });
+  
+  // Clean up timers on page unload
+  window.addEventListener('unload', () => {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    if (checkLockTimer) clearInterval(checkLockTimer);
+  });
+{% endif %}
+</script>

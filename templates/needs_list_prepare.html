@@ -13,6 +13,9 @@
     </a>
   </div>
 
+  <!-- Lock Status Banner -->
+  {% include '_lock_status_banner.html' %}
+
   <div class="row g-3">
     <!-- Main Content Area -->
     <div class="col-lg-9">
@@ -162,7 +165,8 @@
                                     data-item-index="{{ item_index }}"
                                     data-hub-id="{{ hub.id }}"
                                     data-max="{{ available }}"
-                                    placeholder="0">
+                                    placeholder="0"
+                                    {% if lock_status and lock_status.is_locked and not lock_status.is_locked_by_current_user %}disabled{% endif %}>
                                 </div>
                               </div>
                             </div>
@@ -270,7 +274,8 @@
               name="fulfilment_notes" 
               rows="3" 
               form="fulfilmentForm"
-              placeholder="Add notes...">{{ needs_list.fulfilment_notes or '' }}</textarea>
+              placeholder="Add notes..."
+              {% if lock_status and lock_status.is_locked and not lock_status.is_locked_by_current_user %}disabled{% endif %}>{{ needs_list.fulfilment_notes or '' }}</textarea>
           </div>
         </div>
 
@@ -281,14 +286,22 @@
 
         <!-- Actions -->
         <div class="d-grid gap-2">
-          {% if current_user.role == 'LOGISTICS_MANAGER' %}
-            <button type="submit" class="btn btn-success" id="submitBtn" form="fulfilmentForm">
-              <i class="bi bi-check-circle-fill me-1"></i>Approve & Finalize
+          {% if lock_status and lock_status.is_locked and not lock_status.is_locked_by_current_user %}
+            {# User doesn't hold lock - disable submit buttons #}
+            <button type="button" class="btn btn-secondary" disabled>
+              <i class="bi bi-lock-fill me-1"></i>Editing Locked by Another User
             </button>
           {% else %}
-            <button type="submit" class="btn btn-primary" id="submitBtn" form="fulfilmentForm">
-              <i class="bi bi-check-circle me-1"></i>Submit for Approval
-            </button>
+            {# User holds lock or no lock exists - show normal submit buttons #}
+            {% if current_user.role == 'LOGISTICS_MANAGER' %}
+              <button type="submit" class="btn btn-success" id="submitBtn" form="fulfilmentForm">
+                <i class="bi bi-check-circle-fill me-1"></i>Approve & Finalize
+              </button>
+            {% else %}
+              <button type="submit" class="btn btn-primary" id="submitBtn" form="fulfilmentForm">
+                <i class="bi bi-check-circle me-1"></i>Submit for Approval
+              </button>
+            {% endif %}
           {% endif %}
           <a href="{{ url_for('needs_lists') }}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-x-circle me-1"></i>Cancel

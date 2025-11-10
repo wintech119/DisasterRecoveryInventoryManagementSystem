@@ -265,6 +265,10 @@ class NeedsList(db.Model):
     reviewed_at = db.Column(db.DateTime, nullable=True)
     review_notes = db.Column(db.Text, nullable=True)
     
+    # Concurrency control for fulfilment editing (Logistics Officers/Managers)
+    locked_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)  # User currently editing
+    locked_at = db.Column(db.DateTime, nullable=True)  # When lock was acquired/extended
+    
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     agency_hub = db.relationship("Depot", foreign_keys=[agency_hub_id])
@@ -272,6 +276,7 @@ class NeedsList(db.Model):
     event = db.relationship("DisasterEvent")
     dispatched_by_user = db.relationship("User", foreign_keys=[dispatched_by_id])
     received_by_user = db.relationship("User", foreign_keys=[received_by_id])
+    locked_by_user = db.relationship("User", foreign_keys=[locked_by_id])  # User holding the edit lock
     items = db.relationship("NeedsListItem", back_populates="needs_list", cascade="all, delete-orphan")
     fulfilments = db.relationship("NeedsListFulfilment", back_populates="needs_list", cascade="all, delete-orphan")
 
@@ -875,6 +880,173 @@ def can_confirm_receipt(user, needs_list):
     
     return (True, None)
 
+# ---------- Concurrency Control - Lock Management Functions ----------
+LOCK_TIMEOUT_SECONDS = 900  # 15 minutes
+
+def is_lock_expired(needs_list, timeout_seconds=LOCK_TIMEOUT_SECONDS):
+    """
+    Check if a needs list lock has expired based on timeout.
+    
+    Args:
+        needs_list: NeedsList instance
+        timeout_seconds: Lock timeout in seconds (default: 900 = 15 minutes)
+    
+    Returns:
+        bool: True if lock expired or no lock exists, False if lock is still active
+    """
+    if not needs_list.locked_at:
+        return True
+    
+    time_since_lock = datetime.utcnow() - needs_list.locked_at
+    return time_since_lock.total_seconds() >= timeout_seconds
+
+def get_lock_status(needs_list, current_user):
+    """
+    Get comprehensive lock status information for a needs list.
+    
+    Args:
+        needs_list: NeedsList instance
+        current_user: Current user object
+    
+    Returns:
+        dict: {
+            'is_locked': bool,
+            'is_locked_by_current_user': bool,
+            'can_edit': bool,
+            'locked_by_user': User object or None,
+            'locked_at': datetime or None,
+            'lock_duration_minutes': int or None,
+            'lock_message': str or None
+        }
+    """
+    # Check if lock exists and is not expired
+    if not needs_list.locked_by_id or is_lock_expired(needs_list):
+        return {
+            'is_locked': False,
+            'is_locked_by_current_user': False,
+            'can_edit': True,
+            'locked_by_user': None,
+            'locked_at': None,
+            'lock_duration_minutes': None,
+            'lock_message': None
+        }
+    
+    # Lock exists and is active
+    locked_by_user = needs_list.locked_by_user
+    is_locked_by_current = needs_list.locked_by_id == current_user.id
+    time_since_lock = datetime.utcnow() - needs_list.locked_at
+    duration_minutes = int(time_since_lock.total_seconds() / 60)
+    
+    if is_locked_by_current:
+        message = "You are currently editing this Needs List."
+    else:
+        user_name = locked_by_user.full_name if locked_by_user else "Unknown User"
+        message = f"This Needs List is currently being fulfilled by {user_name} (started {duration_minutes} minute{'s' if duration_minutes != 1 else ''} ago). Please try again later."
+    
+    return {
+        'is_locked': True,
+        'is_locked_by_current_user': is_locked_by_current,
+        'can_edit': is_locked_by_current,
+        'locked_by_user': locked_by_user,
+        'locked_at': needs_list.locked_at,
+        'lock_duration_minutes': duration_minutes,
+        'lock_message': message
+    }
+
+def acquire_lock(needs_list, user):
+    """
+    Acquire or extend lock for a needs list.
+    
+    Args:
+        needs_list: NeedsList instance
+        user: User attempting to acquire lock
+    
+    Returns:
+        tuple: (success: bool, message: str or None)
+    """
+    try:
+        # Check if lock is expired or doesn't exist
+        if is_lock_expired(needs_list):
+            # Acquire new lock
+            needs_list.locked_by_id = user.id
+            needs_list.locked_at = datetime.utcnow()
+            db.session.flush()  # Ensure atomic lock acquisition
+            return (True, "Lock acquired successfully.")
+        
+        # Lock exists and is active
+        if needs_list.locked_by_id == user.id:
+            # Same user - extend the lock
+            needs_list.locked_at = datetime.utcnow()
+            db.session.flush()
+            return (True, "Lock extended successfully.")
+        else:
+            # Different user holds the lock
+            locked_by = needs_list.locked_by_user
+            user_name = locked_by.full_name if locked_by else "Unknown User"
+            time_since_lock = datetime.utcnow() - needs_list.locked_at
+            duration_minutes = int(time_since_lock.total_seconds() / 60)
+            message = f"This Needs List is currently being fulfilled by {user_name} (started {duration_minutes} minute{'s' if duration_minutes != 1 else ''} ago)."
+            return (False, message)
+    
+    except Exception as e:
+        db.session.rollback()
+        return (False, f"Error acquiring lock: {str(e)}")
+
+def release_lock(needs_list, user=None):
+    """
+    Release lock for a needs list.
+    
+    Args:
+        needs_list: NeedsList instance
+        user: User attempting to release (optional, for validation)
+    
+    Returns:
+        tuple: (success: bool, message: str or None)
+    """
+    try:
+        # If user is provided, verify they own the lock
+        if user and needs_list.locked_by_id and needs_list.locked_by_id != user.id:
+            return (False, "You cannot release a lock held by another user.")
+        
+        # Release the lock
+        needs_list.locked_by_id = None
+        needs_list.locked_at = None
+        db.session.flush()
+        return (True, "Lock released successfully.")
+    
+    except Exception as e:
+        db.session.rollback()
+        return (False, f"Error releasing lock: {str(e)}")
+
+def extend_lock(needs_list, user):
+    """
+    Extend an existing lock for a needs list (heartbeat functionality).
+    
+    Args:
+        needs_list: NeedsList instance
+        user: User attempting to extend lock
+    
+    Returns:
+        tuple: (success: bool, message: str or None)
+    """
+    try:
+        # Verify user owns the lock
+        if needs_list.locked_by_id != user.id:
+            return (False, "You do not hold the lock for this Needs List.")
+        
+        # Check if lock has expired
+        if is_lock_expired(needs_list):
+            return (False, "Lock has expired. Please reload the page.")
+        
+        # Extend the lock timestamp
+        needs_list.locked_at = datetime.utcnow()
+        db.session.flush()
+        return (True, "Lock extended successfully.")
+    
+    except Exception as e:
+        db.session.rollback()
+        return (False, f"Error extending lock: {str(e)}")
+
 def check_stock_availability(items_requested):
     """
     Check stock availability for requested items and calculate allocated quantities.
@@ -1450,6 +1622,59 @@ def barcode_lookup():
         })
     else:
         return jsonify({"success": False, "message": f"No item found with barcode: {barcode}"}), 404
+
+# ---------- Lock Management API Endpoints ----------
+@app.route("/api/needs-lists/<int:list_id>/extend-lock", methods=["POST"])
+@login_required
+def api_extend_lock(list_id):
+    """Extend lock for a needs list (heartbeat functionality)"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    success, message = extend_lock(needs_list, current_user)
+    
+    if success:
+        db.session.commit()
+        return jsonify({
+            "success": True,
+            "message": message,
+            "locked_at": needs_list.locked_at.isoformat() if needs_list.locked_at else None
+        })
+    else:
+        return jsonify({"success": False, "message": message}), 403
+
+@app.route("/api/needs-lists/<int:list_id>/release-lock", methods=["POST"])
+@login_required
+def api_release_lock(list_id):
+    """Release lock for a needs list"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    success, message = release_lock(needs_list, current_user)
+    
+    if success:
+        db.session.commit()
+        return jsonify({"success": True, "message": message})
+    else:
+        return jsonify({"success": False, "message": message}), 403
+
+@app.route("/api/needs-lists/<int:list_id>/lock-status", methods=["GET"])
+@login_required
+def api_lock_status(list_id):
+    """Get current lock status for a needs list"""
+    needs_list = NeedsList.query.get_or_404(list_id)
+    lock_status = get_lock_status(needs_list, current_user)
+    
+    return jsonify({
+        "success": True,
+        "lock_status": {
+            "is_locked": lock_status['is_locked'],
+            "is_locked_by_current_user": lock_status['is_locked_by_current_user'],
+            "can_edit": lock_status['can_edit'],
+            "locked_by_name": lock_status['locked_by_user'].full_name if lock_status['locked_by_user'] else None,
+            "locked_at": lock_status['locked_at'].isoformat() if lock_status['locked_at'] else None,
+            "lock_duration_minutes": lock_status['lock_duration_minutes'],
+            "lock_message": lock_status['lock_message']
+        }
+    })
 
 @app.route("/distribute", methods=["GET", "POST"])
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF, ROLE_FIELD_PERSONNEL)
@@ -2576,7 +2801,19 @@ def needs_list_prepare(list_id):
         flash(error_msg, "warning")
         return redirect(url_for("needs_list_details", list_id=list_id))
     
+    # Get lock status before processing
+    lock_status = get_lock_status(needs_list, current_user)
+    
     if request.method == "POST":
+        # Verify current user holds the lock before allowing editing
+        if lock_status['is_locked'] and not lock_status['is_locked_by_current_user']:
+            flash(lock_status['lock_message'], "warning")
+            return redirect(url_for("needs_list_details", list_id=list_id))
+        
+        # Verify lock hasn't expired
+        if lock_status['is_locked_by_current_user'] and is_lock_expired(needs_list):
+            flash("Your editing session has expired. Please reload the page to continue.", "warning")
+            return redirect(url_for("needs_list_prepare", list_id=list_id))
         fulfilment_notes = request.form.get("fulfilment_notes", "").strip() or None
         
         # Delete existing fulfilment allocations if re-preparing
@@ -2640,6 +2877,10 @@ def needs_list_prepare(list_id):
             needs_list.approved_by = current_user.full_name
             needs_list.approved_at = datetime.utcnow()
             needs_list.fulfilment_notes = fulfilment_notes
+            
+            # Release lock on completion
+            release_lock(needs_list, current_user)
+            
             db.session.commit()
             
             flash(f"Needs list {needs_list.list_number} approved successfully. Ready for dispatch.", "success")
@@ -2649,6 +2890,10 @@ def needs_list_prepare(list_id):
             needs_list.prepared_by = current_user.full_name
             needs_list.prepared_at = datetime.utcnow()
             needs_list.fulfilment_notes = fulfilment_notes
+            
+            # Release lock on completion
+            release_lock(needs_list, current_user)
+            
             db.session.commit()
             
             # Notify Logistics Managers about approval needed
@@ -2672,6 +2917,18 @@ def needs_list_prepare(list_id):
         return redirect(url_for("needs_list_details", list_id=list_id))
     
     # GET request: Show fulfilment preparation form
+    # Attempt to acquire lock for editing
+    success, message = acquire_lock(needs_list, current_user)
+    
+    if success:
+        db.session.commit()  # Commit lock acquisition
+    else:
+        # Another user holds the lock - show read-only view with message
+        flash(message, "info")
+    
+    # Get lock status after acquisition attempt for UI rendering
+    lock_status = get_lock_status(needs_list, current_user)
+    
     # Get stock availability across all MAIN and SUB hubs
     stock_map = get_stock_by_location()
     odpem_hubs = Depot.query.filter(Depot.hub_type.in_(['MAIN', 'SUB'])).order_by(Depot.name).all()
@@ -2690,7 +2947,8 @@ def needs_list_prepare(list_id):
                          needs_list=needs_list, 
                          stock_map=stock_map, 
                          odpem_hubs=odpem_hubs,
-                         existing_allocations=existing_allocations)
+                         existing_allocations=existing_allocations,
+                         lock_status=lock_status)
 
 @app.route("/needs-lists/<int:list_id>/approve", methods=["POST"])
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER)
