@@ -14,6 +14,15 @@ The system is built with Flask, utilizing SQLAlchemy ORM and a relational databa
 ### Data Model
 Key entities include Items, Depots, Donors, Beneficiaries, DisasterEvents, NeedsLists, and Transactions. Items feature auto-generated SKUs, standardized units, barcode support, and expiry date tracking. NeedsLists support item requests from AGENCY hubs to MAIN hubs with approval workflows and standardized fulfillment terminology ("Fulfilled", "Partially Filled", "Unfilled").
 
+**User Management Schema (November 2025)**:
+- Normalized user management with separate Role, UserRole, and UserHub tables
+- Many-to-many relationships allow users to have multiple roles and hub assignments
+- Enhanced user profile fields: first_name, last_name, organization, job_title, phone, timezone, language, notification_preferences
+- Audit trail with created_by, updated_by, and updated_at timestamps
+- Helper methods: `has_role()`, `has_any_role()`, `has_hub_access()` for cleaner authorization logic
+- Property `display_name` combines first_name + last_name for UI display
+- Legacy fields (full_name, role, assigned_location_id) retained for backwards compatibility during transition
+
 ### UI/UX and Frontend
 The frontend uses server-side rendered HTML templates with Bootstrap 5 and Bootstrap Icons for rapid deployment, accessibility, and mobile-friendliness, aligning with Government of Jamaica branding. Dashboards include responsive design, hero cards for key metrics, Chart.js for data visualizations (stock distribution, fulfillment trends), and an activity feed. Needs List details views adapt layouts based on status, optimizing column distribution and alignment for professional appearance across devices.
 
