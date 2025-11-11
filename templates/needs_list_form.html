@@ -27,6 +27,12 @@
         {% endif %}
       </div>
 
+      <!-- Offline Mode Banner -->
+      <div id="offline-mode-banner" class="alert alert-warning" style="display: none;" role="alert">
+        <i class="bi bi-wifi-off me-2"></i>
+        <strong>Offline Mode:</strong> You are currently offline. This needs list will be saved locally as a draft and synced when connection is restored.
+      </div>
+
       {% if is_edit and needs_list.status == 'Draft' %}
       <div class="alert alert-warning">
         <i class="bi bi-exclamation-triangle me-2"></i>
@@ -322,13 +328,126 @@ function updateRemoveButtons() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
   updateRemoveButtons();
+  updateOfflineBanner();
+  
+  {% if not is_edit %}
+  // Add offline support for create mode only (not edit mode)
+  setupOfflineSupport();
+  {% endif %}
 });
+
+// Update offline banner visibility
+function updateOfflineBanner() {
+  const offlineBanner = document.getElementById('offline-mode-banner');
+  if (!navigator.onLine) {
+    offlineBanner.style.display = 'block';
+  } else {
+    offlineBanner.style.display = 'none';
+  }
+}
+
+// Listen for online/offline events
+window.addEventListener('online', updateOfflineBanner);
+window.addEventListener('offline', updateOfflineBanner);
+
+// Setup offline support for needs list creation
+function setupOfflineSupport() {
+  const needsListForm = document.getElementById('needsListForm');
+  
+  needsListForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    // Check if offline
+    if (!navigator.onLine && window.offlineManager) {
+      // Collect form data
+      const formData = new FormData(needsListForm);
+      const priority = formData.get('priority');
+      const notes = formData.get('notes');
+      
+      // Collect all line items
+      const lineItems = [];
+      const rows = document.querySelectorAll('.item-row');
+      
+      rows.forEach((row, index) => {
+        const itemSku = formData.get(`item_sku_${index}`);
+        const quantity = formData.get(`item_qty_${index}`);
+        const justification = formData.get(`item_justification_${index}`);
+        
+        if (itemSku && quantity) {
+          lineItems.push({
+            item_sku: itemSku,
+            quantity: parseInt(quantity),
+            priority: priority,
+            notes: justification || ''
+          });
+        }
+      });
+      
+      if (lineItems.length === 0) {
+        alert('Please add at least one item to the needs list');
+        return;
+      }
+      
+      // Queue operation for offline sync
+      const payload = {
+        priority: priority,
+        notes: notes,
+        line_items: lineItems,
+        user_id: {{ current_user.id }}
+      };
+      
+      const result = await window.offlineManager.queueOperation(
+        'needs_list_create', 
+        {{ user_depot.id }}, 
+        payload
+      );
+      
+      if (result.success) {
+        alert('✓ Needs list queued for sync when online.\n\nThis needs list will be created as a draft and automatically synced when your connection is restored.');
+        needsListForm.reset();
+        // Reset to one item row
+        const container = document.getElementById('items-container');
+        container.innerHTML = `
+          <tr class="item-row">
+            <td>
+              <select class="form-select form-select-sm item-select" name="item_sku_0" required>
+                <option value="">Select Item</option>
+                {% for item in items %}
+                  <option value="{{ item.sku }}">{{ item.name }} ({{ item.unit }})</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td>
+              <input type="number" class="form-control form-control-sm" name="item_qty_0" min="1" required>
+            </td>
+            <td>
+              <input type="text" class="form-control form-control-sm" name="item_justification_0" placeholder="Why is this item needed?">
+            </td>
+            <td class="text-center">
+              <button type="button" class="btn btn-outline-danger btn-sm remove-item" aria-label="Remove item" style="display:none;">
+                <i class="bi bi-trash" aria-hidden="true"></i>
+                <span class="visually-hidden">Remove</span>
+              </button>
+            </td>
+          </tr>
+        `;
+        itemIndex = 1;
+        updateRemoveButtons();
+      } else {
+        alert('Error queuing needs list: ' + result.error);
+      }
+    } else {
+      // Normal online submission
+      needsListForm.submit();
+    }
+  });
+}
 
 // Keyboard shortcuts for better UX
 document.addEventListener('keydown', function(e) {
   // Ctrl/Cmd + Enter to submit form
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-    document.getElementById('needsListForm').submit();
+    document.getElementById('needsListForm').dispatchEvent(new Event('submit'));
   }
 });
 </script>

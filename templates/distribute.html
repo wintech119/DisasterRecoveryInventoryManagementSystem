@@ -4,9 +4,16 @@
   <h3><i class="bi bi-arrow-up-circle text-danger me-2"></i>Record Distribution</h3>
   <p class="text-muted">Log outgoing relief supplies to beneficiaries</p>
 </div>
+
+<!-- Offline Mode Banner -->
+<div id="offline-mode-banner" class="alert alert-warning" style="display: none;" role="alert">
+  <i class="bi bi-wifi-off me-2"></i>
+  <strong>Offline Mode:</strong> You are currently offline. Entries will be saved locally and synced when connection is restored.
+</div>
+
 <div class="card">
   <div class="card-body">
-<form method="post">
+<form method="post" id="distribution-form">
   <div class="row g-3">
     <div class="col-md-6">
       <label class="form-label">Item *</label>
@@ -73,4 +80,69 @@
 </form>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const distributionForm = document.getElementById('distribution-form');
+  const offlineBanner = document.getElementById('offline-mode-banner');
+  
+  // Update offline banner visibility
+  function updateOfflineBanner() {
+    if (!navigator.onLine) {
+      offlineBanner.style.display = 'block';
+    } else {
+      offlineBanner.style.display = 'none';
+    }
+  }
+  
+  // Listen for online/offline events
+  window.addEventListener('online', updateOfflineBanner);
+  window.addEventListener('offline', updateOfflineBanner);
+  updateOfflineBanner();
+  
+  // Handle form submission (online and offline)
+  distributionForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(distributionForm);
+    const itemSku = formData.get('item_sku');
+    const quantity = parseInt(formData.get('qty'));
+    const locationId = parseInt(formData.get('location_id'));
+    const beneficiaryName = formData.get('beneficiary_name');
+    const beneficiaryParish = formData.get('parish');
+    const notes = formData.get('notes');
+    
+    // Validate required fields
+    if (!itemSku || !quantity || !locationId) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    
+    // Check if offline
+    if (!navigator.onLine && window.offlineManager) {
+      // Queue operation for offline sync
+      const payload = {
+        item_sku: itemSku,
+        quantity: quantity,
+        beneficiary_name: beneficiaryName,
+        beneficiary_parish: beneficiaryParish,
+        notes: notes,
+        user_id: {{ current_user.id }}
+      };
+      
+      const result = await window.offlineManager.queueOperation('distribution', locationId, payload);
+      
+      if (result.success) {
+        alert('✓ Distribution queued for sync when online.\n\nThis entry will be automatically synced when your connection is restored.');
+        distributionForm.reset();
+      } else {
+        alert('Error queuing distribution: ' + result.error);
+      }
+    } else {
+      // Normal online submission
+      distributionForm.submit();
+    }
+  });
+});
+</script>
 {% endblock %}
