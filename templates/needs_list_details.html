@@ -784,7 +784,8 @@
                   <i class="bi bi-box-arrow-right me-1"></i>Dispatch Now
                 </button>
               </form>
-              {% if not user_depot or user_depot.hub_type != 'AGENCY' %}
+              {# Hide Request Fulfilment Change button for completed needs lists #}
+              {% if needs_list.status != 'Completed' and (not user_depot or user_depot.hub_type != 'AGENCY') %}
                 <button type="button" class="btn btn-outline-warning btn-sm w-100" data-bs-toggle="modal" data-bs-target="#requestChangeModal">
                   <i class="bi bi-exclamation-triangle me-1"></i>Request Fulfilment Change
                 </button>
@@ -804,8 +805,8 @@
           </div>
         {% endif %}
 
-        <!-- Change Requests Section (Not for Agency Hubs) -->
-        {% if change_requests and (not user_depot or user_depot.hub_type != 'AGENCY') %}
+        <!-- Change Requests Section (Not for Agency Hubs or Completed Lists) -->
+        {% if change_requests and needs_list.status != 'Completed' and (not user_depot or user_depot.hub_type != 'AGENCY') %}
           <div class="card shadow-sm mb-3">
             <div class="card-header py-2" style="background-color: #ffc107;">
               <h6 class="mb-0"><i class="bi bi-exclamation-circle me-2"></i>Fulfilment Change Requests</h6>
@@ -981,6 +982,19 @@
             </div>
           </div>
         {% endif %}
+
+        {# Edit Fulfilment Button - Only for authorized users after receipt confirmation #}
+        {% if needs_list.status == 'Completed' and needs_list.received_by_id and current_user.has_any_role('ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER') %}
+          <div class="card border-warning mt-3">
+            <div class="card-body p-3">
+              <h6 class="card-title text-warning mb-2"><i class="bi bi-pencil-square me-1"></i>Post-Completion Corrections</h6>
+              <p class="small text-muted mb-2">Make corrections to completed fulfilment records (all changes are audit-logged)</p>
+              <button type="button" class="btn btn-warning btn-sm w-100" data-bs-toggle="modal" data-bs-target="#editFulfilmentModal">
+                <i class="bi bi-pencil-square me-1"></i>Edit Fulfilment
+              </button>
+            </div>
+          </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -1068,6 +1082,178 @@
     </div>
   </div>
 </div>
+{% endif %}
+
+<!-- Edit Fulfilment Modal (Post-Completion Corrections) -->
+{% if needs_list.status == 'Completed' and needs_list.received_by_id and current_user.has_any_role('ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OFFICER') %}
+<div class="modal fade" id="editFulfilmentModal" tabindex="-1" aria-labelledby="editFulfilmentModalLabel" aria-hidden="true" aria-describedby="modalWarningText">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(135deg, #002b5c 0%, #004080 100%); color: white; position: relative; overflow: hidden;">
+        <div style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); opacity: 0.1;">
+          <img src="{{ url_for('static', filename='images/jamaica_coat_of_arms.png') }}" alt="" style="height: 60px;">
+        </div>
+        <h5 class="modal-title position-relative" id="editFulfilmentModalLabel">
+          <i class="bi bi-pencil-square me-2"></i>Edit Completed Fulfilment - {{ needs_list.list_number }}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="{{ url_for('edit_completed_fulfilment', list_id=needs_list.id) }}">
+        <div class="modal-body">
+          <!-- Audit Warning -->
+          <div class="alert alert-warning" id="modalWarningText">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Post-Completion Corrections Only</strong>
+            <p class="mb-0 mt-1 small">
+              This form is for correcting completion records after receipt confirmation. All changes are permanently audit-logged with your name, timestamp, and reason. Use this only to reflect true post-event corrections, not new fulfilment activity.
+            </p>
+          </div>
+
+          <!-- Needs List Level Edits -->
+          <h6 class="mb-3"><i class="bi bi-card-heading me-2"></i>Delivery Metadata</h6>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Dispatch Date/Time</label>
+              <input type="datetime-local" class="form-control" name="dispatched_at" 
+                     value="{{ needs_list.dispatched_at.strftime('%Y-%m-%dT%H:%M') if needs_list.dispatched_at else '' }}">
+              <small class="form-text text-muted">Original: {{ needs_list.dispatched_at|format_datetime if needs_list.dispatched_at else 'Not set' }}</small>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Receipt Date/Time</label>
+              <input type="datetime-local" class="form-control" name="received_at" 
+                     value="{{ needs_list.received_at.strftime('%Y-%m-%dT%H:%M') if needs_list.received_at else '' }}">
+              <small class="form-text text-muted">Original: {{ needs_list.received_at|format_datetime if needs_list.received_at else 'Not set' }}</small>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Dispatch Notes</label>
+            <textarea class="form-control" name="dispatch_notes" rows="2">{{ needs_list.dispatch_notes or '' }}</textarea>
+            <small class="form-text text-muted">Original: {{ needs_list.dispatch_notes or 'None' }}</small>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Receipt Notes</label>
+            <textarea class="form-control" name="receipt_notes" rows="2">{{ needs_list.receipt_notes or '' }}</textarea>
+            <small class="form-text text-muted">Original: {{ needs_list.receipt_notes or 'None' }}</small>
+          </div>
+
+          <hr class="my-4">
+
+          <!-- Delivered Quantities Edit -->
+          <h6 class="mb-3"><i class="bi bi-boxes me-2"></i>Delivered Quantities</h6>
+          <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-sm table-bordered">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th>Item</th>
+                  <th class="text-center">Requested</th>
+                  <th class="text-center">Approved</th>
+                  <th class="text-center">Delivered</th>
+                  <th>Source Hub</th>
+                  <th class="text-center">Variance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item_entry in needs_list.items %}
+                  {% set requested_qty = item_entry.requested_qty %}
+                  {% for fulfilment in needs_list.fulfilments %}
+                    {% if fulfilment.item_sku == item_entry.item_sku %}
+                    <tr>
+                      <td>{{ item_entry.item.name }}</td>
+                      <td class="text-center text-muted">{{ requested_qty }}</td>
+                      <td class="text-center text-muted">{{ fulfilment.allocated_qty }}</td>
+                      <td class="text-center">
+                        <input type="number" class="form-control form-control-sm" 
+                               name="delivered_qty_{{ fulfilment.id }}" 
+                               value="{{ fulfilment.allocated_qty }}" 
+                               min="0" 
+                               style="width: 90px; margin: 0 auto;">
+                        <input type="hidden" name="fulfilment_ids" value="{{ fulfilment.id }}">
+                      </td>
+                      <td><small>{{ fulfilment.source_hub.name }}</small></td>
+                      <td class="text-center">
+                        <span class="badge bg-secondary" id="variance_{{ fulfilment.id }}">0</span>
+                      </td>
+                    </tr>
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <hr class="my-4">
+
+          <!-- Edit Reason (Required) -->
+          <div class="mb-3">
+            <label class="form-label fw-bold">
+              Reason for Correction <span class="text-danger">*</span>
+            </label>
+            <textarea class="form-control" name="edit_reason" rows="3" required 
+                      placeholder="Explain why these corrections are needed. Examples:&#10;- Correcting dispatch date to match actual shipping date&#10;- Adjusting delivered quantity - 5 items damaged in transit&#10;- Updating receipt notes with storage location"></textarea>
+            <div class="form-text">Required for audit trail. Be specific about what changed and why.</div>
+          </div>
+
+          <!-- Recent Audit Log (Collapsible) -->
+          <div class="accordion" id="auditLogAccordion">
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#auditLogCollapse">
+                  <i class="bi bi-clock-history me-2"></i>Recent Edit History
+                </button>
+              </h2>
+              <div id="auditLogCollapse" class="accordion-collapse collapse" data-bs-parent="#auditLogAccordion">
+                <div class="accordion-body">
+                  <div class="small text-muted">
+                    <p class="mb-2">Audit log for post-completion edits will appear here after the first correction is made.</p>
+                    <p class="mb-0"><em>No edit history yet for this completed fulfilment.</em></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning">
+            <i class="bi bi-save me-1"></i>Save Corrections (Audit Logged)
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// Calculate variance for delivered quantities
+document.addEventListener('DOMContentLoaded', function() {
+  const deliveredInputs = document.querySelectorAll('[name^="delivered_qty_"]');
+  
+  deliveredInputs.forEach(input => {
+    const fulfilmentId = input.name.split('_')[2];
+    const approvedQty = parseInt(input.value);
+    
+    input.addEventListener('input', function() {
+      const deliveredQty = parseInt(this.value) || 0;
+      const variance = deliveredQty - approvedQty;
+      const varianceBadge = document.getElementById('variance_' + fulfilmentId);
+      
+      if (varianceBadge) {
+        varianceBadge.textContent = (variance >= 0 ? '+' : '') + variance;
+        
+        if (variance > 0) {
+          varianceBadge.className = 'badge bg-success';
+        } else if (variance < 0) {
+          varianceBadge.className = 'badge bg-danger';
+        } else {
+          varianceBadge.className = 'badge bg-secondary';
+        }
+      }
+    });
+  });
+});
+</script>
 {% endif %}
 
 <style>
