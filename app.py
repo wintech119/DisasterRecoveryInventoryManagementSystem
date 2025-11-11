@@ -6143,6 +6143,240 @@ def serve_upload(file_path):
         flash(f"Error accessing file: {str(e)}", "error")
         return redirect(url_for("items"))
 
+# ---------- Offline Sync API Endpoints ----------
+
+@app.route("/api/offline/sync", methods=["POST"])
+@login_required
+def sync_offline_operation():
+    """
+    Sync offline queued operations to the server.
+    Handles intake, distribution, and needs list creation operations.
+    """
+    try:
+        operation = request.get_json()
+        
+        if not operation:
+            return jsonify({"success": False, "error": "No operation data provided"}), 400
+        
+        operation_type = operation.get("type")
+        hub_id = operation.get("hub_id")
+        payload = operation.get("payload", {})
+        client_id = operation.get("client_id")
+        
+        # Verify user has access to this hub
+        if not can_access_hub(current_user, hub_id):
+            return jsonify({"success": False, "error": "Access denied to this hub"}), 403
+        
+        # Route to appropriate handler based on operation type
+        if operation_type == "intake":
+            return handle_offline_intake(hub_id, payload, client_id)
+        elif operation_type == "distribution":
+            return handle_offline_distribution(hub_id, payload, client_id)
+        elif operation_type == "needs_list_create":
+            return handle_offline_needs_list(hub_id, payload, client_id)
+        else:
+            return jsonify({"success": False, "error": f"Unknown operation type: {operation_type}"}), 400
+            
+    except Exception as e:
+        print(f"[Offline Sync] Error: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+def can_access_hub(user, hub_id):
+    """Check if user has access to the specified hub"""
+    if not hub_id:
+        return False
+    
+    # Admin and Logistics roles have access to all hubs
+    if user.has_any_role([ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER]):
+        return True
+    
+    # Check if user has hub access via UserHub table
+    if user.has_hub_access(hub_id):
+        return True
+    
+    # Check legacy assigned_location_id
+    if user.assigned_location_id == hub_id:
+        return True
+    
+    return False
+
+def handle_offline_intake(hub_id, payload, client_id):
+    """Handle offline intake (donation/stock in) operation"""
+    try:
+        item_sku = payload.get("item_sku")
+        quantity = payload.get("quantity")
+        donor_name = payload.get("donor_name")
+        notes = payload.get("notes", "")
+        expiry_date_str = payload.get("expiry_date")
+        
+        # Validate item exists
+        item = Item.query.filter_by(sku=item_sku).first()
+        if not item:
+            return jsonify({"success": False, "error": f"Item {item_sku} not found"}), 404
+        
+        # Validate hub exists
+        hub = Depot.query.get(hub_id)
+        if not hub:
+            return jsonify({"success": False, "error": f"Hub {hub_id} not found"}), 404
+        
+        # Create or get donor
+        donor = None
+        if donor_name:
+            donor = Donor.query.filter_by(name=donor_name).first()
+            if not donor:
+                donor = Donor(name=donor_name)
+                db.session.add(donor)
+                db.session.flush()
+        
+        # Parse expiry date if provided
+        expiry_date = None
+        if expiry_date_str:
+            try:
+                expiry_date = datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
+            except:
+                pass
+        
+        # Create transaction
+        transaction = Transaction(
+            item_sku=item_sku,
+            ttype="IN",
+            qty=quantity,
+            location_id=hub_id,
+            donor_id=donor.id if donor else None,
+            expiry_date=expiry_date,
+            notes=f"[Offline Sync - {client_id}] {notes}",
+            created_by=current_user.username,
+            created_at=datetime.utcnow()
+        )
+        
+        db.session.add(transaction)
+        db.session.commit()
+        
+        return jsonify({"success": True, "transaction_id": transaction.id})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[Offline Sync - Intake] Error: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+def handle_offline_distribution(hub_id, payload, client_id):
+    """Handle offline distribution (stock out) operation"""
+    try:
+        item_sku = payload.get("item_sku")
+        quantity = payload.get("quantity")
+        beneficiary_name = payload.get("beneficiary_name")
+        beneficiary_parish = payload.get("beneficiary_parish")
+        notes = payload.get("notes", "")
+        
+        # Validate item exists
+        item = Item.query.filter_by(sku=item_sku).first()
+        if not item:
+            return jsonify({"success": False, "error": f"Item {item_sku} not found"}), 404
+        
+        # Validate hub exists
+        hub = Depot.query.get(hub_id)
+        if not hub:
+            return jsonify({"success": False, "error": f"Hub {hub_id} not found"}), 404
+        
+        # Check stock availability
+        stock_map = get_stock_by_location()
+        current_stock = stock_map.get((item_sku, hub_id), 0)
+        
+        if current_stock < quantity:
+            return jsonify({
+                "success": False, 
+                "error": f"Insufficient stock. Available: {current_stock}, Requested: {quantity}"
+            }), 400
+        
+        # Create or get beneficiary
+        beneficiary = None
+        if beneficiary_name:
+            beneficiary = Beneficiary.query.filter_by(
+                name=beneficiary_name,
+                parish=beneficiary_parish
+            ).first()
+            if not beneficiary:
+                beneficiary = Beneficiary(
+                    name=beneficiary_name,
+                    parish=beneficiary_parish
+                )
+                db.session.add(beneficiary)
+                db.session.flush()
+        
+        # Create transaction
+        transaction = Transaction(
+            item_sku=item_sku,
+            ttype="OUT",
+            qty=quantity,
+            location_id=hub_id,
+            beneficiary_id=beneficiary.id if beneficiary else None,
+            notes=f"[Offline Sync - {client_id}] {notes}",
+            created_by=current_user.username,
+            created_at=datetime.utcnow()
+        )
+        
+        db.session.add(transaction)
+        db.session.commit()
+        
+        return jsonify({"success": True, "transaction_id": transaction.id})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[Offline Sync - Distribution] Error: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+def handle_offline_needs_list(hub_id, payload, client_id):
+    """Handle offline needs list creation"""
+    try:
+        # Only allow Agency and Sub hubs to create needs lists offline
+        hub = Depot.query.get(hub_id)
+        if not hub:
+            return jsonify({"success": False, "error": f"Hub {hub_id} not found"}), 404
+        
+        if hub.hub_type not in ['AGENCY', 'SUB']:
+            return jsonify({
+                "success": False, 
+                "error": "Only Agency and Sub hubs can create needs lists"
+            }), 403
+        
+        # Create needs list as Draft (will need online approval anyway)
+        needs_list = NeedsList(
+            agency_hub_id=hub_id,
+            status='Draft',
+            created_by_id=current_user.id,
+            created_at=datetime.utcnow(),
+            notes=f"[Offline Sync - {client_id}] {payload.get('notes', '')}"
+        )
+        
+        db.session.add(needs_list)
+        db.session.flush()
+        
+        # Add line items
+        line_items = payload.get("line_items", [])
+        for item_data in line_items:
+            line_item = NeedsListLineItem(
+                needs_list_id=needs_list.id,
+                item_sku=item_data.get("item_sku"),
+                quantity_requested=item_data.get("quantity"),
+                priority=item_data.get("priority", "MEDIUM"),
+                notes=item_data.get("notes", "")
+            )
+            db.session.add(line_item)
+        
+        db.session.commit()
+        
+        return jsonify({"success": True, "needs_list_id": needs_list.id})
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[Offline Sync - Needs List] Error: {str(e)}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/offline")
+def offline_page():
+    """Fallback page shown when application is offline"""
+    return render_template("offline.html")
+
 # ---------- Error Handlers ----------
 
 @app.errorhandler(403)
