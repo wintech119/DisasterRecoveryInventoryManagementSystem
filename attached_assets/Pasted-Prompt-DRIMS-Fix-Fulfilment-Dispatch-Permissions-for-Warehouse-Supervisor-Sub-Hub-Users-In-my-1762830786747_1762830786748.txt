@@ -1,0 +1,136 @@
+Prompt (DRIMS – Fix Fulfilment & Dispatch Permissions for Warehouse Supervisor/Sub-Hub Users)
+
+In my DRIMS Flask app, update the permission logic for Needs List fulfilment and dispatch so that:
+
+1. Keep the existing high-level rules
+
+Preserve the previous behavior:
+
+Fulfilment Change Request section remains removed.
+
+Post-completion “Edit Fulfilment” is only available when:
+
+Needs List is Completed/Fulfilled and
+
+Receipt is confirmed
+and only visible to:
+
+System Administrator
+
+Logistics Manager
+
+Logistics Officer
+
+All edits are audit-logged.
+
+Do not change those parts.
+
+2. Restore and clarify permissions for operational users (Main Hub / Sub-Hub)
+
+Adjust the route and template permissions for Prepare Fulfilment and Dispatch/Issue so that:
+
+a) Prepare Fulfilment page (allocation logic)
+
+Access allowed to:
+
+System Administrator
+
+Logistics Manager
+
+Logistics Officer
+
+Not for Warehouse Supervisor / Sub-Hub Users.
+(They do not prepare allocations; they execute them.)
+
+b) Dispatch / Issue page (executing approved fulfilment)
+
+For dispatch or equivalent routes/pages (e.g. /needs-lists/<id>/dispatch, /fulfilment/<id>/dispatch):
+
+Allow access and enable buttons/inputs if:
+
+Needs List has an approved fulfilment (by LM) that assigns this user’s Hub as a source hub, and
+
+The user’s role is one of:
+
+Main Hub User
+
+Sub-Hub User
+
+Inventory Clerk (if assigned to that Hub and you support this role)
+
+Behavior:
+
+These users (including Warehouse Supervisors tagged as Sub-Hub User) must be able to:
+
+Open the dispatch page for Needs Lists where their Hub is a source.
+
+Enter/confirm dispatched quantities (up to the approved allocation).
+
+Mark items as dispatched/shipped from their Hub.
+
+They must NOT:
+
+Change fulfilment allocations.
+
+Change Needs List statuses beyond what the workflow allows (those remain under LM/LO control).
+
+3. Specific fix for Warehouse Supervisor – Montego Bay
+
+User example:
+
+Rick James
+
+Role: Sub-Hub User
+
+Location/Hub: Montego Bay (SUB)
+
+Ensure in code:
+
+When a Needs List fulfilment includes Montego Bay as a source hub:
+
+Rick James can:
+
+View the Needs List dispatch page.
+
+Enter/confirm dispatch records from Montego Bay.
+
+He does not see or edit allocations for other hubs.
+
+He should not see "You don't have permission to view this needs list." for Needs Lists involving his own Hub as requester or source.
+
+4. Technical implementation details
+
+In the view/route handlers for Needs List pages:
+
+Introduce a reusable permission helper, e.g.:
+
+def can_view_needs_list(user, needs_list):
+    # existing global/role checks (Admin, LM, LO)
+    # allow requesting hub users (Sub-Hub / Agency)
+    # allow source hub users for approved fulfilment
+
+def can_dispatch_from_hub(user, needs_list):
+    # return True if:
+    # - user.role in ["Main Hub User", "Sub-Hub User", "Inventory Clerk"]
+    # - AND user.hub_id is one of the source hubs in the approved fulfilment
+
+
+In the dispatch template:
+
+Show Dispatch / Issue buttons and edit controls only when can_dispatch_from_hub(current_user, needs_list) is True.
+
+If a user fails these checks:
+
+Keep: "You don't have permission to view this needs list."
+
+But do not block valid Sub-Hub/Main Hub users tied to that Needs List.
+
+5. Summary
+
+Leave post-completion edit rights restricted to Admin/LM/LO.
+
+Ensure operational hub users (Main Hub / Sub-Hub / Warehouse Supervisor) can:
+
+Access and operate the Dispatch/Issue sections for Needs Lists that involve their Hub.
+
+Apply this consistently so your Montego Bay Warehouse Supervisor and similar users can perform their jobs without elevating their governance role.
