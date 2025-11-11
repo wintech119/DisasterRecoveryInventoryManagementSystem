@@ -1,0 +1,173 @@
+In my DRIMS Flask app, update the Logistics Manager dashboard to be compact, modern, and role-specific, following UI/UX best practices. This dashboard should give the Logistics Manager a clear national overview without clutter.
+
+1. General Requirements
+
+This dashboard is for users with role: Logistics Manager.
+
+Use the existing left-side navigation layout.
+
+Follow modern dashboard best practices:
+
+Clean, minimal, compact.
+
+Clear hierarchy: key metrics on top, drill-down below.
+
+Consistent padding, spacing, and typography.
+
+Mobile-responsive and readable on standard laptops.
+
+Add a modern icon in the page heading:
+
+Same style/icon set as other user dashboards (e.g. a simple outlined “grid/analytics” or “control panel” icon).
+
+Keep icon consistent across all dashboards; just change heading text per role.
+
+2. Top Summary Bar (Compact KPI Cards)
+
+At the top of the Logistics Manager dashboard, add a row of small, compact KPI cards:
+
+Total Main Hubs (Active)
+
+Total Sub-Hubs (Active)
+
+Total Agency Hubs (Active)
+
+Total Items in Stock (Gov Hubs Only)
+
+Open Needs Lists
+
+Count of Needs Lists in key statuses: Submitted, Fulfilment Prepared, Awaiting Approval
+
+Rules:
+
+For Total Items in Stock, only include:
+
+Hubs with type MAIN or SUB
+
+Exclude Agency hubs from all stock totals.
+
+Use concise labels, subtle icons, and no large blocks of text.
+
+Each card should be clickable (optional) to filter or navigate to details later.
+
+3. Hub Status & Stock Overview (Main + Sub-Hubs)
+
+Below the KPI bar, add a compact table or grid showing per-hub information for all Main and Sub-Hubs:
+
+Columns:
+
+Hub Name
+
+Hub Type (Main / Sub)
+
+Status (Active / Inactive)
+
+Current Stock Count (sum of quantities at that hub)
+
+Last Activity (timestamp of last transaction: intake, distribution, or transfer)
+
+Behavior:
+
+Sort by Hub Type (Main Hubs first), then by Hub Name.
+
+Use a small status pill:
+
+Green = Active
+
+Gray = Inactive
+
+Make each row clickable to view that hub’s detailed inventory (existing page if available).
+
+Do not show Agency internal stock here.
+
+Keep row height tight but readable (compact, not bulky).
+
+4. Category Distribution Chart (Gov Hubs Only)
+
+On the right side or directly below the hub table (depending on screen width), show a visual summary of stock distribution by category.
+
+Requirements:
+
+Use only stock from:
+
+MAIN and SUB hubs.
+
+Exclude AGENCY hubs fully.
+
+Group by category, e.g.:
+
+Food & Water
+
+Hygiene & Sanitization
+
+Medical Supplies
+
+Shelter & NFI
+
+Logistics & Equipment
+
+Use a simple, modern chart:
+
+Horizontal bar chart or donut chart is fine.
+
+Labels: Category + total units.
+
+Keep it clean, no 3D, no cluttered legends.
+
+5. Active vs Inactive Hubs Snapshot
+
+Add a small, compact section (could be a mini chart or list) showing:
+
+Count of Active vs Inactive:
+
+Main Hubs
+
+Sub-Hubs
+
+Agency Hubs
+
+Example layout:
+
+“Main Hubs: 3 Active / 0 Inactive”
+
+“Sub-Hubs: 5 Active / 1 Inactive”
+
+“Agency Hubs: 4 Active / 2 Inactive”
+
+Use small icons and aligned text—no giant widgets.
+
+6. Permissions & Data Rules
+
+This dashboard is visible only to:
+
+Logistics Manager
+
+(Optionally System Administrator for testing)
+
+Must respect DRIMS rules:
+
+Agency internal inventory is not shown.
+
+Aggregated stats are based only on allowed data (Main/Sub for stock, Agency only as count/status and transactions).
+
+All queries must be efficient and scoped:
+
+Use proper filtering by hub_type and status.
+
+7. Visual & UX Details
+
+Use:
+
+A single, modern icon in the page title (e.g. next to “Logistics Manager Dashboard”).
+
+Consistent icon pack across all dashboards.
+
+Keep everything:
+
+Left-aligned.
+
+With enough whitespace to avoid feeling congested.
+
+No bright, harsh colors; use subtle accents for highlights and statuses.
+
+Implement this as the default view for Logistics Manager when visiting /dashboard, using partials/components so other role dashboards can reuse the same layout and icon style.

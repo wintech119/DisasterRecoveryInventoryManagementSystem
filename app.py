@@ -707,45 +707,105 @@ def build_logistics_manager_dashboard(user):
     """
     Build dashboard context for Logistics Manager role.
     Full visibility of government hubs, needs lists, and stock.
+    Compact, modern design with national overview.
     """
     from datetime import datetime, timedelta, date
     
     context = {'role': 'Logistics Manager', 'template': 'logistics_manager'}
     
-    # Hub counts
+    # Hub queries
     main_hubs = Depot.query.filter_by(hub_type='MAIN').all()
     sub_hubs = Depot.query.filter_by(hub_type='SUB').all()
     agency_hubs = Depot.query.filter_by(hub_type='AGENCY').all()
     
-    context['cards'] = {
-        'main_hubs_count': len(main_hubs),
-        'sub_hubs_count': len(sub_hubs),
-        'agency_hubs_count': len(agency_hubs),
-        'submitted_count': NeedsList.query.filter_by(status='Submitted').count(),
-        'fulfilment_prepared_count': NeedsList.query.filter_by(status='Fulfilment Prepared').count(),
-        'awaiting_approval_count': NeedsList.query.filter_by(status='Awaiting Approval').count(),
-        'approved_count': NeedsList.query.filter_by(status='Approved').count()
-    }
+    # Active/Inactive counts by hub type
+    main_active = sum(1 for h in main_hubs if h.status == 'Active')
+    main_inactive = len(main_hubs) - main_active
+    sub_active = sum(1 for h in sub_hubs if h.status == 'Active')
+    sub_inactive = len(sub_hubs) - sub_active
+    agency_active = sum(1 for h in agency_hubs if h.status == 'Active')
+    agency_inactive = len(agency_hubs) - agency_active
+    
+    # Open Needs Lists count (Submitted + Fulfilment Prepared + Awaiting Approval)
+    open_needs_count = NeedsList.query.filter(
+        NeedsList.status.in_(['Submitted', 'Fulfilment Prepared', 'Awaiting Approval'])
+    ).count()
     
     # Government stock summary (Main + Sub hubs only, exclude Agency)
-    government_hubs = main_hubs + sub_hubs
+    government_hubs = [h for h in main_hubs + sub_hubs if h.status == 'Active']
     stock_map = get_stock_by_location()
+    all_items = Item.query.all()
     total_stock_units = 0
-    stock_by_hub = []
     
-    for hub in government_hubs:
-        hub_total = sum(stock_map.get((item.sku, hub.id), 0) for item in Item.query.all())
-        total_stock_units += hub_total
-        stock_by_hub.append({
-            'hub': hub,
-            'total_units': hub_total,
-            'hub_type': hub.hub_type
+    # Compact KPI Cards
+    context['kpi_cards'] = {
+        'main_hubs_active': main_active,
+        'main_hubs_total': len(main_hubs),
+        'sub_hubs_active': sub_active,
+        'sub_hubs_total': len(sub_hubs),
+        'agency_hubs_active': agency_active,
+        'agency_hubs_total': len(agency_hubs),
+        'total_gov_stock': 0,
+        'open_needs_lists': open_needs_count
+    }
+    
+    # Hub Status & Stock Overview (Main + Sub only)
+    hub_overview = []
+    category_totals = {}
+    
+    for hub in main_hubs + sub_hubs:
+        hub_total = 0
+        last_activity = None
+        
+        # Calculate stock at this hub
+        for item in all_items:
+            qty = stock_map.get((item.sku, hub.id), 0)
+            hub_total += qty
+            
+            # Track category totals (only for active gov hubs)
+            if hub.status == 'Active' and qty > 0:
+                cat = item.category or 'Uncategorized'
+                category_totals[cat] = category_totals.get(cat, 0) + qty
+        
+        # Add to government stock total (active hubs only)
+        if hub.status == 'Active':
+            total_stock_units += hub_total
+        
+        # Find last transaction at this hub
+        last_txn = Transaction.query.filter_by(location_id=hub.id)\
+                                    .order_by(Transaction.created_at.desc()).first()
+        
+        if last_txn:
+            last_activity = last_txn.created_at
+        
+        hub_overview.append({
+            'id': hub.id,
+            'name': hub.name,
+            'hub_type': hub.hub_type,
+            'status': hub.status,
+            'stock_count': hub_total,
+            'last_activity': last_activity
         })
     
-    context['government_stock'] = {
-        'total_units': total_stock_units,
-        'by_hub': sorted(stock_by_hub, key=lambda x: x['total_units'], reverse=True)[:10]
+    # Sort: Main first, then Sub; then by name
+    hub_overview.sort(key=lambda x: (0 if x['hub_type'] == 'MAIN' else 1, x['name']))
+    
+    context['kpi_cards']['total_gov_stock'] = total_stock_units
+    context['hub_overview'] = hub_overview
+    
+    # Active vs Inactive Hub Snapshot
+    context['hub_status_summary'] = {
+        'main': {'active': main_active, 'inactive': main_inactive},
+        'sub': {'active': sub_active, 'inactive': sub_inactive},
+        'agency': {'active': agency_active, 'inactive': agency_inactive}
     }
+    
+    # Category Distribution (for chart)
+    context['category_distribution'] = sorted(
+        [{'category': k, 'total': v} for k, v in category_totals.items()],
+        key=lambda x: x['total'],
+        reverse=True
+    )
     
     # Needs Lists requiring review/approval
     context['needs_lists_queue'] = {
@@ -767,22 +827,6 @@ def build_logistics_manager_dashboard(user):
         'rejected': NeedsList.query.filter_by(status='Rejected')\
                              .filter(NeedsList.approved_at >= thirty_days_ago)\
                              .order_by(NeedsList.approved_at.desc()).limit(5).all()
-    }
-    
-    # KPIs - Last 7 days activity
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
-    context['kpis'] = {
-        'approved_7d': NeedsList.query.filter(
-            NeedsList.approved_at >= seven_days_ago
-        ).count(),
-        'dispatched_7d': NeedsList.query.filter(
-            NeedsList.status.in_(['Dispatched', 'Received', 'Completed']),
-            NeedsList.dispatched_at >= seven_days_ago
-        ).count(),
-        'completed_7d': NeedsList.query.filter(
-            NeedsList.status == 'Completed',
-            NeedsList.fulfilled_at >= seven_days_ago
-        ).count()
     }
     
     return context
