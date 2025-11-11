@@ -2424,6 +2424,14 @@ def dashboard():
         return render_template("dashboard_main_hub.html", **ctx)
     elif template_name == 'sub_hub':
         return render_template("dashboard_sub_hub.html", **ctx)
+    elif template_name == 'agency_hub':
+        return render_template("dashboard_agency_hub.html", **ctx)
+    elif template_name == 'inventory_clerk':
+        return render_template("dashboard_inventory_clerk.html", **ctx)
+    elif template_name == 'auditor':
+        return render_template("dashboard_auditor.html", **ctx)
+    elif template_name == 'system_administrator':
+        return render_template("dashboard_system_administrator.html", **ctx)
     else:
         # Fallback to basic dashboard
         return render_template("dashboard_basic.html", **ctx)

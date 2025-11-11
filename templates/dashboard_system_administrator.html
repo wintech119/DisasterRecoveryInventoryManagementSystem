@@ -91,25 +91,25 @@
         <div class="card-body">
           <div class="row g-3">
             <div class="col-md-3">
-              <a href="{{ url_for('manage_users') }}" class="btn btn-primary w-100 py-3" aria-label="Manage users">
+              <a href="{{ url_for('users') }}" class="btn btn-primary w-100 py-3" aria-label="Manage users">
                 <i class="bi bi-person-gear fs-4 d-block mb-2"></i>
                 <div class="fw-semibold">Manage Users</div>
               </a>
             </div>
             <div class="col-md-3">
-              <a href="{{ url_for('manage_hubs') }}" class="btn btn-info w-100 py-3" aria-label="Manage hubs">
+              <a href="{{ url_for('depots') }}" class="btn btn-info w-100 py-3" aria-label="Manage hubs">
                 <i class="bi bi-building-gear fs-4 d-block mb-2"></i>
                 <div class="fw-semibold">Manage Hubs</div>
               </a>
             </div>
             <div class="col-md-3">
-              <a href="{{ url_for('system_settings') }}" class="btn btn-secondary w-100 py-3" aria-label="System settings">
-                <i class="bi bi-gear fs-4 d-block mb-2"></i>
-                <div class="fw-semibold">System Settings</div>
+              <a href="{{ url_for('disaster_events') }}" class="btn btn-warning w-100 py-3" aria-label="Manage events">
+                <i class="bi bi-exclamation-triangle fs-4 d-block mb-2"></i>
+                <div class="fw-semibold">Disaster Events</div>
               </a>
             </div>
             <div class="col-md-3">
-              <a href="{{ url_for('export_data') }}" class="btn btn-success w-100 py-3" aria-label="Export data">
+              <a href="{{ url_for('export_items') }}" class="btn btn-success w-100 py-3" aria-label="Export data">
                 <i class="bi bi-download fs-4 d-block mb-2"></i>
                 <div class="fw-semibold">Export Data</div>
               </a>
