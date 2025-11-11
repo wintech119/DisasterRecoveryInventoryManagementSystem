@@ -18,7 +18,7 @@ Key entities include Items, Depots, Donors, Beneficiaries, DisasterEvents, Needs
 The frontend uses server-side rendered HTML templates with Bootstrap 5 and Bootstrap Icons, designed for rapid deployment, accessibility, and mobile-friendliness. Dashboards include responsive design, hero cards for key metrics, Chart.js for data visualizations, and an activity feed. Needs List views adapt layouts based on status for professional appearance.
 
 ### Core Features
--   **Progressive Web App (PWA) with Offline Mode**: Comprehensive offline-first architecture for unstable connectivity, featuring a Service Worker for asset caching, Web App Manifest for PWA installation, IndexedDB for local storage of pending operations, and an Offline Sync Engine for background synchronization with backend sync endpoints. Supports offline form submissions for intake, distribution, and needs list creation, with real-time online/offline status indicators and session persistence.
+-   **Progressive Web App (PWA) with Offline Mode (EXPERIMENTAL - DISABLED BY DEFAULT)**: Comprehensive offline-first architecture for unstable connectivity. **Status**: Feature infrastructure complete with 2/3 security fixes implemented. Session encryption pending - **disabled by default** until Phase 2 completion. Enable with `OFFLINE_MODE_ENABLED=true` environment variable for testing only. Features include: Service Worker for asset caching, Web App Manifest for PWA installation, IndexedDB for local storage, Offline Sync Engine with automatic background synchronization, offline form submissions (intake, distribution, needs list creation), online/offline status indicators. **Security**: Idempotency enforcement via OfflineSyncLog table prevents duplicate syncs; strict hub-level access control prevents unauthorized operations; session encryption infrastructure created but not yet integrated (tokens currently stored in plaintext when enabled).
 -   **Agency Hub Request List Form**: Accessible interface for item requests with a table-based layout and responsive design.
 -   **Barcode Scanning**: Supports barcode scanning for efficient donation intake (online only).
 -   **Needs List Management**: Comprehensive workflow for requesting and fulfilling supplies, including concurrency control, stock over-allocation prevention, draft-save functionality, and streamlined views for various fulfillment stages.
@@ -42,3 +42,101 @@ The frontend uses server-side rendered HTML templates with Bootstrap 5 and Boots
 -   **Data Processing**: Pandas (2.2.2).
 -   **Configuration Management**: python-dotenv (1.0.1).
 -   **Frontend Libraries (CDN)**: Bootstrap (5.3.3), Bootstrap Icons (1.11.3), Chart.js (4.4.0).
+
+## Offline Mode Architecture (November 2025 - Experimental)
+
+**Status**: DISABLED BY DEFAULT - Enable with `OFFLINE_MODE_ENABLED=true` for testing only
+
+### Implementation Status
+
+**✅ Completed (Production-Ready)**:
+1. **Idempotency Enforcement**: 
+   - OfflineSyncLog database model with UNIQUE constraint on (client_operation_id, user_id)
+   - All sync handlers check for duplicates before processing
+   - Duplicate operations return cached results from result_data JSON field
+   - Prevents double-processing of queued operations
+
+2. **Strict Hub Access Control**:
+   - `can_access_hub()` function enforces explicit hub assignments for ALL users
+   - Removed blanket access for admin/logistics roles in offline operations
+   - Validates hub access via UserHub table and legacy assigned_location_id
+   - Prevents replay attacks where users queue operations for unauthorized hubs
+
+**⚠️ Partial Implementation (NOT Production-Ready)**:
+3. **Session Encryption**:
+   - ✅ Web Crypto API module created (`static/js/offline-encryption.js`)
+   - ✅ PBKDF2 key derivation (100,000 iterations) + AES-GCM encryption
+   - ✅ Random salt and IV generation for each encryption operation
+   - ✅ PIN verification hash support
+   - ❌ NOT YET integrated into `offline-storage.js`
+   - ❌ No PIN entry UI implemented
+   - ❌ Session tokens currently stored in **plaintext** in IndexedDB when offline mode enabled
+
+### Security Status
+
+**Current Risk**: Session tokens stored in plaintext in browser IndexedDB when offline mode is enabled. Anyone with device/browser access can extract credentials.
+
+**Recommendation**: Keep offline mode disabled (`OFFLINE_MODE_ENABLED=false`, the default) until Phase 2 encryption work is complete.
+
+### Architecture Components
+
+1. **Service Worker** (`static/service-worker.js`): 
+   - Caches core assets (CSS, JS, templates) for offline access
+   - Version-based cache management
+   - Cache-first strategy with network fallback
+   - Excludes user-specific data to prevent stale information
+
+2. **IndexedDB Wrapper** (`static/js/offline-storage.js`):
+   - `pendingOperations` store: Queues operations with operation_type, hub_id, payload, timestamp, retry_count
+   - `offline_session` store: Session tokens (currently plaintext - encryption pending)
+   - `sync_metadata` store: Tracks last successful sync timestamp
+   - Automatic 30-day cleanup (when implemented)
+
+3. **Offline Sync Engine** (`static/js/offline.js`):
+   - Background sync every 30 seconds when online
+   - Exponential backoff on failures (max 5 retries)
+   - Batch processing for efficient network usage
+   - Client-generated UUIDs for idempotent operations
+
+4. **Backend Sync API** (`/api/offline/sync` in app.py):
+   - Processes intake, distribution, needs_list_create operations
+   - OfflineSyncLog table enforces idempotency with duplicate checks
+   - Hub-based access control validation via `can_access_hub()`
+   - Returns success/failure status with error messages
+
+5. **Form Integration**:
+   - `templates/intake.html`: Offline banner + queueing logic
+   - `templates/distribute.html`: Offline banner + queueing logic
+   - `templates/needs_list_form.html`: Offline banner + line items queueing (create mode only)
+
+### Phase 2 Roadmap (Estimated 1-2 hours)
+
+**Required for Production Deployment**:
+1. **Integrate Encryption Module**:
+   - Wire `OfflineEncryption` class into `offline-storage.js` storeSession()/getSession()
+   - Encrypt session tokens before IndexedDB storage
+   - Decrypt on retrieval with user-provided PIN
+
+2. **Add PIN Entry UI**:
+   - Modal prompt for offline PIN setup on first offline operation
+   - PIN verification on subsequent offline access
+   - Secure salt storage alongside encrypted data
+
+3. **Cleanup Job**:
+   - Add periodic task to purge OfflineSyncLog entries older than 30 days
+   - Prevent unbounded table growth
+
+**Testing**:
+- Regression test idempotency (duplicate sync attempts)
+- Regression test hub access control (cross-hub replay attacks)
+- Test encryption/decryption flow with PIN
+- Test offline → online sync with all operation types
+
+### Enabling Offline Mode (For Testing Only)
+
+Set environment variable:
+```
+OFFLINE_MODE_ENABLED=true
+```
+
+**⚠️ WARNING**: Only enable for testing in development. Session tokens will be stored in plaintext until Phase 2 encryption integration is complete.

@@ -1013,12 +1013,15 @@
       startNotificationPolling();
     }
 
-    // Service Worker Registration for Offline Mode
+    {% if config.OFFLINE_MODE_ENABLED %}
+    // Service Worker Registration for Offline Mode (EXPERIMENTAL)
+    // WARNING: Session encryption not yet implemented - tokens stored in plaintext
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
         navigator.serviceWorker.register('/static/service-worker.js')
           .then(function(registration) {
             console.log('[Service Worker] Registered successfully:', registration.scope);
+            console.warn('[Offline Mode] EXPERIMENTAL - Session encryption pending');
             
             // Check for updates periodically
             setInterval(function() {
@@ -1042,10 +1045,60 @@
       });
     }
     {% endif %}
+    {% else %}
+    // CRITICAL SECURITY: Unregister service workers and clear offline data when disabled
+    console.log('[Offline Mode] Disabled - Cleaning up existing service workers and offline data');
+    
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        // Unregister all service workers
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (let registration of registrations) {
+            registration.unregister().then(function(success) {
+              if (success) {
+                console.log('[Service Worker] Unregistered successfully');
+              }
+            });
+          }
+        });
+        
+        // Clear all caches
+        if ('caches' in window) {
+          caches.keys().then(function(cacheNames) {
+            return Promise.all(
+              cacheNames.map(function(cacheName) {
+                return caches.delete(cacheName);
+              })
+            );
+          }).then(function() {
+            console.log('[Cache] All offline caches cleared');
+          });
+        }
+        
+        // Clear IndexedDB (offline data)
+        if ('indexedDB' in window) {
+          try {
+            const deleteRequest = indexedDB.deleteDatabase('DRIMS_Offline');
+            deleteRequest.onsuccess = function() {
+              console.log('[IndexedDB] Offline database cleared');
+            };
+            deleteRequest.onerror = function() {
+              console.log('[IndexedDB] Failed to clear offline database');
+            };
+          } catch (e) {
+            console.log('[IndexedDB] Error clearing database:', e);
+          }
+        }
+      });
+    }
+    {% endif %}
   </script>
   
-  <!-- Offline Mode Scripts -->
+  {% if config.OFFLINE_MODE_ENABLED %}
+  <!-- Offline Mode Scripts (EXPERIMENTAL) -->
+  <script src="{{ url_for('static', filename='js/offline-encryption.js') }}"></script>
   <script src="{{ url_for('static', filename='js/offline-storage.js') }}"></script>
   <script src="{{ url_for('static', filename='js/offline.js') }}"></script>
+  {% endif %}
 </body>
 </html>

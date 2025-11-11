@@ -25,6 +25,12 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
 db_url = os.environ.get("DATABASE_URL", "sqlite:///db.sqlite3")
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Feature Flags
+# OFFLINE_MODE_ENABLED: Set to "true" to enable experimental offline mode
+# WARNING: Offline mode has partial security implementation (session encryption pending)
+app.config["OFFLINE_MODE_ENABLED"] = os.environ.get("OFFLINE_MODE_ENABLED", "false").lower() == "true"
+
 db = SQLAlchemy(app)
 
 # ---------- Models ----------
