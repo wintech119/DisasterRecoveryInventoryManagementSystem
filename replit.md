@@ -1,7 +1,7 @@
 # Disaster Relief Inventory Management System (DRIMS)
 
 ## Overview
-The Disaster Relief Inventory Management System (DRIMS) is designed to enhance disaster response efficiency and accountability by tracking and managing relief supplies across various locations. It provides real-time stock monitoring, manages donations, records distributions, issues low-stock alerts, and tracks all transactions, serving as a robust supply chain management solution for disaster relief efforts.
+The Disaster Relief Inventory Management System (DRIMS) is designed to enhance disaster response efficiency and accountability by tracking and managing relief supplies across various locations. It provides real-time stock monitoring, manages donations, records distributions, issues low-stock alerts, and tracks all transactions, serving as a robust supply chain management solution for disaster relief efforts. The system aims to significantly improve supply chain management for disaster relief, ensuring timely and accurate delivery of aid.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -12,70 +12,33 @@ Preferred communication style: Simple, everyday language.
 The system is built with Flask, utilizing SQLAlchemy ORM and a relational database. All timestamps are stored in UTC and displayed in Eastern Standard Time (EST/GMT-5) in YYYY-MM-DD format.
 
 ### Data Model
-Key entities include Items, Depots, Donors, Beneficiaries, DisasterEvents, NeedsLists, and Transactions. Items feature auto-generated SKUs, standardized units, barcode support, and expiry date tracking. NeedsLists support item requests from AGENCY hubs to MAIN hubs with approval workflows and standardized fulfillment terminology ("Fulfilled", "Partially Filled", "Unfilled").
-
-**User Management Schema (November 2025)**:
-- Normalized user management with separate Role, UserRole, and UserHub tables
-- Many-to-many relationships allow users to have multiple roles and hub assignments
-- Enhanced user profile fields: first_name, last_name, organization, job_title, phone, timezone, language, notification_preferences
-- Audit trail with created_by, updated_by, and updated_at timestamps
-- Helper methods: `has_role()`, `has_any_role()`, `has_hub_access()` for cleaner authorization logic
-- Property `display_name` combines first_name + last_name for UI display
-- Legacy fields (full_name, role, assigned_location_id) retained for backwards compatibility during transition
-- **New Governance Model Roles (Active)**: ADMIN (System Administrator), LOGISTICS_MANAGER, LOGISTICS_OFFICER, MAIN_HUB_USER (for Main Hub operations), SUB_HUB_USER (for Sub-Hub operations), AGENCY_HUB_USER (for Agency Hub operations), AUDITOR (read-only oversight), INVENTORY_CLERK (inventory operations)
-- **Legacy Roles (Deprecated)**: WAREHOUSE_STAFF, WAREHOUSE_SUPERVISOR, WAREHOUSE_OFFICER, FIELD_PERSONNEL, EXECUTIVE - kept for backwards compatibility, WAREHOUSE_SUPERVISOR maps to SUB_HUB_USER permissions for dispatch operations
+Key entities include Items, Depots, Donors, Beneficiaries, DisasterEvents, NeedsLists, and Transactions. Items feature auto-generated SKUs, standardized units, barcode support, and expiry date tracking. NeedsLists support item requests with approval workflows and standardized fulfillment terminology. User management includes normalized roles (ADMIN, LOGISTICS_MANAGER, LOGISTICS_OFFICER, MAIN_HUB_USER, SUB_HUB_USER, AGENCY_HUB_USER, AUDITOR, INVENTORY_CLERK) and hub assignments, with enhanced user profile fields and audit trails.
 
 ### UI/UX and Frontend
-The frontend uses server-side rendered HTML templates with Bootstrap 5 and Bootstrap Icons for rapid deployment, accessibility, and mobile-friendliness, aligning with Government of Jamaica branding. Dashboards include responsive design, hero cards for key metrics, Chart.js for data visualizations (stock distribution, fulfillment trends), and an activity feed. Needs List details views adapt layouts based on status, optimizing column distribution and alignment for professional appearance across devices.
+The frontend uses server-side rendered HTML templates with Bootstrap 5 and Bootstrap Icons, designed for rapid deployment, accessibility, and mobile-friendliness. Dashboards include responsive design, hero cards for key metrics, Chart.js for data visualizations, and an activity feed. Needs List views adapt layouts based on status for professional appearance.
 
 ### Core Features
--   **Agency Hub Request List Form**: Accessible interface for item requests with table-based layout, hover effects, auto-focus, accessible remove buttons, responsive design, and keyboard shortcuts.
--   **Barcode Scanning**: Supports barcode scanning for efficient donation intake.
--   **Needs List Management**: Comprehensive workflow for AGENCY and SUB hubs to request supplies, including:
-    -   Concurrency control, stock over-allocation prevention, and draft-save functionality.
-    -   Real-time data accuracy with backend-computed line items.
-    -   Streamlined views for "Fulfilment Prepared" (Draft Fulfilments), "Awaiting Approval", and "Approved for Dispatch" lists.
--   **Distribution Package Management**: Manages creation, review, and approval of distribution packages, including stock validation and real-time updates.
--   **Stock Management**: Dynamically aggregates stock levels from transaction records with validations to prevent negative stock.
+-   **Progressive Web App (PWA) with Offline Mode**: Comprehensive offline-first architecture for unstable connectivity, featuring a Service Worker for asset caching, Web App Manifest for PWA installation, IndexedDB for local storage of pending operations, and an Offline Sync Engine for background synchronization with backend sync endpoints. Supports offline form submissions for intake, distribution, and needs list creation, with real-time online/offline status indicators and session persistence.
+-   **Agency Hub Request List Form**: Accessible interface for item requests with a table-based layout and responsive design.
+-   **Barcode Scanning**: Supports barcode scanning for efficient donation intake (online only).
+-   **Needs List Management**: Comprehensive workflow for requesting and fulfilling supplies, including concurrency control, stock over-allocation prevention, draft-save functionality, and streamlined views for various fulfillment stages.
+-   **Distribution Package Management**: Manages creation, review, and approval of distribution packages with stock validation.
+-   **Stock Management**: Dynamically aggregates stock levels from transaction records with validations.
 -   **Three-Tier Hub Orchestration**: Role-based system with MAIN, SUB, and AGENCY hubs defining transfer approval workflows and visibility rules.
 -   **Stock Transfer with Approval Workflow**: Enables transfers between depots with hub-based approval rules.
--   **Authentication and User Management**: Flask-Login with role-based access control (RBAC) for nine user roles, secure password hashing, session management, and an ADMIN-only user management interface.
--   **Hub-Based Access Control and Dispatch Workflow**: Implements strict hub-scoped permissions where SUB_HUB_USERs can view and dispatch Needs Lists where their hub is either the requesting hub OR a source hub in fulfilments. MAIN_HUB_USERs have similar visibility for Main hubs, while AGENCY_HUB_USERs can only view their own requests. **Dispatch Permissions (November 2025)**: Centralized `can_dispatch_from_hub()` helper function controls dispatch access - operational hub users (MAIN_HUB_USER, SUB_HUB_USER, INVENTORY_CLERK, legacy WAREHOUSE_SUPERVISOR) can dispatch when their hub (checked via `has_hub_access()` for multi-hub assignments or `assigned_location_id` for legacy users) is a source hub in approved fulfilments. Dispatch is only available for "Approved" and "Resent for Dispatch" statuses. **Prepare Fulfilment**: Restricted to ADMIN, LOGISTICS_MANAGER, LOGISTICS_OFFICER only - operational hub users cannot prepare allocations. Includes a "Request Fulfilment Change" workflow where Sub-Hub users request adjustments to approved lists. Logistics Managers can reopen and edit Approved/Resent for Dispatch fulfilments via a prominent "Edit Fulfilment" button when active change requests exist. Managers can either edit allocations (with mandatory adjustment_reason and automatic versioning) OR respond without editing to reject/clarify. Change request statuses track workflow progress (Pending Review → In Progress → Approved & Resent/Rejected/Clarification Needed), and audit timestamps (reviewed_by/at) are set only when Managers commit decisions, not when merely viewing.
--   **Role-Based Dashboard System (November 2025)**: Comprehensive dashboard architecture with 7 role-specific context builders and templates, each designed for specific operational workflows. Central `get_dashboard_context()` function routes users to specialized dashboard experiences with strict security boundaries and hub-based access control.
-    -   **Logistics Manager Dashboard**: National overview with 5 KPI cards (Main/Sub/Agency hub counts with active status, government stock total from Main+Sub hubs only, open needs lists count), hub status overview showing active/inactive breakdown by hub type, hub status & stock table with clickable rows displaying stock counts and last activity timestamps, category distribution horizontal bar chart for government hubs, and approval queues (Submitted, Fulfilment Prepared, Awaiting Approval) in compact cards.
-    -   **Logistics Officer Dashboard**: Fulfilment preparation workflows with 4 KPI cards (total submitted requests, pending allocation count, recently approved count, alerts for overdue submissions), submitted needs lists work queue, pending allocation work queue, and fulfilment trends chart showing monthly approval patterns.
-    -   **Main Hub User Dashboard**: Hub-scoped operations with 4 KPI cards (hub stock value, linked sub-hubs count, pending dispatches, recent allocations), current hub stock table with category breakdown, linked sub-hub requests queue showing incoming transfer requests, and outgoing dispatches table tracking fulfilment progress.
-    -   **Sub-Hub User Dashboard**: Local hub operations with 4 KPI cards (hub stock total, pending incoming transfers, ready-to-dispatch count, items received this month), hub stock overview table, incoming transfers work queue for receiving allocations, dispatch-ready queue showing approved fulfilments ready to send, and pending transfer requests tracking outbound requests.
-    -   **Agency Hub User Dashboard**: Agency-scoped requests ONLY with 4 KPI cards (needs lists submitted, approved count, pending count, allocations received in 30 days), my needs lists work queue, and transfers received queue. **Critical Security**: Uses DTOs (Data Transfer Objects - plain dicts) instead of ORM objects to prevent template access to government fulfilment allocations via lazy-loaded relationships. DTOs contain only safe fields: id, list_number, status, timestamps - NO fulfilment relationship access.
-    -   **Inventory Clerk Dashboard**: Daily operational focus with 4 KPI cards (items received today, distributions today, low-stock items count, hub total stock), recent intake transactions table, recent distribution transactions table, and low-stock alerts queue. Strictly scoped to clerk's assigned hub location.
-    -   **Auditor Dashboard**: Read-only oversight with 6 KPI cards (total needs lists, approved count, fulfilled count, on-time fulfilment percentage, total items dispatched from government hubs, active hubs count), fulfilment log showing last 30 days of needs list activity, and exceptions queue tracking partial fulfilments and change requests. **Error Guards**: Timestamp validation prevents crashes when data incomplete; all context builders return default KPI structures on error paths.
-    -   **System Administrator Dashboard**: User and hub management focus with 4 KPI cards (total users, active users, total hubs, active hubs), recent user activity table showing last logins, hub configuration overview table, and system health alerts. No stock/fulfilment focus - purely administrative.
-    -   **Design Consistency**: All 7 dashboards follow unified compact design with responsive Bootstrap 5 layouts (p-3 padding), modern icons (bi-graph-up-arrow for all dashboard headers), hover effects on KPI cards, WCAG 2.1 accessibility (aria-labels, focus outlines, sufficient color contrast), Chart.js visualizations where appropriate, and consistent status badge styling.
-    -   **Security Architecture**: Hub-based access control ensures Agency users CANNOT access government stock data, Inventory Clerks see ONLY their assigned hub, Auditors have read-only access across all hubs, operational hub users see only their hub scope. DTO pattern prevents ORM relationship traversal to unauthorized data. Legacy role compatibility maintained (WAREHOUSE_SUPERVISOR → SUB_HUB_USER permissions) with safe fallback to basic dashboard for unmapped roles.
--   **Universal In-App Notification System**: Provides real-time, deep-linking notifications for workflow events across all user roles.
--   **File Storage**: Supports local file attachments with UUID-based filenames, designed for future cloud migration.
+-   **Authentication and User Management**: Flask-Login with role-based access control (RBAC), secure password hashing, and session management.
+-   **Hub-Based Access Control and Dispatch Workflow**: Implements strict hub-scoped permissions for viewing and dispatching Needs Lists. Dispatch permissions are controlled by a centralized helper function, allowing operational hub users to dispatch when their hub is a source hub in approved fulfilments. Fulfilment preparation is restricted to specific managerial roles, with a "Request Fulfilment Change" workflow for adjustments to approved lists.
+-   **Role-Based Dashboard System**: Features 7 role-specific dashboards (Logistics Manager, Logistics Officer, Main Hub User, Sub-Hub User, Agency Hub User, Inventory Clerk, Auditor, System Administrator) with context builders and templates, strict security boundaries, and hub-based access control. Dashboards follow a unified design, incorporate Bootstrap 5 layouts, modern icons, accessibility features, and Chart.js visualizations. Security architecture ensures data isolation between roles and hubs.
+-   **Universal In-App Notification System**: Provides real-time, deep-linking notifications for workflow events.
+-   **File Storage**: Supports local file attachments with UUID-based filenames.
 -   **Data Import/Export**: Uses Pandas for CSV import and export.
--   **Session Management**: Utilizes Flask's built-in session handling with environment variable-configured secret keys.
--   **Status Consistency**: Defines 10 official Needs List statuses (Draft, Submitted, Fulfilment Prepared, Awaiting Approval, Approved, Resent for Dispatch, Dispatched, Received, Completed, Rejected) consistently displayed across UIs.
+-   **Session Management**: Utilizes Flask's built-in session handling.
+-   **Status Consistency**: Defines 10 official Needs List statuses consistently displayed across UIs.
 
 ## External Dependencies
 
-### Core Framework Dependencies
--   **Flask**: 3.0.3
--   **Flask-SQLAlchemy**: 3.1.1
--   **SQLAlchemy**: 2.0.32
-
-### Database Drivers
--   **psycopg2-binary**: For PostgreSQL.
--   **SQLite**: Built-in for development.
-
-### Data Processing
--   **Pandas**: 2.2.2 (for CSV handling).
-
-### Configuration Management
--   **python-dotenv**: 1.0.1 (for environment variables).
-
-### Frontend Dependencies (CDN-delivered)
--   **Bootstrap**: 5.3.3
--   **Bootstrap Icons**: 1.11.3
--   **Chart.js**: 4.4.0 (for dashboard data visualizations)
+-   **Core Frameworks**: Flask (3.0.3), Flask-SQLAlchemy (3.1.1), SQLAlchemy (2.0.32).
+-   **Database Drivers**: psycopg2-binary (for PostgreSQL), SQLite (for development).
+-   **Data Processing**: Pandas (2.2.2).
+-   **Configuration Management**: python-dotenv (1.0.1).
+-   **Frontend Libraries (CDN)**: Bootstrap (5.3.3), Bootstrap Icons (1.11.3), Chart.js (4.4.0).
