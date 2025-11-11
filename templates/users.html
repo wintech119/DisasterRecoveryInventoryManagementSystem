@@ -9,10 +9,11 @@
   <table class="table table-striped">
     <thead>
       <tr>
-        <th>Full Name</th>
+        <th>Name</th>
         <th>Email</th>
+        <th>Organization</th>
         <th>Role</th>
-        <th>Assigned Location</th>
+        <th>Assigned Hub</th>
         <th>Status</th>
         <th>Last Login</th>
         <th></th>
@@ -22,32 +23,52 @@
     {% for u in users %}
       <tr class="{% if not u.is_active %}table-secondary{% endif %}">
         <td>
-          {{ u.full_name }}
+          {{ u.display_name }}
           {% if u.id == current_user.id %}<span class="badge bg-info ms-1">You</span>{% endif %}
+          {% if u.job_title %}
+            <br><small class="text-muted">{{ u.job_title }}</small>
+          {% endif %}
         </td>
         <td>{{ u.email }}</td>
         <td>
-          {% if u.role == 'ADMIN' %}
-            <span class="badge bg-danger">Administrator</span>
-          {% elif u.role == 'LOGISTICS_MANAGER' %}
-            <span class="badge bg-primary">Logistics Manager</span>
-          {% elif u.role == 'LOGISTICS_OFFICER' %}
-            <span class="badge bg-info">Logistics Officer</span>
-          {% elif u.role == 'WAREHOUSE_STAFF' %}
-            <span class="badge bg-success">Warehouse Staff</span>
-          {% elif u.role == 'FIELD_PERSONNEL' %}
-            <span class="badge bg-warning">Field Personnel</span>
-          {% elif u.role == 'EXECUTIVE' %}
-            <span class="badge bg-dark">Executive</span>
-          {% elif u.role == 'AUDITOR' %}
-            <span class="badge bg-secondary">Auditor</span>
-          {% elif u.role == 'DISTRIBUTOR' %}
-            <span class="badge bg-light text-dark border">Distributor</span>
+          {% if u.organization %}
+            {{ u.organization }}
           {% else %}
-            <span class="badge bg-secondary">{{ u.role }}</span>
+            <span class="text-muted">—</span>
           {% endif %}
         </td>
-        <td>{{ u.assigned_location.name if u.assigned_location else '—' }}</td>
+        <td>
+          {% set user_role = u.roles[0] if u.roles else u.role %}
+          {% if user_role == 'ADMIN' %}
+            <span class="badge bg-danger">Administrator</span>
+          {% elif user_role == 'LOGISTICS_MANAGER' %}
+            <span class="badge bg-primary">Logistics Manager</span>
+          {% elif user_role == 'LOGISTICS_OFFICER' %}
+            <span class="badge bg-info">Logistics Officer</span>
+          {% elif user_role == 'WAREHOUSE_SUPERVISOR' %}
+            <span class="badge bg-success">Warehouse Supervisor</span>
+          {% elif user_role == 'WAREHOUSE_OFFICER' %}
+            <span class="badge bg-success">Warehouse Officer</span>
+          {% elif user_role == 'WAREHOUSE_STAFF' %}
+            <span class="badge bg-success">Warehouse Staff</span>
+          {% elif user_role == 'FIELD_PERSONNEL' %}
+            <span class="badge bg-warning">Field Personnel</span>
+          {% elif user_role == 'EXECUTIVE' %}
+            <span class="badge bg-dark">Executive</span>
+          {% elif user_role == 'AUDITOR' %}
+            <span class="badge bg-secondary">Auditor</span>
+          {% else %}
+            <span class="badge bg-secondary">{{ user_role }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% set user_hub = u.hubs[0] if u.hubs else u.assigned_location %}
+          {% if user_hub %}
+            {{ user_hub.name }}
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
         <td>
           {% if u.is_active %}
             <span class="badge bg-success">Active</span>
@@ -67,7 +88,7 @@
         </td>
       </tr>
     {% else %}
-      <tr><td colspan="7" class="text-center py-3">No users found.</td></tr>
+      <tr><td colspan="8" class="text-center py-3">No users found.</td></tr>
     {% endfor %}
     </tbody>
   </table>

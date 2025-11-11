@@ -4526,14 +4526,18 @@ def users():
 def user_new():
     if request.method == "POST":
         email = request.form["email"].strip().lower()
-        full_name = request.form["full_name"].strip()
+        first_name = request.form.get("first_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
+        organization = request.form.get("organization", "").strip()
+        job_title = request.form.get("job_title", "").strip()
+        phone = request.form.get("phone", "").strip()
         role = request.form["role"]
         password = request.form["password"]
         password_confirm = request.form["password_confirm"]
         assigned_location_id = request.form.get("assigned_location_id") or None
         
-        if not email or not full_name or not role or not password:
-            flash("All fields except location are required.", "danger")
+        if not email or not first_name or not last_name or not role or not password:
+            flash("Email, first name, last name, role, and password are required.", "danger")
             return redirect(url_for("user_new"))
         
         if password != password_confirm:
@@ -4570,17 +4574,38 @@ def user_new():
         
         user = User(
             email=email,
-            full_name=full_name,
+            first_name=first_name,
+            last_name=last_name,
+            organization=organization,
+            job_title=job_title,
+            phone=phone,
+            full_name=f"{first_name} {last_name}",
             role=role,
+            timezone='America/Jamaica',
+            language='en',
             is_active=True,
-            assigned_location_id=int(assigned_location_id) if assigned_location_id else None
+            assigned_location_id=int(assigned_location_id) if assigned_location_id else None,
+            created_by_id=current_user.id
         )
         user.set_password(password)
         
         db.session.add(user)
+        db.session.flush()
+        
+        # Create role assignment
+        role_obj = Role.query.filter_by(code=role).first()
+        if role_obj:
+            user_role = UserRole(user_id=user.id, role_id=role_obj.id, assigned_at=datetime.utcnow())
+            db.session.add(user_role)
+        
+        # Create hub assignment if provided
+        if assigned_location_id:
+            user_hub = UserHub(user_id=user.id, hub_id=int(assigned_location_id), assigned_at=datetime.utcnow())
+            db.session.add(user_hub)
+        
         db.session.commit()
         
-        flash(f"User '{full_name}' created successfully.", "success")
+        flash(f"User '{first_name} {last_name}' created successfully.", "success")
         return redirect(url_for("users"))
     
     locations = Depot.query.order_by(Depot.name.asc()).all()
@@ -4593,15 +4618,19 @@ def user_edit(user_id):
     
     if request.method == "POST":
         email = request.form["email"].strip().lower()
-        full_name = request.form["full_name"].strip()
+        first_name = request.form.get("first_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
+        organization = request.form.get("organization", "").strip()
+        job_title = request.form.get("job_title", "").strip()
+        phone = request.form.get("phone", "").strip()
         role = request.form["role"]
         is_active = request.form.get("is_active") == "on"
         assigned_location_id = request.form.get("assigned_location_id") or None
         password = request.form.get("password", "").strip()
         password_confirm = request.form.get("password_confirm", "").strip()
         
-        if not email or not full_name or not role:
-            flash("Email, full name, and role are required.", "danger")
+        if not email or not first_name or not last_name or not role:
+            flash("Email, first name, last name, and role are required.", "danger")
             return redirect(url_for("user_edit", user_id=user_id))
         
         if role not in ALL_ROLES:
@@ -4638,13 +4667,40 @@ def user_edit(user_id):
             user.set_password(password)
         
         user.email = email
-        user.full_name = full_name
+        user.first_name = first_name
+        user.last_name = last_name
+        user.organization = organization
+        user.job_title = job_title
+        user.phone = phone
+        user.full_name = f"{first_name} {last_name}"
         user.role = role
         user.is_active = is_active
         user.assigned_location_id = int(assigned_location_id) if assigned_location_id else None
+        user.updated_by_id = current_user.id
+        user.updated_at = datetime.utcnow()
+        
+        # Update role assignment - preserve existing if unchanged
+        current_roles = user.roles
+        if not current_roles or (len(current_roles) == 1 and current_roles[0] != role):
+            # Only update if role changed or no role exists
+            UserRole.query.filter_by(user_id=user.id).delete()
+            role_obj = Role.query.filter_by(code=role).first()
+            if role_obj:
+                user_role = UserRole(user_id=user.id, role_id=role_obj.id, assigned_at=datetime.utcnow())
+                db.session.add(user_role)
+        
+        # Update hub assignment - preserve existing if unchanged
+        current_hub_ids = [h.id for h in user.hubs]
+        new_hub_id = int(assigned_location_id) if assigned_location_id else None
+        if len(current_hub_ids) != 1 or (current_hub_ids and current_hub_ids[0] != new_hub_id):
+            # Only update if hub changed or no single hub exists
+            UserHub.query.filter_by(user_id=user.id).delete()
+            if new_hub_id:
+                user_hub = UserHub(user_id=user.id, hub_id=new_hub_id, assigned_at=datetime.utcnow())
+                db.session.add(user_hub)
         
         db.session.commit()
-        flash(f"User '{full_name}' updated successfully.", "success")
+        flash(f"User '{first_name} {last_name}' updated successfully.", "success")
         return redirect(url_for("users"))
     
     locations = Depot.query.order_by(Depot.name.asc()).all()

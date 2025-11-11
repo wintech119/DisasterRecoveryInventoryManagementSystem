@@ -5,14 +5,24 @@
     <h3>{% if user %}Edit User{% else %}New User{% endif %}</h3>
     
     <form method="post">
+      <h5 class="mb-3"><i class="bi bi-person me-2"></i>Personal Information</h5>
       <div class="row">
         <div class="col-md-6 mb-3">
-          <label class="form-label">Full Name *</label>
-          <input class="form-control" type="text" name="full_name" 
-                 value="{{ user.full_name if user else '' }}" 
-                 placeholder="e.g., Jane Doe" required>
+          <label class="form-label">First Name *</label>
+          <input class="form-control" type="text" name="first_name" 
+                 value="{{ user.first_name if user else '' }}" 
+                 placeholder="e.g., Jane" required>
         </div>
         
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Last Name *</label>
+          <input class="form-control" type="text" name="last_name" 
+                 value="{{ user.last_name if user else '' }}" 
+                 placeholder="e.g., Doe" required>
+        </div>
+      </div>
+      
+      <div class="row">
         <div class="col-md-6 mb-3">
           <label class="form-label">Email *</label>
           <input class="form-control" type="email" name="email" 
@@ -20,32 +30,59 @@
                  placeholder="user@odpem.gov.jm" required>
           <small class="form-text text-muted">This will be the login username</small>
         </div>
+        
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Phone <small class="text-muted">(optional)</small></label>
+          <input class="form-control" type="tel" name="phone" 
+                 value="{{ user.phone if user else '' }}" 
+                 placeholder="e.g., (876) 555-1234">
+        </div>
       </div>
+      
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Organization <small class="text-muted">(optional)</small></label>
+          <input class="form-control" type="text" name="organization" 
+                 value="{{ user.organization if user else '' }}" 
+                 placeholder="e.g., ODPEM">
+        </div>
+        
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Job Title <small class="text-muted">(optional)</small></label>
+          <input class="form-control" type="text" name="job_title" 
+                 value="{{ user.job_title if user else '' }}" 
+                 placeholder="e.g., Logistics Coordinator">
+        </div>
+      </div>
+      
+      <hr class="my-4">
+      <h5 class="mb-3"><i class="bi bi-shield-check me-2"></i>Role & Access</h5>
       
       <div class="row">
         <div class="col-md-6 mb-3">
           <label class="form-label">Role *</label>
           <select class="form-select" name="role" required>
             <option value="">-- Select Role --</option>
-            <option value="ADMIN" {% if user and user.role == 'ADMIN' %}selected{% endif %}>Administrator</option>
-            <option value="LOGISTICS_MANAGER" {% if user and user.role == 'LOGISTICS_MANAGER' %}selected{% endif %}>Logistics Manager</option>
-            <option value="LOGISTICS_OFFICER" {% if user and user.role == 'LOGISTICS_OFFICER' %}selected{% endif %}>Logistics Officer</option>
-            <option value="WAREHOUSE_SUPERVISOR" {% if user and user.role == 'WAREHOUSE_SUPERVISOR' %}selected{% endif %}>Warehouse Supervisor</option>
-            <option value="WAREHOUSE_OFFICER" {% if user and user.role == 'WAREHOUSE_OFFICER' %}selected{% endif %}>Warehouse Officer</option>
-            <option value="WAREHOUSE_STAFF" {% if user and user.role == 'WAREHOUSE_STAFF' %}selected{% endif %}>Warehouse Staff</option>
-            <option value="FIELD_PERSONNEL" {% if user and user.role == 'FIELD_PERSONNEL' %}selected{% endif %}>Field Personnel</option>
-            <option value="EXECUTIVE" {% if user and user.role == 'EXECUTIVE' %}selected{% endif %}>Executive</option>
-            <option value="AUDITOR" {% if user and user.role == 'AUDITOR' %}selected{% endif %}>Auditor</option>
-            <option value="DISTRIBUTOR" {% if user and user.role == 'DISTRIBUTOR' %}selected{% endif %}>Distributor</option>
+            {% set user_role = user.roles[0] if user and user.roles else user.role if user else '' %}
+            <option value="ADMIN" {% if user_role == 'ADMIN' %}selected{% endif %}>Administrator</option>
+            <option value="LOGISTICS_MANAGER" {% if user_role == 'LOGISTICS_MANAGER' %}selected{% endif %}>Logistics Manager</option>
+            <option value="LOGISTICS_OFFICER" {% if user_role == 'LOGISTICS_OFFICER' %}selected{% endif %}>Logistics Officer</option>
+            <option value="WAREHOUSE_SUPERVISOR" {% if user_role == 'WAREHOUSE_SUPERVISOR' %}selected{% endif %}>Warehouse Supervisor</option>
+            <option value="WAREHOUSE_OFFICER" {% if user_role == 'WAREHOUSE_OFFICER' %}selected{% endif %}>Warehouse Officer</option>
+            <option value="WAREHOUSE_STAFF" {% if user_role == 'WAREHOUSE_STAFF' %}selected{% endif %}>Warehouse Staff</option>
+            <option value="FIELD_PERSONNEL" {% if user_role == 'FIELD_PERSONNEL' %}selected{% endif %}>Field Personnel</option>
+            <option value="EXECUTIVE" {% if user_role == 'EXECUTIVE' %}selected{% endif %}>Executive</option>
+            <option value="AUDITOR" {% if user_role == 'AUDITOR' %}selected{% endif %}>Auditor</option>
           </select>
         </div>
         
         <div class="col-md-6 mb-3">
-          <label class="form-label">Assigned Location <small class="text-muted">(optional)</small></label>
+          <label class="form-label">Assigned Hub <small class="text-muted">(optional)</small></label>
           <select class="form-select" name="assigned_location_id">
             <option value="">-- None --</option>
+            {% set user_hub_id = user.hubs[0].id if user and user.hubs else user.assigned_location_id if user else none %}
             {% for loc in locations %}
-              <option value="{{ loc.id }}" {% if user and user.assigned_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+              <option value="{{ loc.id }}" {% if user_hub_id == loc.id %}selected{% endif %}>{{ loc.name }} ({{ loc.hub_type }})</option>
             {% endfor %}
           </select>
           <small class="form-text text-muted">Required for Warehouse Supervisors and Officers (must be a Sub-Hub)</small>
@@ -101,8 +138,11 @@
           <dt class="text-muted small">User ID</dt>
           <dd>{{ user.id }}</dd>
           
+          <dt class="text-muted small">Display Name</dt>
+          <dd>{{ user.display_name }}</dd>
+          
           <dt class="text-muted small">Created</dt>
-          <dd>{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+          <dd>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'N/A' }}</dd>
           
           <dt class="text-muted small">Last Login</dt>
           <dd>
@@ -112,6 +152,11 @@
               <span class="text-muted">Never</span>
             {% endif %}
           </dd>
+          
+          {% if user.updated_at %}
+          <dt class="text-muted small">Last Updated</dt>
+          <dd>{{ user.updated_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+          {% endif %}
         </dl>
       </div>
     </div>
