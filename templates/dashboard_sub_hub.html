@@ -94,7 +94,7 @@
           {% if work_queues.ready_to_dispatch %}
             <div class="list-group list-group-flush">
               {% for nl in work_queues.ready_to_dispatch %}
-                <a href="{{ url_for('needs_list_details', id=nl.id) }}" class="list-group-item list-group-item-action px-0">
+                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action px-0">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <div class="fw-semibold">{{ nl.list_number }}</div>
@@ -123,7 +123,7 @@
           {% if work_queues.own_needs_lists %}
             <div class="list-group list-group-flush">
               {% for nl in work_queues.own_needs_lists %}
-                <a href="{{ url_for('needs_list_details', id=nl.id) }}" class="list-group-item list-group-item-action px-0">
+                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action px-0">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <div class="fw-semibold">{{ nl.list_number }}</div>

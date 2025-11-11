@@ -83,7 +83,7 @@
           {% if work_queues.submitted %}
             <div class="list-group list-group-flush">
               {% for nl in work_queues.submitted %}
-                <a href="{{ url_for('needs_list_details', id=nl.id) }}" class="list-group-item list-group-item-action px-0">
+                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action px-0">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <div class="fw-semibold">{{ nl.list_number }}</div>
@@ -117,7 +117,7 @@
           {% if work_queues.awaiting_approval %}
             <div class="list-group list-group-flush">
               {% for nl in work_queues.awaiting_approval %}
-                <a href="{{ url_for('needs_list_details', id=nl.id) }}" class="list-group-item list-group-item-action px-0">
+                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action px-0">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <div class="fw-semibold">{{ nl.list_number }}</div>
@@ -164,7 +164,7 @@
                 </thead>
                 <tbody>
                   {% for nl in my_recent_work %}
-                    <tr onclick="window.location='{{ url_for('needs_list_details', id=nl.id) }}'" style="cursor: pointer;">
+                    <tr onclick="window.location='{{ url_for('needs_list_details', list_id=nl.id) }}'" style="cursor: pointer;">
                       <td class="fw-semibold">{{ nl.list_number }}</td>
                       <td><i class="bi bi-building me-1"></i>{{ nl.agency_hub.name if nl.agency_hub else 'Unknown' }}</td>
                       <td><span class="badge bg-{{ 'success' if nl.status in ['Approved', 'Dispatched', 'Completed'] else 'primary' if nl.status == 'Fulfilment Prepared' else 'warning' }}">{{ nl.status }}</span></td>

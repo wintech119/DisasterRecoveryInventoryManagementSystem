@@ -818,7 +818,7 @@ def build_logistics_officer_dashboard(user):
     }
     
     # Queue of needs lists to work on
-    context['work_queue'] = {
+    context['work_queues'] = {
         'submitted': submitted_lists[:15],
         'fulfilment_prepared': prepared_lists[:10],
         'awaiting_approval': awaiting_approval[:10]

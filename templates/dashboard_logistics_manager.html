@@ -83,7 +83,7 @@
           {% if needs_lists_queue.submitted %}
             <div class="list-group list-group-flush">
               {% for nl in needs_lists_queue.submitted %}
-                <a href="{{ url_for('needs_list_details', id=nl.id) }}" class="list-group-item list-group-item-action px-0">
+                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action px-0">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <div class="fw-semibold">{{ nl.list_number }}</div>
@@ -112,7 +112,7 @@
           {% if needs_lists_queue.awaiting_approval %}
             <div class="list-group list-group-flush">
               {% for nl in needs_lists_queue.awaiting_approval %}
-                <a href="{{ url_for('needs_list_details', id=nl.id) }}" class="list-group-item list-group-item-action px-0">
+                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action px-0">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <div class="fw-semibold">{{ nl.list_number }}</div>
@@ -141,7 +141,7 @@
           {% if recent_decisions.approved %}
             <div class="list-group list-group-flush">
               {% for nl in recent_decisions.approved %}
-                <a href="{{ url_for('needs_list_details', id=nl.id) }}" class="list-group-item list-group-item-action px-0">
+                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action px-0">
                   <div class="d-flex justify-content-between align-items-start">
                     <div>
                       <div class="fw-semibold">{{ nl.list_number }}</div>
