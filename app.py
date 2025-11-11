@@ -4040,6 +4040,154 @@ def needs_list_confirm_receipt(list_id):
     flash(f"Receipt confirmed for needs list {needs_list.list_number}. Request is now completed.", "success")
     return redirect(url_for("needs_list_details", list_id=list_id))
 
+@app.route("/needs-lists/<int:list_id>/edit-completed", methods=["POST"])
+@login_required
+def edit_completed_fulfilment(list_id):
+    """Edit completed fulfilment records (post-receipt corrections) - Logistics staff only
+    
+    This route allows authorized users (ADMIN, LOGISTICS_MANAGER, LOGISTICS_OFFICER) to make
+    corrections to completed needs lists after receipt has been confirmed. All changes are
+    audit-logged with session grouping.
+    """
+    from uuid import uuid4
+    
+    needs_list = NeedsList.query.get_or_404(list_id)
+    
+    # Permission check - Only ADMIN, LOGISTICS_MANAGER, LOGISTICS_OFFICER
+    if not current_user.has_any_role(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER):
+        flash("You don't have permission to edit completed fulfilments.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    # Verify needs list is completed and receipt is confirmed
+    if needs_list.status != 'Completed':
+        flash("Only completed needs lists can be edited using this function.", "warning")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    if not needs_list.received_by_id:
+        flash("Receipt must be confirmed before corrections can be made.", "warning")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    # Generate session ID for grouping all edits from this save action
+    edit_session_id = str(uuid4())
+    edit_reason = request.form.get("edit_reason", "").strip()
+    
+    if not edit_reason:
+        flash("Edit reason is required for audit trail.", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    changes_made = []
+    
+    try:
+        # Edit needs-list level fields
+        
+        # Dispatch notes
+        new_dispatch_notes = request.form.get("dispatch_notes", "").strip() or None
+        if new_dispatch_notes != needs_list.dispatch_notes:
+            log_entry = FulfilmentEditLog(
+                needs_list_id=needs_list.id,
+                fulfilment_id=None,  # Needs-list level edit
+                edit_session_id=edit_session_id,
+                edited_by_id=current_user.id,
+                field_name='dispatch_notes',
+                value_before=needs_list.dispatch_notes or '',
+                value_after=new_dispatch_notes or '',
+                edit_reason=edit_reason
+            )
+            db.session.add(log_entry)
+            needs_list.dispatch_notes = new_dispatch_notes
+            changes_made.append("dispatch notes")
+        
+        # Receipt notes
+        new_receipt_notes = request.form.get("receipt_notes", "").strip() or None
+        if new_receipt_notes != needs_list.receipt_notes:
+            log_entry = FulfilmentEditLog(
+                needs_list_id=needs_list.id,
+                fulfilment_id=None,
+                edit_session_id=edit_session_id,
+                edited_by_id=current_user.id,
+                field_name='receipt_notes',
+                value_before=needs_list.receipt_notes or '',
+                value_after=new_receipt_notes or '',
+                edit_reason=edit_reason
+            )
+            db.session.add(log_entry)
+            needs_list.receipt_notes = new_receipt_notes
+            changes_made.append("receipt notes")
+        
+        # Dispatched at
+        new_dispatched_at_str = request.form.get("dispatched_at", "").strip()
+        if new_dispatched_at_str:
+            new_dispatched_at = datetime.strptime(new_dispatched_at_str, '%Y-%m-%dT%H:%M')
+            if new_dispatched_at != needs_list.dispatched_at:
+                log_entry = FulfilmentEditLog(
+                    needs_list_id=needs_list.id,
+                    fulfilment_id=None,
+                    edit_session_id=edit_session_id,
+                    edited_by_id=current_user.id,
+                    field_name='dispatched_at',
+                    value_before=str(needs_list.dispatched_at) if needs_list.dispatched_at else '',
+                    value_after=str(new_dispatched_at),
+                    edit_reason=edit_reason
+                )
+                db.session.add(log_entry)
+                needs_list.dispatched_at = new_dispatched_at
+                changes_made.append("dispatch date/time")
+        
+        # Received at
+        new_received_at_str = request.form.get("received_at", "").strip()
+        if new_received_at_str:
+            new_received_at = datetime.strptime(new_received_at_str, '%Y-%m-%dT%H:%M')
+            if new_received_at != needs_list.received_at:
+                log_entry = FulfilmentEditLog(
+                    needs_list_id=needs_list.id,
+                    fulfilment_id=None,
+                    edit_session_id=edit_session_id,
+                    edited_by_id=current_user.id,
+                    field_name='received_at',
+                    value_before=str(needs_list.received_at) if needs_list.received_at else '',
+                    value_after=str(new_received_at),
+                    edit_reason=edit_reason
+                )
+                db.session.add(log_entry)
+                needs_list.received_at = new_received_at
+                changes_made.append("receipt date/time")
+        
+        # Edit fulfilment line item quantities
+        fulfilment_ids = request.form.getlist("fulfilment_ids")
+        for fulfilment_id in fulfilment_ids:
+            fulfilment = NeedsListFulfilment.query.get(int(fulfilment_id))
+            if fulfilment and fulfilment.needs_list_id == needs_list.id:
+                new_qty_str = request.form.get(f"delivered_qty_{fulfilment_id}", "").strip()
+                if new_qty_str:
+                    new_qty = int(new_qty_str)
+                    if new_qty != fulfilment.allocated_qty:
+                        log_entry = FulfilmentEditLog(
+                            needs_list_id=needs_list.id,
+                            fulfilment_id=fulfilment.id,
+                            edit_session_id=edit_session_id,
+                            edited_by_id=current_user.id,
+                            field_name='allocated_qty',
+                            value_before=str(fulfilment.allocated_qty),
+                            value_after=str(new_qty),
+                            edit_reason=edit_reason
+                        )
+                        db.session.add(log_entry)
+                        fulfilment.allocated_qty = new_qty
+                        changes_made.append(f"delivered quantity for fulfilment #{fulfilment.id}")
+        
+        if changes_made:
+            db.session.commit()
+            flash(f"Corrections saved and audit-logged: {', '.join(changes_made)}. Session ID: {edit_session_id[:8]}...", "success")
+        else:
+            flash("No changes detected.", "info")
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error saving corrections: {str(e)}", "danger")
+        return redirect(url_for("needs_list_details", list_id=list_id))
+    
+    return redirect(url_for("needs_list_details", list_id=list_id))
+
 @app.route("/needs-lists/<int:list_id>/completed-report")
 @login_required
 def needs_list_completed_report(list_id):
