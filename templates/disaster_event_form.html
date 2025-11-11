@@ -36,13 +36,16 @@
             <div class="col-md-6 mb-3">
               <label class="form-label">Start Date *</label>
               <input class="form-control" type="date" name="start_date" 
-                     value="{{ event.start_date.strftime('%Y-%m-%d') if event else '' }}" required>
+                     value="{{ event.start_date.strftime('%Y-%m-%d') if event else '' }}" 
+                     max="{{ today }}" required>
+              <small class="text-muted">Cannot be a future date</small>
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">End Date</label>
               <input class="form-control" type="date" name="end_date" 
-                     value="{{ event.end_date.strftime('%Y-%m-%d') if event and event.end_date else '' }}">
-              <small class="text-muted">Leave blank if ongoing</small>
+                     value="{{ event.end_date.strftime('%Y-%m-%d') if event and event.end_date else '' }}"
+                     max="{{ today }}">
+              <small class="text-muted">Leave blank if ongoing. Cannot be a future date</small>
             </div>
           </div>
           

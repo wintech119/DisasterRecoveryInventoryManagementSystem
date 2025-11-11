@@ -4307,6 +4307,8 @@ def disaster_events():
 @app.route("/disaster-events/new", methods=["GET", "POST"])
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def disaster_event_new():
+    from datetime import datetime as dt, date
+    
     if request.method == "POST":
         name = request.form["name"].strip()
         if not name:
@@ -4323,9 +4325,17 @@ def disaster_event_new():
             flash("Start date is required.", "danger")
             return redirect(url_for("disaster_event_new"))
         
-        from datetime import datetime as dt
         start_date = dt.strptime(start_date_str, "%Y-%m-%d").date()
         end_date = dt.strptime(end_date_str, "%Y-%m-%d").date() if end_date_str else None
+        
+        today = date.today()
+        if start_date > today:
+            flash("Start date cannot be in the future.", "danger")
+            return redirect(url_for("disaster_event_new"))
+        
+        if end_date and end_date > today:
+            flash("End date cannot be in the future.", "danger")
+            return redirect(url_for("disaster_event_new"))
         
         event = DisasterEvent(name=name, event_type=event_type, start_date=start_date, 
                             end_date=end_date, description=description, status=status)
@@ -4333,11 +4343,15 @@ def disaster_event_new():
         db.session.commit()
         flash(f"Disaster event '{name}' created successfully.", "success")
         return redirect(url_for("disaster_events"))
-    return render_template("disaster_event_form.html", event=None)
+    
+    today = date.today().strftime("%Y-%m-%d")
+    return render_template("disaster_event_form.html", event=None, today=today)
 
 @app.route("/disaster-events/<int:event_id>/edit", methods=["GET", "POST"])
 @role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER)
 def disaster_event_edit(event_id):
+    from datetime import datetime as dt, date
+    
     event = DisasterEvent.query.get_or_404(event_id)
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -4355,9 +4369,17 @@ def disaster_event_edit(event_id):
             flash("Start date is required.", "danger")
             return redirect(url_for("disaster_event_edit", event_id=event_id))
         
-        from datetime import datetime as dt
         start_date = dt.strptime(start_date_str, "%Y-%m-%d").date()
         end_date = dt.strptime(end_date_str, "%Y-%m-%d").date() if end_date_str else None
+        
+        today = date.today()
+        if start_date > today:
+            flash("Start date cannot be in the future.", "danger")
+            return redirect(url_for("disaster_event_edit", event_id=event_id))
+        
+        if end_date and end_date > today:
+            flash("End date cannot be in the future.", "danger")
+            return redirect(url_for("disaster_event_edit", event_id=event_id))
         
         event.name = name
         event.event_type = event_type
@@ -4368,7 +4390,9 @@ def disaster_event_edit(event_id):
         db.session.commit()
         flash(f"Disaster event updated successfully.", "success")
         return redirect(url_for("disaster_events"))
-    return render_template("disaster_event_form.html", event=event)
+    
+    today = date.today().strftime("%Y-%m-%d")
+    return render_template("disaster_event_form.html", event=event, today=today)
 
 # ---------- User Management Routes ----------
 @app.route("/users")
