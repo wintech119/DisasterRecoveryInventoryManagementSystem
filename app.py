@@ -519,6 +519,41 @@ class FulfilmentEditLog(db.Model):
     fulfilment = db.relationship("NeedsListFulfilment")
     edited_by = db.relationship("User", lazy='joined')
 
+class OfflineSyncLog(db.Model):
+    """Tracks processed offline operations to prevent duplicate syncs
+    
+    This model enforces idempotency for offline operations by recording
+    client-generated operation IDs. Before processing any offline sync,
+    the system checks this table to avoid creating duplicate records.
+    """
+    __tablename__ = 'offline_sync_log'
+    __table_args__ = (
+        db.UniqueConstraint('client_operation_id', 'user_id', name='uq_client_operation_user'),
+        db.Index('idx_sync_log_client_id', 'client_operation_id'),
+        db.Index('idx_sync_log_user', 'user_id'),
+        db.Index('idx_sync_log_processed_at', 'processed_at'),
+    )
+    
+    id = db.Column(db.Integer, primary_key=True)
+    client_operation_id = db.Column(db.String(64), nullable=False)  # Client-generated UUID
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    operation_type = db.Column(db.String(50), nullable=False)  # intake, distribution, needs_list_create
+    hub_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=False)
+    
+    processed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # References to created records (one will be set based on operation_type)
+    transaction_id = db.Column(db.Integer, db.ForeignKey("transaction.id"), nullable=True)
+    needs_list_id = db.Column(db.Integer, db.ForeignKey("needs_list.id"), nullable=True)
+    
+    # Store sync result for replay responses
+    result_data = db.Column(db.JSON, nullable=True)
+    
+    user = db.relationship("User")
+    hub = db.relationship("Depot")
+    transaction = db.relationship("Transaction")
+    needs_list = db.relationship("NeedsList")
+
 # ---------- Flask-Login Configuration ----------
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -6182,13 +6217,19 @@ def sync_offline_operation():
         return jsonify({"success": False, "error": str(e)}), 500
 
 def can_access_hub(user, hub_id):
-    """Check if user has access to the specified hub"""
+    """
+    Check if user has access to the specified hub for offline operations.
+    
+    SECURITY: For offline operations, we enforce strict hub-level access control.
+    Even admin/logistics roles must have explicit hub assignments to prevent
+    unauthorized access via offline sync replay attacks.
+    """
     if not hub_id:
         return False
     
-    # Admin and Logistics roles have access to all hubs
-    if user.has_any_role([ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER]):
-        return True
+    # For offline operations, ALL users must have explicit hub access
+    # This prevents replay attacks where a user could queue operations
+    # for hubs they shouldn't access
     
     # Check if user has hub access via UserHub table
     if user.has_hub_access(hub_id):
@@ -6198,11 +6239,24 @@ def can_access_hub(user, hub_id):
     if user.assigned_location_id == hub_id:
         return True
     
+    # Admin/logistics roles need explicit hub assignments for offline operations
+    # This is stricter than online operations for security reasons
     return False
 
 def handle_offline_intake(hub_id, payload, client_id):
     """Handle offline intake (donation/stock in) operation"""
     try:
+        # Check for duplicate operation (idempotency)
+        existing_log = OfflineSyncLog.query.filter_by(
+            client_operation_id=client_id,
+            user_id=current_user.id
+        ).first()
+        
+        if existing_log:
+            # Operation already processed - return cached result
+            print(f"[Offline Sync - Intake] Duplicate operation detected: {client_id}, returning cached result")
+            return jsonify(existing_log.result_data)
+        
         item_sku = payload.get("item_sku")
         quantity = payload.get("quantity")
         donor_name = payload.get("donor_name")
@@ -6250,9 +6304,22 @@ def handle_offline_intake(hub_id, payload, client_id):
         )
         
         db.session.add(transaction)
+        db.session.flush()
+        
+        # Log successful operation
+        result_data = {"success": True, "transaction_id": transaction.id}
+        sync_log = OfflineSyncLog(
+            client_operation_id=client_id,
+            user_id=current_user.id,
+            operation_type='intake',
+            hub_id=hub_id,
+            transaction_id=transaction.id,
+            result_data=result_data
+        )
+        db.session.add(sync_log)
         db.session.commit()
         
-        return jsonify({"success": True, "transaction_id": transaction.id})
+        return jsonify(result_data)
         
     except Exception as e:
         db.session.rollback()
@@ -6262,6 +6329,17 @@ def handle_offline_intake(hub_id, payload, client_id):
 def handle_offline_distribution(hub_id, payload, client_id):
     """Handle offline distribution (stock out) operation"""
     try:
+        # Check for duplicate operation (idempotency)
+        existing_log = OfflineSyncLog.query.filter_by(
+            client_operation_id=client_id,
+            user_id=current_user.id
+        ).first()
+        
+        if existing_log:
+            # Operation already processed - return cached result
+            print(f"[Offline Sync - Distribution] Duplicate operation detected: {client_id}, returning cached result")
+            return jsonify(existing_log.result_data)
+        
         item_sku = payload.get("item_sku")
         quantity = payload.get("quantity")
         beneficiary_name = payload.get("beneficiary_name")
@@ -6316,9 +6394,22 @@ def handle_offline_distribution(hub_id, payload, client_id):
         )
         
         db.session.add(transaction)
+        db.session.flush()
+        
+        # Log successful operation
+        result_data = {"success": True, "transaction_id": transaction.id}
+        sync_log = OfflineSyncLog(
+            client_operation_id=client_id,
+            user_id=current_user.id,
+            operation_type='distribution',
+            hub_id=hub_id,
+            transaction_id=transaction.id,
+            result_data=result_data
+        )
+        db.session.add(sync_log)
         db.session.commit()
         
-        return jsonify({"success": True, "transaction_id": transaction.id})
+        return jsonify(result_data)
         
     except Exception as e:
         db.session.rollback()
@@ -6328,6 +6419,17 @@ def handle_offline_distribution(hub_id, payload, client_id):
 def handle_offline_needs_list(hub_id, payload, client_id):
     """Handle offline needs list creation"""
     try:
+        # Check for duplicate operation (idempotency)
+        existing_log = OfflineSyncLog.query.filter_by(
+            client_operation_id=client_id,
+            user_id=current_user.id
+        ).first()
+        
+        if existing_log:
+            # Operation already processed - return cached result
+            print(f"[Offline Sync - Needs List] Duplicate operation detected: {client_id}, returning cached result")
+            return jsonify(existing_log.result_data)
+        
         # Only allow Agency and Sub hubs to create needs lists offline
         hub = Depot.query.get(hub_id)
         if not hub:
@@ -6363,9 +6465,20 @@ def handle_offline_needs_list(hub_id, payload, client_id):
             )
             db.session.add(line_item)
         
+        # Log successful operation
+        result_data = {"success": True, "needs_list_id": needs_list.id}
+        sync_log = OfflineSyncLog(
+            client_operation_id=client_id,
+            user_id=current_user.id,
+            operation_type='needs_list_create',
+            hub_id=hub_id,
+            needs_list_id=needs_list.id,
+            result_data=result_data
+        )
+        db.session.add(sync_log)
         db.session.commit()
         
-        return jsonify({"success": True, "needs_list_id": needs_list.id})
+        return jsonify(result_data)
         
     except Exception as e:
         db.session.rollback()
