@@ -3886,10 +3886,10 @@ def needs_list_reject(list_id):
     return redirect(url_for("needs_list_details", list_id=list_id))
 
 @app.route("/needs-lists/<int:list_id>/dispatch", methods=["POST"])
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_SUB_HUB_USER, ROLE_MAIN_HUB_USER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_SUB_HUB_USER, ROLE_MAIN_HUB_USER, ROLE_INVENTORY_CLERK, ROLE_WAREHOUSE_SUPERVISOR)
 def needs_list_dispatch(list_id):
     """Dispatch approved needs list - Creates stock transactions and updates status to Dispatched
-    Authorized users: Admins, Logistics staff, and Sub/Main Hub users at source hubs."""
+    Authorized users: Admins, Logistics staff, Hub users (Main/Sub/Inventory Clerk), and legacy Warehouse Supervisors at source hubs."""
     needs_list = NeedsList.query.get_or_404(list_id)
     
     # Permission check using centralized helper
