@@ -1,0 +1,386 @@
+In my DRIMS Flask app, update the Users data to align with the new governance model, Hub types, and Agency Hub logic.
+
+
+Normalize roles to use only these system roles:
+
+
+System Administrator
+
+
+Logistics Manager
+
+
+Logistics Officer
+
+
+Main Hub User
+
+
+Sub-Hub User
+
+
+Agency Hub User
+
+
+Auditor / M&E Officer
+
+
+(Optional for future) Inventory Clerk
+
+
+
+
+Update the existing users to the following exact records (by ID), keeping them Active:
+
+
+ID 1
+
+
+Name: System Administrator
+
+
+Email: admin@gov.jm
+
+
+Role: System Administrator
+
+
+Location: -
+
+
+Hub Type: -
+
+
+Organization: Government of Jamaica
+
+
+Job Title: Administrator
+
+
+Phone: -
+
+
+Status: Active
+
+
+
+
+ID 2
+
+
+Name: Maria Johnson
+
+
+Email: manager@gov.jm
+
+
+Role: Logistics Manager
+
+
+Location: Trelawny
+
+
+Hub Type: SUB
+
+
+Organization: Ministry of Local Government / ODPEM
+
+
+Job Title: National Logistics Manager
+
+
+Phone: -
+
+
+Status: Active
+
+
+
+
+ID 3
+
+
+Name: John Brown
+
+
+Email: warehouse@gov.jm
+
+
+Role: Main Hub User
+
+
+Location: Pimento JDF
+
+
+Hub Type: MAIN
+
+
+Organization: Government of Jamaica
+
+
+Job Title: Main Hub Operations Officer
+
+
+Phone: -
+
+
+Status: Active
+
+
+
+
+ID 4
+
+
+Name: Dr. Sarah Williams
+
+
+Email: executive@gov.jm
+
+
+Role: Auditor / M&E Officer
+
+
+Location: -
+
+
+Hub Type: -
+
+
+Organization: Ministry of Local Government
+
+
+Job Title: Executive Auditor
+
+
+Phone: -
+
+
+Status: Active
+
+
+
+
+ID 5
+
+
+Name: Michael Davis
+
+
+Email: field@gov.jm
+
+
+Role: Sub-Hub User
+
+
+Location: Montego Bay
+
+
+Hub Type: SUB
+
+
+Organization: Government of Jamaica
+
+
+Job Title: Sub-Hub Field Operator
+
+
+Phone: -
+
+
+Status: Active
+
+
+
+
+ID 7
+
+
+Name: Sarah Williams
+
+
+Email: distributor@gov.jm
+
+
+Role: Agency Hub User
+
+
+Location: Food for the Poor
+
+
+Hub Type: AGENCY
+
+
+Organization: Food for the Poor Jamaica
+
+
+Job Title: Agency Warehouse Staff
+
+
+Phone: -
+
+
+Status: Active
+
+
+
+
+ID 8
+
+
+Name: Jane Thompson
+
+
+Email: logistics.manager@gov.jm
+
+
+Role: Logistics Manager
+
+
+Location: Pimento JDF
+
+
+Hub Type: MAIN
+
+
+Organization: Ministry of Local Government / ODPEM
+
+
+Job Title: Logistics Division Head
+
+
+Phone: -
+
+
+Status: Active
+
+
+
+
+ID 9
+
+
+Name: Mark Davis
+
+
+Email: logistics.officer@gov.jm
+
+
+Role: Logistics Officer
+
+
+Location: Haining
+
+
+Hub Type: SUB
+
+
+Organization: ODPEM
+
+
+Job Title: National Logistics Officer
+
+
+Phone: -
+
+
+Status: Active
+
+
+
+
+ID 10
+
+
+Name: James Brown
+
+
+Email: redcross@gov.jm
+
+
+Role: Agency Hub User
+
+
+Location: Red Cross
+
+
+Hub Type: AGENCY
+
+
+Organization: Jamaica Red Cross
+
+
+Job Title: Agency Logistics Coordinator
+
+
+Phone: -
+
+
+Status: Active
+
+
+
+
+ID 11
+
+
+Name: Rick James
+
+
+Email: rick.james@gov.jm
+
+
+Role: Sub-Hub User
+
+
+Location: Montego Bay
+
+
+Hub Type: SUB
+
+
+Organization: ODPEM
+
+
+Job Title: Warehouse Supervisor
+
+
+Phone: -
+
+
+Status: Active
+
+
+
+
+
+
+Ensure:
+
+
+The Role, Location, Hub Type, and Organization fields are consistent with the DRIMS governance rules:
+
+
+Agency Hub User = independent Agency Hubs (e.g. Food for the Poor, Red Cross); their inventory is private and excluded from overall government stock summaries.
+
+
+Main Hub User and Sub-Hub User are for government-owned hubs only.
+
+
+Logistics Manager has final approval rights; Logistics Officer prepares but does not approve.
+
+
+Auditor / M&E Officer is read-only.
+
+
+
+
+Remove any legacy or deprecated roles such as Warehouse Staff, Field Personnel, Executive where used, replacing them with the aligned roles above.
+
+
+Do not change passwords or authentication logic; only update the seed/user records and role mappings.
+
+
+
+
+Apply these updates directly in the Users model/seed data so the DRIMS system reflects this exact configuration.
