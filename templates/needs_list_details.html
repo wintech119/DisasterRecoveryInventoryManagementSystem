@@ -769,8 +769,8 @@
           </div>
         {% endif %}
 
-        <!-- Dispatch Items Section (Warehouse Users) -->
-        {% if current_user.role in ['ADMIN', 'WAREHOUSE_SUPERVISOR', 'WAREHOUSE_OFFICER'] and needs_list.status == 'Approved' and can_dispatch %}
+        <!-- Dispatch Items Section (Hub Users with dispatch permissions) -->
+        {% if can_dispatch and needs_list.status == 'Approved' %}
           <div class="card border-info mb-3">
             <div class="card-body p-3">
               <h6 class="card-title text-info mb-2"><i class="bi bi-truck me-1"></i>Dispatch Items</h6>
@@ -790,17 +790,6 @@
                   <i class="bi bi-exclamation-triangle me-1"></i>Request Fulfilment Change
                 </button>
               {% endif %}
-            </div>
-          </div>
-        {% elif current_user.role in ['LOGISTICS_OFFICER', 'LOGISTICS_MANAGER'] and needs_list.status == 'Approved' %}
-          <div class="card border-secondary mb-3">
-            <div class="card-body p-3">
-              <h6 class="card-title text-secondary mb-2"><i class="bi bi-eye me-1"></i>Monitoring</h6>
-              <p class="small text-muted mb-2">Warehouse team will dispatch items from source hubs</p>
-              <div class="alert alert-light mb-0 small">
-                <i class="bi bi-info-circle me-1"></i>
-                Dispatch is handled by warehouse supervisors/officers at the source hub.
-              </div>
             </div>
           </div>
         {% endif %}
@@ -1000,8 +989,8 @@
   </div>
 </div>
 
-<!-- Request Fulfilment Change Modal (Not for Agency Hubs) -->
-{% if current_user.role in ['WAREHOUSE_SUPERVISOR', 'WAREHOUSE_OFFICER'] and needs_list.status == 'Approved' and can_dispatch and (not user_depot or user_depot.hub_type != 'AGENCY') %}
+<!-- Request Fulfilment Change Modal (Hub users with dispatch permissions) -->
+{% if can_dispatch and needs_list.status == 'Approved' and (not user_depot or user_depot.hub_type != 'AGENCY') %}
 <div class="modal fade" id="requestChangeModal" tabindex="-1" aria-labelledby="requestChangeModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">

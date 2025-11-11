@@ -3253,8 +3253,9 @@ def needs_list_details(list_id):
     
     # Check if current user can dispatch this needs list (for hub users and admins)
     can_dispatch = False
-    if needs_list.status == 'Approved' and current_user.has_any_role(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_SUB_HUB_USER, ROLE_MAIN_HUB_USER):
-        can_dispatch, _ = can_dispatch_needs_list(current_user, needs_list)
+    if needs_list.status == 'Approved':
+        # Use the new can_dispatch_from_hub helper which includes all operational roles
+        can_dispatch, _ = can_dispatch_from_hub(current_user, needs_list)
     
     # Fetch change requests for this needs list
     change_requests = FulfilmentChangeRequest.query.filter_by(
