@@ -378,6 +378,9 @@ class NeedsList(db.Model):
     received_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)  # Agency user who confirmed receipt
     received_at = db.Column(db.DateTime, nullable=True)  # When receipt was confirmed
     receipt_notes = db.Column(db.Text, nullable=True)  # Notes from agency on receipt
+    receipt_confirmed = db.Column(db.Boolean, default=False, nullable=False)  # Whether receipt has been confirmed
+    receipt_confirmed_at = db.Column(db.DateTime, nullable=True)  # When receipt was confirmed (timestamp for auditing)
+    receipt_confirmed_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)  # User who confirmed receipt
     
     # Fulfilment completion tracking
     fulfilled_at = db.Column(db.DateTime, nullable=True)
@@ -481,6 +484,30 @@ class NeedsListFulfilmentVersion(db.Model):
     needs_list = db.relationship("NeedsList", back_populates="fulfilment_versions")
     change_request = db.relationship("FulfilmentChangeRequest")
     adjusted_by = db.relationship("User", lazy='joined')
+
+class FulfilmentEditLog(db.Model):
+    """Audit trail for post-completion fulfilment edits (after receipt confirmation)"""
+    __tablename__ = 'fulfilment_edit_log'
+    __table_args__ = (
+        db.Index('idx_edit_log_needs_list', 'needs_list_id'),
+        db.Index('idx_edit_log_edited_at', 'edited_at'),
+    )
+    
+    id = db.Column(db.Integer, primary_key=True)
+    needs_list_id = db.Column(db.Integer, db.ForeignKey("needs_list.id"), nullable=False)
+    edited_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    edited_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Field being edited
+    field_name = db.Column(db.String(100), nullable=False)
+    value_before = db.Column(db.Text, nullable=True)
+    value_after = db.Column(db.Text, nullable=True)
+    
+    # Context
+    edit_reason = db.Column(db.Text, nullable=True)
+    
+    needs_list = db.relationship("NeedsList")
+    edited_by = db.relationship("User", lazy='joined')
 
 # ---------- Flask-Login Configuration ----------
 login_manager = LoginManager()

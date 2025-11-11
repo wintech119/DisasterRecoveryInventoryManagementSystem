@@ -1,0 +1,91 @@
+In my DRIMS Flask app, update the Needs List completion page behavior as follows, applying it to both Logistics Managers and Logistics Officers:
+
+1. Remove Fulfilment Change Request section
+
+On the Needs List completion / details page (the page viewed after a Needs List has been fully fulfilled and processed):
+
+Remove the “Fulfilment Change Request” section or block entirely.
+
+Do not display any “Fulfilment Change Request” buttons, forms, or links for:
+
+Logistics Manager
+
+Logistics Officer
+
+Any other role
+
+This applies to all user views of a completed Needs List.
+
+2. Edit option after completion + receipt confirmation
+
+Implement the following rules:
+
+A Needs List becomes editable only when:
+
+Its status is Completed / Fulfilled
+
+The requesting Hub (Sub-Hub or Agency Hub) has confirmed receipt of the items
+
+Use an existing flag or add one such as:
+
+receipt_confirmed (boolean)
+
+receipt_confirmed_at (timestamp)
+
+receipt_confirmed_by (user id)
+
+When both conditions are true:
+
+Show an “Edit Fulfilment” button on the Needs List completion page for the following roles only:
+
+System Administrator
+
+Logistics Manager
+
+Logistics Officer
+
+Behavior:
+
+Clicking “Edit Fulfilment” allows these users to correct fulfilment records (e.g. delivered quantities, references, notes, delivery date) directly on that page.
+
+All edits must be audit-logged, including:
+
+Needs List ID
+
+Before vs after values
+
+Editor (user id + role)
+
+Timestamp
+
+3. Permissions & Security
+
+The “Edit Fulfilment” option must not appear for:
+
+Main Hub User
+
+Sub-Hub User
+
+Agency Hub User
+
+Inventory Clerk
+
+Auditor / M&E Officer
+
+If any non-authorized user attempts to access the edit endpoint/route directly:
+
+Return a standard: "You don't have permission to edit this fulfilment."
+
+Keep:
+
+CSRF protection
+
+Server-side permission checks
+
+No silent overwrites (all edits go through audit logging).
+
+Update the templates, routes, and permission checks so:
+
+Fulfilment Change Request is fully removed from completed views.
+
+Post-completion corrections are only allowed for System Administrator, Logistics Manager, and Logistics Officer once receipt is confirmed.
