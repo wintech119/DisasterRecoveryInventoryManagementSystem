@@ -782,7 +782,7 @@ def prepare_completed_context(needs_list, current_user):
         })
     
     if needs_list.dispatched_at:
-        dispatcher_name = needs_list.dispatched_by_user.full_name if needs_list.dispatched_by_user else 'System'
+        dispatcher_name = needs_list.dispatched_by_user.display_name if needs_list.dispatched_by_user else 'System'
         timeline.append({
             'milestone': 'Dispatched',
             'label': 'Items Dispatched',
@@ -793,7 +793,7 @@ def prepare_completed_context(needs_list, current_user):
         })
     
     if needs_list.received_at:
-        receiver_name = needs_list.received_by_user.full_name if needs_list.received_by_user else 'System'
+        receiver_name = needs_list.received_by_user.display_name if needs_list.received_by_user else 'System'
         timeline.append({
             'milestone': 'Received',
             'label': 'Receipt Confirmed',
@@ -819,13 +819,13 @@ def prepare_completed_context(needs_list, current_user):
     # Role-specific data
     roles = {
         'agency': {
-            'can_download_pdf': current_user.role in [ROLE_ADMIN] or (
+            'can_download_pdf': current_user.has_any_role(ROLE_ADMIN) or (
                 current_user.assigned_location_id and 
                 current_user.assigned_location_id == needs_list.agency_hub_id
             ),
             'total_received': total_dispatched_qty,
             'dispatch_sources': list(set([hub['hub_name'] for item in items_data for hub in item['source_hubs']])),
-            'confirmed_by': needs_list.received_by_user.full_name if needs_list.received_by_user else None,
+            'confirmed_by': needs_list.received_by_user.display_name if needs_list.received_by_user else None,
             'confirmed_at': needs_list.received_at
         },
         'officer': {
@@ -833,7 +833,7 @@ def prepare_completed_context(needs_list, current_user):
             'has_discrepancies': shortfall_qty > 0,
             'shortfall_items': [item for item in items_data if item['has_shortfall']],
             'dispatch_details': {
-                'dispatcher': needs_list.dispatched_by_user.full_name if needs_list.dispatched_by_user else None,
+                'dispatcher': needs_list.dispatched_by_user.display_name if needs_list.dispatched_by_user else None,
                 'dispatch_date': needs_list.dispatched_at,
                 'dispatch_notes': needs_list.dispatch_notes
             }
@@ -862,7 +862,7 @@ def prepare_completed_context(needs_list, current_user):
             'fulfillment_class': fulfillment_class,
             'dispatch_date': needs_list.dispatched_at,
             'receipt_date': needs_list.received_at,
-            'confirmed_by': needs_list.received_by_user.full_name if needs_list.received_by_user else None
+            'confirmed_by': needs_list.received_by_user.display_name if needs_list.received_by_user else None
         },
         'items': items_data,
         'timeline': timeline,
@@ -879,15 +879,15 @@ def can_view_needs_list(user, needs_list):
         tuple: (allowed: bool, error_message: str or None)
     """
     # ADMIN has full access
-    if user.role == ROLE_ADMIN:
+    if user.has_role(ROLE_ADMIN):
         return (True, None)
     
     # Logistics Officers and Managers have global visibility
-    if user.role in [ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER]:
+    if user.has_any_role(ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER):
         return (True, None)
     
     # Warehouse Supervisors/Officers: check if their Sub-Hub is a source hub for this needs list
-    if user.role in [ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+    if user.has_any_role(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
         if user.assigned_location_id:
             # Check if this needs list has fulfilments from their assigned hub
             has_fulfilment = NeedsListFulfilment.query.filter_by(
@@ -920,7 +920,7 @@ def can_edit_needs_list(user, needs_list):
         return (False, "Only draft needs lists can be edited.")
     
     # ADMIN can edit
-    if user.role == ROLE_ADMIN:
+    if user.has_role(ROLE_ADMIN):
         return (True, None)
     
     # Only the owning hub can edit their draft
@@ -943,7 +943,7 @@ def can_submit_needs_list(user, needs_list):
         return (False, "Only draft needs lists can be submitted.")
     
     # ADMIN can submit
-    if user.role == ROLE_ADMIN:
+    if user.has_role(ROLE_ADMIN):
         return (True, None)
     
     # Only SUB/AGENCY hub users from the owning hub can submit
@@ -973,7 +973,7 @@ def can_prepare_fulfilment(user, needs_list):
         tuple: (allowed: bool, error_message: str or None)
     """
     # Only ADMIN, Logistics Officers, and Logistics Managers can prepare
-    if user.role not in [ROLE_ADMIN, ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER]:
+    if not user.has_any_role(ROLE_ADMIN, ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER):
         return (False, "Only logistics staff can prepare fulfilments.")
     
     # Check if there's an active change request for this needs list
@@ -986,7 +986,7 @@ def can_prepare_fulfilment(user, needs_list):
     # Logistics Managers can edit if:
     # 1. Normal statuses (Submitted, Fulfilment Prepared, Awaiting Approval), OR
     # 2. Approved/Resent for Dispatch WITH an active change request
-    if user.role == ROLE_LOGISTICS_MANAGER:
+    if user.has_role(ROLE_LOGISTICS_MANAGER):
         if needs_list.status in ['Submitted', 'Fulfilment Prepared', 'Awaiting Approval']:
             return (True, None)
         elif needs_list.status in ['Approved', 'Resent for Dispatch'] and active_change_request:
@@ -995,7 +995,7 @@ def can_prepare_fulfilment(user, needs_list):
             return (False, "This needs list is not in an editable state.")
     
     # Logistics Officers can only edit Submitted or Fulfilment Prepared
-    if user.role == ROLE_LOGISTICS_OFFICER:
+    if user.has_role(ROLE_LOGISTICS_OFFICER):
         if needs_list.status in ['Submitted', 'Fulfilment Prepared']:
             return (True, None)
         elif needs_list.status == 'Awaiting Approval':
@@ -1021,7 +1021,7 @@ def can_approve_fulfilment(user, needs_list):
         return (False, "Only needs lists awaiting approval can be approved.")
     
     # Only ADMIN and Logistics Managers can approve
-    if user.role not in [ROLE_ADMIN, ROLE_LOGISTICS_MANAGER]:
+    if not user.has_any_role(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER):
         return (False, "Only Logistics Managers can approve fulfilments.")
     
     return (True, None)
@@ -1038,7 +1038,7 @@ def can_reject_fulfilment(user, needs_list):
         return (False, "Only needs lists awaiting approval can be rejected.")
     
     # Only ADMIN and Logistics Managers can reject
-    if user.role not in [ROLE_ADMIN, ROLE_LOGISTICS_MANAGER]:
+    if not user.has_any_role(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER):
         return (False, "Only Logistics Managers can reject fulfilments.")
     
     return (True, None)
@@ -1055,7 +1055,7 @@ def can_delete_needs_list(user, needs_list):
         return (False, "Only draft needs lists can be deleted.")
     
     # ADMIN can delete
-    if user.role == ROLE_ADMIN:
+    if user.has_role(ROLE_ADMIN):
         return (True, None)
     
     # Only the owning hub can delete their draft
@@ -1104,11 +1104,11 @@ def can_dispatch_needs_list(user, needs_list):
         return (False, "Only approved needs lists can be dispatched.")
     
     # Only ADMIN, Warehouse Supervisors, and Warehouse Officers can dispatch
-    if user.role not in [ROLE_ADMIN, ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+    if not user.has_any_role(ROLE_ADMIN, ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
         return (False, "Only Warehouse Supervisors and Warehouse Officers can dispatch items.")
     
     # For non-admin warehouse users, verify they are assigned to a source hub
-    if user.role in [ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+    if user.has_any_role(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
         if not user.assigned_location_id:
             return (False, "You must be assigned to a hub to dispatch items.")
         
@@ -1130,7 +1130,7 @@ def can_confirm_receipt(user, needs_list):
         return (False, "Only dispatched needs lists can have receipt confirmed.")
     
     # ADMIN can always confirm
-    if user.role == ROLE_ADMIN:
+    if user.has_role(ROLE_ADMIN):
         return (True, None)
     
     # User must be assigned to the agency hub that owns this needs list
@@ -1206,7 +1206,7 @@ def get_lock_status(needs_list, current_user):
     if is_locked_by_current:
         message = "You are currently editing this Needs List."
     else:
-        user_name = locked_by_user.full_name if locked_by_user else "Unknown User"
+        user_name = locked_by_user.display_name if locked_by_user else "Unknown User"
         message = f"This Needs List is currently being fulfilled by {user_name} (started {duration_minutes} minute{'s' if duration_minutes != 1 else ''} ago). Please try again later."
     
     return {
@@ -1248,7 +1248,7 @@ def acquire_lock(needs_list, user):
         else:
             # Different user holds the lock
             locked_by = needs_list.locked_by_user
-            user_name = locked_by.full_name if locked_by else "Unknown User"
+            user_name = locked_by.display_name if locked_by else "Unknown User"
             time_since_lock = datetime.utcnow() - needs_list.locked_at
             duration_minutes = int(time_since_lock.total_seconds() / 60)
             message = f"This Needs List is currently being fulfilled by {user_name} (started {duration_minutes} minute{'s' if duration_minutes != 1 else ''} ago)."
@@ -1402,7 +1402,7 @@ def record_package_status_change(package, old_status, new_status, changed_by, no
 def login():
     if current_user.is_authenticated:
         # Redirect warehouse users to their dedicated dashboard
-        if current_user.role in [ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+        if current_user.has_any_role(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
             return redirect(url_for("warehouse_dashboard"))
         return redirect(url_for("dashboard"))
     
@@ -1433,7 +1433,7 @@ def login():
                 return redirect(next_page)
             
             # Redirect warehouse users to their dedicated dashboard
-            if user.role in [ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+            if user.has_any_role(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
                 return redirect(url_for("warehouse_dashboard"))
             
             return redirect(url_for("dashboard"))
@@ -1457,7 +1457,7 @@ def dashboard():
     from datetime import datetime, timedelta
     
     # Redirect warehouse users to dedicated warehouse dashboard
-    if current_user.role in [ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+    if current_user.has_any_role(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
         return redirect(url_for("warehouse_dashboard"))
     
     # Block Agency hub users from accessing dashboard
@@ -1588,7 +1588,7 @@ def dashboard():
     
     # Pending needs lists (for logistics staff and admins)
     pending_needs_lists = []
-    if current_user.role in [ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER]:
+    if current_user.has_any_role(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER):
         pending_needs_lists = DistributionPackage.query.filter_by(status="Draft")\
                                                        .order_by(DistributionPackage.created_at.asc()).all()
     
@@ -1782,7 +1782,7 @@ def items():
     stock_map = get_stock_by_location()
     
     # For warehouse supervisors/officers: show only their assigned Sub-Hub
-    if current_user.role in [ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+    if current_user.has_any_role(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
         if not current_user.assigned_location_id:
             flash("You must be assigned to a hub to view inventory.", "danger")
             return redirect(url_for("warehouse_dashboard"))
@@ -1963,7 +1963,7 @@ def intake():
         tx = Transaction(item_sku=item_sku, ttype="IN", qty=qty, location_id=location_id,
                          donor_id=donor.id if donor else None, event_id=event_id, 
                          expiry_date=expiry_date, notes=notes,
-                         created_by=current_user.full_name)
+                         created_by=current_user.display_name)
         db.session.add(tx)
         db.session.commit()
         flash("Intake recorded.", "success")
@@ -2085,7 +2085,7 @@ def distribute():
         tx = Transaction(item_sku=item_sku, ttype="OUT", qty=qty, location_id=location_id,
                          beneficiary_id=beneficiary.id if beneficiary else None, 
                          event_id=event_id, notes=notes,
-                         created_by=current_user.full_name)
+                         created_by=current_user.display_name)
         db.session.add(tx)
         db.session.commit()
         flash("Distribution recorded.", "success")
@@ -2103,7 +2103,7 @@ def transactions():
     query = Transaction.query
     
     # Warehouse Supervisors/Officers should only see transactions for their assigned Sub-Hub
-    if current_user.role in [ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+    if current_user.has_any_role(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
         if not current_user.assigned_location_id:
             flash("You must be assigned to a hub to view transaction history.", "danger")
             return redirect(url_for("warehouse_dashboard"))
@@ -2152,7 +2152,7 @@ def transactions():
 @login_required
 def report_stock():
     # Warehouse Supervisors/Officers should only see stock for their assigned Sub-Hub
-    if current_user.role in [ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+    if current_user.has_any_role(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
         if not current_user.assigned_location_id:
             flash("You must be assigned to a hub to view stock reports.", "danger")
             return redirect(url_for("warehouse_dashboard"))
@@ -2505,7 +2505,7 @@ def package_create():
             event_id=int(event_id) if event_id else None,
             status="Draft",
             is_partial=is_partial,
-            created_by=current_user.full_name,
+            created_by=current_user.display_name,
             notes=notes
         )
         db.session.add(package)
@@ -2532,7 +2532,7 @@ def package_create():
                 db.session.add(allocation)
         
         # Record initial status
-        record_package_status_change(package, None, "Draft", current_user.full_name, "Package created")
+        record_package_status_change(package, None, "Draft", current_user.display_name, "Package created")
         
         db.session.commit()
         
@@ -2636,7 +2636,7 @@ def stock_transfer():
                     qty=quantity,
                     location_id=from_depot_id,
                     notes=transfer_note,
-                    created_by=current_user.full_name
+                    created_by=current_user.display_name
                 )
                 db.session.add(out_transaction)
                 
@@ -2647,7 +2647,7 @@ def stock_transfer():
                     qty=quantity,
                     location_id=to_depot_id,
                     notes=in_note,
-                    created_by=current_user.full_name
+                    created_by=current_user.display_name
                 )
                 db.session.add(in_transaction)
                 
@@ -2763,7 +2763,7 @@ def approve_transfer_request(request_id):
         qty=transfer_request.quantity,
         location_id=transfer_request.from_location_id,
         notes=transfer_note,
-        created_by=current_user.full_name
+        created_by=current_user.display_name
     )
     db.session.add(out_transaction)
     
@@ -2774,7 +2774,7 @@ def approve_transfer_request(request_id):
         qty=transfer_request.quantity,
         location_id=transfer_request.to_location_id,
         notes=in_note,
-        created_by=current_user.full_name
+        created_by=current_user.display_name
     )
     db.session.add(in_transaction)
     
@@ -2830,7 +2830,7 @@ def needs_lists():
         user_depot = Depot.query.get(current_user.assigned_location_id)
     
     # Warehouse Supervisor/Officer view: All relevant statuses for their Sub-Hub
-    if current_user.role in [ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+    if current_user.has_any_role(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
         if not current_user.assigned_location_id:
             flash("You must be assigned to a hub to view needs lists.", "danger")
             return redirect(url_for("warehouse_dashboard"))
@@ -2863,18 +2863,18 @@ def needs_lists():
                              assigned_hub=assigned_hub)
     
     # Role-based views for Logistics Officers and Managers
-    elif current_user.role == ROLE_LOGISTICS_OFFICER:
+    elif current_user.has_role(ROLE_LOGISTICS_OFFICER):
         # Logistics Officer view: All submitted needs lists awaiting fulfilment preparation
         submitted_lists = NeedsList.query.filter_by(status='Submitted').order_by(NeedsList.submitted_at.desc()).all()
         # Draft Fulfilments: Show ALL drafts (not just their own) for visibility and collaboration
         draft_fulfilments = NeedsList.query.filter_by(status='Fulfilment Prepared').order_by(NeedsList.updated_at.desc()).all()
         # Their prepared lists that are awaiting approval (submitted for approval)
-        awaiting_lists = NeedsList.query.filter_by(status='Awaiting Approval').filter_by(prepared_by=current_user.full_name).order_by(NeedsList.prepared_at.desc()).all()
+        awaiting_lists = NeedsList.query.filter_by(status='Awaiting Approval').filter_by(prepared_by=current_user.display_name).order_by(NeedsList.prepared_at.desc()).all()
         # Approved for Dispatch: Lists approved by Manager and ready for dispatch
         approved_lists = NeedsList.query.filter_by(status='Approved').order_by(NeedsList.approved_at.desc()).all()
         return render_template("logistics_officer_needs_lists.html", submitted_lists=submitted_lists, draft_fulfilments=draft_fulfilments, awaiting_lists=awaiting_lists, approved_lists=approved_lists)
     
-    elif current_user.role == ROLE_LOGISTICS_MANAGER:
+    elif current_user.has_role(ROLE_LOGISTICS_MANAGER):
         # Logistics Manager view: Can do EVERYTHING - prepare AND approve
         submitted_lists = NeedsList.query.filter_by(status='Submitted').order_by(NeedsList.submitted_at.desc()).all()
         # Draft Fulfilments: Show ALL drafts for review and editing
@@ -2957,7 +2957,7 @@ def needs_list_create():
             status="Draft",
             priority=priority,
             notes=notes,
-            created_by=current_user.full_name
+            created_by=current_user.display_name
         )
         db.session.add(needs_list)
         db.session.flush()
@@ -3012,7 +3012,7 @@ def needs_list_details(list_id):
     
     # Get stock availability for logistics staff
     stock_map = {}
-    if current_user.role in [ROLE_ADMIN, ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER]:
+    if current_user.has_any_role(ROLE_ADMIN, ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER):
         stock_map = get_stock_by_location()
     
     # Prepare completed context for enhanced Completed view
@@ -3088,7 +3088,7 @@ def needs_list_details(list_id):
     
     # Check if current user can dispatch this needs list (for warehouse users and admins)
     can_dispatch = False
-    if needs_list.status == 'Approved' and current_user.role in [ROLE_ADMIN, ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER]:
+    if needs_list.status == 'Approved' and current_user.has_any_role(ROLE_ADMIN, ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
         can_dispatch, _ = can_dispatch_needs_list(current_user, needs_list)
     
     # Fetch change requests for this needs list
@@ -3149,7 +3149,7 @@ def needs_list_submit(list_id):
         payload_data={
             "needs_list_number": needs_list.list_number,
             "agency_hub": needs_list.agency_hub.name,
-            "submitted_by": current_user.full_name,
+            "submitted_by": current_user.display_name,
             "submitted_by_id": current_user.id
         },
         needs_list_id=needs_list.id
@@ -3165,7 +3165,7 @@ def needs_list_submit(list_id):
         payload_data={
             "needs_list_number": needs_list.list_number,
             "agency_hub": needs_list.agency_hub.name,
-            "submitted_by": current_user.full_name,
+            "submitted_by": current_user.display_name,
             "submitted_by_id": current_user.id
         },
         needs_list_id=needs_list.id
@@ -3181,7 +3181,7 @@ def needs_list_submit(list_id):
         payload_data={
             "needs_list_number": needs_list.list_number,
             "agency_hub": needs_list.agency_hub.name,
-            "submitted_by": current_user.full_name,
+            "submitted_by": current_user.display_name,
             "submitted_by_id": current_user.id,
             "event_type": "system_monitoring"
         },
@@ -3383,12 +3383,12 @@ def needs_list_prepare(list_id):
         
         # Determine which action was requested: "save_draft", "submit", or "approve"
         action = request.form.get("action", "submit")
-        is_manager = current_user.role == ROLE_LOGISTICS_MANAGER
+        is_manager = current_user.has_role(ROLE_LOGISTICS_MANAGER)
         
         if action == "save_draft":
             # Save as Draft - both Officer and Manager can do this
             needs_list.status = 'Fulfilment Prepared'
-            needs_list.draft_saved_by = current_user.full_name
+            needs_list.draft_saved_by = current_user.display_name
             needs_list.draft_saved_at = datetime.utcnow()
             needs_list.fulfilment_notes = fulfilment_notes
             
@@ -3397,7 +3397,7 @@ def needs_list_prepare(list_id):
             
             db.session.commit()
             
-            flash(f"Draft saved successfully. Last saved by {current_user.full_name}.", "success")
+            flash(f"Draft saved successfully. Last saved by {current_user.display_name}.", "success")
             return redirect(url_for("needs_list_prepare", list_id=list_id))
         
         elif action == "approve" and is_manager:
@@ -3473,7 +3473,7 @@ def needs_list_prepare(list_id):
                 
                 # Set needs list status to Resent for Dispatch
                 needs_list.status = 'Resent for Dispatch'
-                needs_list.approved_by = current_user.full_name
+                needs_list.approved_by = current_user.display_name
                 needs_list.approved_at = datetime.utcnow()
                 needs_list.fulfilment_notes = fulfilment_notes
                 
@@ -3502,7 +3502,7 @@ def needs_list_prepare(list_id):
                     link_url=f"/needs-lists/{needs_list.id}",
                     payload_data={
                         "needs_list_number": needs_list.list_number,
-                        "updated_by": current_user.full_name,
+                        "updated_by": current_user.display_name,
                         "adjustment_reason": adjustment_reason
                     },
                     needs_list_id=needs_list.id
@@ -3515,10 +3515,10 @@ def needs_list_prepare(list_id):
                 
                 # Preserve Officer's preparation info if it exists, otherwise set Manager as preparer
                 if not needs_list.prepared_by or not needs_list.prepared_at:
-                    needs_list.prepared_by = current_user.full_name
+                    needs_list.prepared_by = current_user.display_name
                     needs_list.prepared_at = datetime.utcnow()
                 
-                needs_list.approved_by = current_user.full_name
+                needs_list.approved_by = current_user.display_name
                 needs_list.approved_at = datetime.utcnow()
                 needs_list.fulfilment_notes = fulfilment_notes
                 
@@ -3536,7 +3536,7 @@ def needs_list_prepare(list_id):
         else:
             # Logistics Officer: Submit for manager approval (default action)
             needs_list.status = 'Awaiting Approval'
-            needs_list.prepared_by = current_user.full_name
+            needs_list.prepared_by = current_user.display_name
             needs_list.prepared_at = datetime.utcnow()
             needs_list.fulfilment_notes = fulfilment_notes
             
@@ -3559,7 +3559,7 @@ def needs_list_prepare(list_id):
                 payload_data={
                     "needs_list_number": needs_list.list_number,
                     "agency_hub": needs_list.agency_hub.name,
-                    "prepared_by": current_user.full_name,
+                    "prepared_by": current_user.display_name,
                     "prepared_by_id": current_user.id
                 },
                 needs_list_id=needs_list.id
@@ -3593,7 +3593,7 @@ def needs_list_prepare(list_id):
             return redirect(url_for("needs_list_details", list_id=list_id))
         
         # Only Logistics Managers can edit via change request
-        if current_user.role != ROLE_LOGISTICS_MANAGER:
+        if not current_user.has_role(ROLE_LOGISTICS_MANAGER):
             flash("Only Logistics Managers can edit fulfilments via change requests.", "danger")
             return redirect(url_for("needs_list_details", list_id=list_id))
         
@@ -3661,7 +3661,7 @@ def needs_list_approve(list_id):
     
     # Update needs list status to Approved (stock transfers will happen during dispatch)
     needs_list.status = 'Approved'
-    needs_list.approved_by = current_user.full_name
+    needs_list.approved_by = current_user.display_name
     needs_list.approved_at = datetime.utcnow()
     needs_list.approval_notes = approval_notes
     db.session.commit()
@@ -3670,7 +3670,7 @@ def needs_list_approve(list_id):
     create_notification_for_agency_hub(
         needs_list=needs_list,
         title="Needs List Approved",
-        message=f"Your needs list {needs_list.list_number} has been approved by {current_user.full_name} and is ready for dispatch.",
+        message=f"Your needs list {needs_list.list_number} has been approved by {current_user.display_name} and is ready for dispatch.",
         notification_type="approved",
         triggered_by_user=current_user
     )
@@ -3679,7 +3679,7 @@ def needs_list_approve(list_id):
     create_notification_for_warehouse_users_at_source_hubs(
         needs_list=needs_list,
         title="New Approved Needs List Received",
-        message=f"Needs List {needs_list.list_number} has been approved for dispatch at your Sub-Hub. Requested by {needs_list.agency_hub.name}, approved by {current_user.full_name}.",
+        message=f"Needs List {needs_list.list_number} has been approved for dispatch at your Sub-Hub. Requested by {needs_list.agency_hub.name}, approved by {current_user.display_name}.",
         notification_type="task_assigned",
         triggered_by_user=current_user
     )
@@ -3705,7 +3705,7 @@ def needs_list_reject(list_id):
     NeedsListFulfilment.query.filter_by(needs_list_id=needs_list.id).delete()
     
     needs_list.status = 'Submitted'
-    needs_list.approved_by = current_user.full_name
+    needs_list.approved_by = current_user.display_name
     needs_list.approved_at = datetime.utcnow()
     needs_list.approval_notes = approval_notes
     needs_list.prepared_by = None
@@ -3779,7 +3779,7 @@ def needs_list_dispatch(list_id):
             location_id=fulfilment.source_hub_id,
             ttype="OUT",
             qty=fulfilment.allocated_qty,
-            created_by=current_user.full_name,
+            created_by=current_user.display_name,
             notes=f"Dispatched for Needs List: {needs_list.list_number} to {requesting_hub.name}",
             event_id=needs_list.event_id
         )
@@ -3791,7 +3791,7 @@ def needs_list_dispatch(list_id):
             location_id=needs_list.agency_hub_id,
             ttype="IN",
             qty=fulfilment.allocated_qty,
-            created_by=current_user.full_name,
+            created_by=current_user.display_name,
             notes=f"Dispatched from Needs List: {needs_list.list_number} from {source_hub.name}",
             event_id=needs_list.event_id
         )
@@ -3805,7 +3805,7 @@ def needs_list_dispatch(list_id):
     
     # If not yet approved, mark as approved during dispatch
     if needs_list.status in ['Awaiting Approval', 'Fulfilment Prepared']:
-        needs_list.approved_by = current_user.full_name
+        needs_list.approved_by = current_user.display_name
         needs_list.approved_at = datetime.utcnow()
     
     db.session.commit()
@@ -3814,7 +3814,7 @@ def needs_list_dispatch(list_id):
     create_notification_for_agency_hub(
         needs_list=needs_list,
         title="Items Dispatched",
-        message=f"Items for needs list {needs_list.list_number} have been dispatched by {current_user.full_name}. Please confirm receipt when items arrive.",
+        message=f"Items for needs list {needs_list.list_number} have been dispatched by {current_user.display_name}. Please confirm receipt when items arrive.",
         notification_type="dispatched",
         triggered_by_user=current_user
     )
@@ -3829,7 +3829,7 @@ def needs_list_dispatch(list_id):
         payload_data={
             "needs_list_number": needs_list.list_number,
             "agency_hub": needs_list.agency_hub.name,
-            "dispatched_by": current_user.full_name,
+            "dispatched_by": current_user.display_name,
             "dispatched_by_id": current_user.id
         },
         needs_list_id=needs_list.id
@@ -3845,7 +3845,7 @@ def needs_list_dispatch(list_id):
         payload_data={
             "needs_list_number": needs_list.list_number,
             "agency_hub": needs_list.agency_hub.name,
-            "dispatched_by": current_user.full_name,
+            "dispatched_by": current_user.display_name,
             "dispatched_by_id": current_user.id,
             "event_type": "distribution_support"
         },
@@ -3882,7 +3882,7 @@ def needs_list_confirm_receipt(list_id):
     create_notification_for_agency_hub(
         needs_list=needs_list,
         title="Receipt Confirmed",
-        message=f"Receipt has been confirmed for needs list {needs_list.list_number} by {current_user.full_name}. Request is now completed.",
+        message=f"Receipt has been confirmed for needs list {needs_list.list_number} by {current_user.display_name}. Request is now completed.",
         notification_type="received",
         triggered_by_user=current_user
     )
@@ -3897,7 +3897,7 @@ def needs_list_confirm_receipt(list_id):
         payload_data={
             "needs_list_number": needs_list.list_number,
             "agency_hub": needs_list.agency_hub.name,
-            "received_by": current_user.full_name,
+            "received_by": current_user.display_name,
             "received_by_id": current_user.id,
             "completed_at": format_datetime_iso_est(datetime.utcnow())
         },
@@ -3914,7 +3914,7 @@ def needs_list_confirm_receipt(list_id):
         payload_data={
             "needs_list_number": needs_list.list_number,
             "agency_hub": needs_list.agency_hub.name,
-            "received_by": current_user.full_name,
+            "received_by": current_user.display_name,
             "received_by_id": current_user.id
         },
         needs_list_id=needs_list.id
@@ -3949,7 +3949,7 @@ def needs_list_completed_report(list_id):
     ).get_or_404(list_id)
     
     # Permission check - Only agency hub users or admins can download
-    if current_user.role != ROLE_ADMIN:
+    if not current_user.has_role(ROLE_ADMIN):
         if not current_user.assigned_location_id or current_user.assigned_location_id != needs_list.agency_hub_id:
             flash("You don't have permission to download this report.", "danger")
             return redirect(url_for("needs_list_details", list_id=list_id))
@@ -4036,13 +4036,13 @@ def fulfilment_change_request_create(list_id):
     create_notifications_for_role(
         role=ROLE_LOGISTICS_OFFICER,
         title="Fulfilment Change Requested",
-        message=f"Fulfilment change requested by {current_user.full_name} at {assigned_hub.name} for needs list {needs_list.list_number}.",
+        message=f"Fulfilment change requested by {current_user.display_name} at {assigned_hub.name} for needs list {needs_list.list_number}.",
         notification_type="task_assigned",
         link_url=f"/needs-lists/{needs_list.id}",
         payload_data={
             "needs_list_number": needs_list.list_number,
             "requesting_hub": assigned_hub.name,
-            "requested_by": current_user.full_name,
+            "requested_by": current_user.display_name,
             "requested_by_id": current_user.id,
             "change_request_id": change_request.id
         },
@@ -4052,13 +4052,13 @@ def fulfilment_change_request_create(list_id):
     create_notifications_for_role(
         role=ROLE_LOGISTICS_MANAGER,
         title="Fulfilment Change Requested",
-        message=f"Fulfilment change requested by {current_user.full_name} at {assigned_hub.name} for needs list {needs_list.list_number}.",
+        message=f"Fulfilment change requested by {current_user.display_name} at {assigned_hub.name} for needs list {needs_list.list_number}.",
         notification_type="task_assigned",
         link_url=f"/needs-lists/{needs_list.id}",
         payload_data={
             "needs_list_number": needs_list.list_number,
             "requesting_hub": assigned_hub.name,
-            "requested_by": current_user.full_name,
+            "requested_by": current_user.display_name,
             "requested_by_id": current_user.id,
             "change_request_id": change_request.id
         },
@@ -4089,7 +4089,7 @@ def fulfilment_change_request_process(request_id):
     
     if action == "approve":
         # Only Logistics Managers can edit and resend fulfilments
-        if current_user.role != ROLE_LOGISTICS_MANAGER:
+        if not current_user.has_role(ROLE_LOGISTICS_MANAGER):
             flash("Only Logistics Managers can approve and update fulfilments. Please escalate to a Manager.", "warning")
             return redirect(url_for("needs_list_details", list_id=change_request.needs_list_id))
         
@@ -4133,7 +4133,7 @@ def fulfilment_change_request_process(request_id):
         link_url=f"/needs-lists/{change_request.needs_list_id}",
         payload_data={
             "needs_list_number": change_request.needs_list.list_number,
-            "reviewed_by": current_user.full_name,
+            "reviewed_by": current_user.display_name,
             "reviewed_by_id": current_user.id,
             "review_comments": review_comments,
             "change_request_id": change_request.id
@@ -4211,7 +4211,7 @@ def package_fulfill(package_id):
         package.updated_at = datetime.utcnow()
         
         # Record update in audit trail
-        record_package_status_change(package, "Draft", "Draft", current_user.full_name, 
+        record_package_status_change(package, "Draft", "Draft", current_user.display_name, 
                                     "Depot allocations updated by inventory manager")
         
         db.session.commit()
@@ -4298,7 +4298,7 @@ def package_submit_review(package_id):
     package.status = "Under Review"
     package.updated_at = datetime.utcnow()
     
-    record_package_status_change(package, old_status, "Under Review", current_user.full_name, 
+    record_package_status_change(package, old_status, "Under Review", current_user.display_name, 
                                 "Package submitted for review")
     
     db.session.commit()
@@ -4320,11 +4320,11 @@ def package_approve(package_id):
     
     old_status = package.status
     package.status = "Approved"
-    package.approved_by = current_user.full_name
+    package.approved_by = current_user.display_name
     package.approved_at = datetime.utcnow()
     package.updated_at = datetime.utcnow()
     
-    record_package_status_change(package, old_status, "Approved", current_user.full_name, approval_notes)
+    record_package_status_change(package, old_status, "Approved", current_user.display_name, approval_notes)
     
     db.session.commit()
     
@@ -4372,17 +4372,17 @@ def package_dispatch(package_id):
                     location_id=allocation.depot_id,  # Transaction from specific depot
                     event_id=package.event_id,
                     notes=f"Dispatched from {allocation.depot.name} via package {package.package_number}",
-                    created_by=current_user.full_name
+                    created_by=current_user.display_name
                 )
                 db.session.add(transaction)
     
     old_status = package.status
     package.status = "Dispatched"
-    package.dispatched_by = current_user.full_name
+    package.dispatched_by = current_user.display_name
     package.dispatched_at = datetime.utcnow()
     package.updated_at = datetime.utcnow()
     
-    record_package_status_change(package, old_status, "Dispatched", current_user.full_name, dispatch_notes)
+    record_package_status_change(package, old_status, "Dispatched", current_user.display_name, dispatch_notes)
     
     db.session.commit()
     
@@ -4406,7 +4406,7 @@ def package_deliver(package_id):
     package.delivered_at = datetime.utcnow()
     package.updated_at = datetime.utcnow()
     
-    record_package_status_change(package, old_status, "Delivered", current_user.full_name, delivery_notes)
+    record_package_status_change(package, old_status, "Delivered", current_user.display_name, delivery_notes)
     
     db.session.commit()
     
@@ -5178,7 +5178,7 @@ def create_notification_for_agency_hub(needs_list, title, message, notification_
         # Build payload for audit trail
         payload_data = {
             "needs_list_number": needs_list.list_number,
-            "triggered_by": triggered_by_user.full_name if triggered_by_user else "System",
+            "triggered_by": triggered_by_user.display_name if triggered_by_user else "System",
             "triggered_by_id": triggered_by_user.id if triggered_by_user else None,
         }
         payload_json = json.dumps(payload_data)
@@ -5247,7 +5247,7 @@ def create_notification_for_warehouse_users_at_source_hubs(needs_list, title, me
         payload_data = {
             "needs_list_number": needs_list.list_number,
             "agency_hub": needs_list.agency_hub.name if needs_list.agency_hub else None,
-            "triggered_by": triggered_by_user.full_name if triggered_by_user else "System",
+            "triggered_by": triggered_by_user.display_name if triggered_by_user else "System",
             "triggered_by_id": triggered_by_user.id if triggered_by_user else None,
         }
         payload_json = json.dumps(payload_data)
