@@ -1,10 +1,12 @@
 import os
+import uuid
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy import func, case
+from sqlalchemy.dialects.postgresql import UUID
 from functools import wraps
 from urllib.parse import urlparse, urljoin
 import pandas as pd
@@ -30,10 +32,10 @@ db = SQLAlchemy(app)
 # ---------- Models ----------
 class Depot(db.Model):
     __tablename__ = 'location'  # Keep existing table name for backward compatibility
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = db.Column(db.String(120), unique=True, nullable=False)  # e.g., Parish depot / shelter
     hub_type = db.Column(db.String(10), nullable=False, default='MAIN')  # MAIN, SUB, AGENCY
-    parent_location_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=True)  # Parent hub for SUB/AGENCY
+    parent_location_id = db.Column(UUID(as_uuid=True), db.ForeignKey('location.id'), nullable=True)  # Parent hub for SUB/AGENCY
     status = db.Column(db.String(10), nullable=False, default='Active')  # Active or Inactive
     operational_timestamp = db.Column(db.DateTime, nullable=True)  # Last time hub was activated
     
@@ -52,18 +54,18 @@ class Item(db.Model):
     attachment_path = db.Column(db.String(500), nullable=True)             # Storage path (local or S3/Nexus URL in future)
 
 class Donor(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = db.Column(db.String(200), nullable=False, unique=False)
     contact = db.Column(db.String(200), nullable=True)
 
 class Beneficiary(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = db.Column(db.String(200), nullable=False)
     contact = db.Column(db.String(200), nullable=True)
     parish = db.Column(db.String(120), nullable=True)
 
 class DisasterEvent(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = db.Column(db.String(200), nullable=False)
     event_type = db.Column(db.String(100), nullable=True)  # Hurricane, Earthquake, Flood, etc.
     start_date = db.Column(db.Date, nullable=False)
@@ -73,14 +75,14 @@ class DisasterEvent(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Transaction(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     item_sku = db.Column(db.String(64), db.ForeignKey("item.sku"), nullable=False)
     ttype = db.Column(db.String(8), nullable=False)  # "IN" or "OUT"
     qty = db.Column(db.Integer, nullable=False)
-    location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)
-    donor_id = db.Column(db.Integer, db.ForeignKey("donor.id"), nullable=True)
-    beneficiary_id = db.Column(db.Integer, db.ForeignKey("beneficiary.id"), nullable=True)
-    event_id = db.Column(db.Integer, db.ForeignKey("disaster_event.id"), nullable=True)
+    location_id = db.Column(UUID(as_uuid=True), db.ForeignKey("location.id"), nullable=True)
+    donor_id = db.Column(UUID(as_uuid=True), db.ForeignKey("donor.id"), nullable=True)
+    beneficiary_id = db.Column(UUID(as_uuid=True), db.ForeignKey("beneficiary.id"), nullable=True)
+    event_id = db.Column(UUID(as_uuid=True), db.ForeignKey("disaster_event.id"), nullable=True)
     expiry_date = db.Column(db.Date, nullable=True)  # Expiry date for this batch of items
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -94,15 +96,15 @@ class Transaction(db.Model):
 
 class TransferRequest(db.Model):
     """Transfer requests for hub-to-hub stock movements requiring approval"""
-    id = db.Column(db.Integer, primary_key=True)
-    from_location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=False)
-    to_location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=False)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    from_location_id = db.Column(UUID(as_uuid=True), db.ForeignKey("location.id"), nullable=False)
+    to_location_id = db.Column(UUID(as_uuid=True), db.ForeignKey("location.id"), nullable=False)
     item_sku = db.Column(db.String(64), db.ForeignKey("item.sku"), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(20), nullable=False, default='PENDING')  # PENDING, APPROVED, REJECTED, COMPLETED
-    requested_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    requested_by = db.Column(UUID(as_uuid=True), db.ForeignKey("user.id"), nullable=True)
     requested_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    reviewed_by = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    reviewed_by = db.Column(UUID(as_uuid=True), db.ForeignKey("user.id"), nullable=True)
     reviewed_at = db.Column(db.DateTime, nullable=True)
     notes = db.Column(db.Text, nullable=True)
     
@@ -116,7 +118,7 @@ class Role(db.Model):
     """Roles table for normalized role management"""
     __tablename__ = 'role'
     
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     code = db.Column(db.String(50), unique=True, nullable=False, index=True)  # e.g., LOGISTICS_MANAGER
     name = db.Column(db.String(100), nullable=False)  # Display name
     description = db.Column(db.Text, nullable=True)
@@ -132,10 +134,10 @@ class UserRole(db.Model):
         db.PrimaryKeyConstraint('user_id', 'role_id'),
     )
     
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
-    role_id = db.Column(db.Integer, db.ForeignKey('role.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    role_id = db.Column(UUID(as_uuid=True), db.ForeignKey('role.id', ondelete='CASCADE'), nullable=False)
     assigned_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    assigned_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    assigned_by = db.Column(UUID(as_uuid=True), db.ForeignKey('user.id'), nullable=True)
     
     user = db.relationship('User', foreign_keys=[user_id], back_populates='user_roles')
     role = db.relationship('Role', back_populates='users')
@@ -149,10 +151,10 @@ class UserHub(db.Model):
         db.PrimaryKeyConstraint('user_id', 'hub_id'),
     )
     
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
-    hub_id = db.Column(db.Integer, db.ForeignKey('location.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    hub_id = db.Column(UUID(as_uuid=True), db.ForeignKey('location.id', ondelete='CASCADE'), nullable=False)
     assigned_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    assigned_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    assigned_by = db.Column(UUID(as_uuid=True), db.ForeignKey('user.id'), nullable=True)
     
     user = db.relationship('User', foreign_keys=[user_id], back_populates='user_hubs')
     hub = db.relationship('Depot')
@@ -162,7 +164,7 @@ class UserHub(db.Model):
 class User(UserMixin, db.Model):
     __tablename__ = 'user'
     
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
     # Authentication fields
     email = db.Column(db.String(200), unique=True, nullable=False, index=True)
@@ -188,14 +190,14 @@ class User(UserMixin, db.Model):
     notification_preferences = db.Column(db.Text, nullable=True)  # JSON string
     
     # Legacy location field - kept for backwards compatibility during migration
-    assigned_location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)
+    assigned_location_id = db.Column(UUID(as_uuid=True), db.ForeignKey("location.id"), nullable=True)
     
     # Audit fields
     last_login_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
-    updated_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_by_id = db.Column(UUID(as_uuid=True), db.ForeignKey('user.id'), nullable=True)
+    updated_by_id = db.Column(UUID(as_uuid=True), db.ForeignKey('user.id'), nullable=True)
     
     # Relationships
     user_roles = db.relationship('UserRole', foreign_keys='UserRole.user_id', back_populates='user', cascade='all, delete-orphan')
@@ -255,10 +257,10 @@ class Notification(db.Model):
         db.Index('idx_notification_hub_created', 'hub_id', 'created_at'),
     )
     
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
-    hub_id = db.Column(db.Integer, db.ForeignKey('location.id'), nullable=True, index=True)
-    needs_list_id = db.Column(db.Integer, db.ForeignKey('needs_list.id'), nullable=True, index=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('user.id'), nullable=False, index=True)
+    hub_id = db.Column(UUID(as_uuid=True), db.ForeignKey('location.id'), nullable=True, index=True)
+    needs_list_id = db.Column(UUID(as_uuid=True), db.ForeignKey('needs_list.id'), nullable=True, index=True)
     title = db.Column(db.String(200), nullable=False)
     message = db.Column(db.Text, nullable=False)
     type = db.Column(db.String(50), nullable=False)  # submitted, approved, dispatched, received, comment
@@ -274,11 +276,11 @@ class Notification(db.Model):
 
 class DistributionPackage(db.Model):
     """Distribution packages for relief operations delivered to AGENCY hubs"""
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     package_number = db.Column(db.String(64), unique=True, nullable=False, index=True)  # e.g., PKG-000001
-    recipient_agency_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=False)  # AGENCY hub that will receive this package
-    assigned_location_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)  # Warehouse/outpost (deprecated, kept for compatibility)
-    event_id = db.Column(db.Integer, db.ForeignKey("disaster_event.id"), nullable=True)
+    recipient_agency_id = db.Column(UUID(as_uuid=True), db.ForeignKey("location.id"), nullable=False)  # AGENCY hub that will receive this package
+    assigned_location_id = db.Column(UUID(as_uuid=True), db.ForeignKey("location.id"), nullable=True)  # Warehouse/outpost (deprecated, kept for compatibility)
+    event_id = db.Column(UUID(as_uuid=True), db.ForeignKey("disaster_event.id"), nullable=True)
     status = db.Column(db.String(50), nullable=False, default="Draft")  # Draft, Under Review, Approved, Dispatched, Delivered
     is_partial = db.Column(db.Boolean, default=False, nullable=False)  # True if stock insufficient for full fulfillment
     created_by = db.Column(db.String(200), nullable=False)
@@ -299,8 +301,8 @@ class DistributionPackage(db.Model):
 
 class PackageItem(db.Model):
     """Items in a distribution package"""
-    id = db.Column(db.Integer, primary_key=True)
-    package_id = db.Column(db.Integer, db.ForeignKey("distribution_package.id"), nullable=False)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    package_id = db.Column(UUID(as_uuid=True), db.ForeignKey("distribution_package.id"), nullable=False)
     item_sku = db.Column(db.String(64), db.ForeignKey("item.sku"), nullable=False)
     requested_qty = db.Column(db.Integer, nullable=False)  # Quantity requested for agency
     allocated_qty = db.Column(db.Integer, nullable=False, default=0)  # Total quantity allocated (sum of all depot allocations)
@@ -316,9 +318,9 @@ class PackageItemAllocation(db.Model):
         db.UniqueConstraint('package_item_id', 'depot_id', name='uq_package_item_depot'),
     )
     
-    id = db.Column(db.Integer, primary_key=True)
-    package_item_id = db.Column(db.Integer, db.ForeignKey("package_item.id", ondelete="CASCADE"), nullable=False)
-    depot_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=False)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    package_item_id = db.Column(UUID(as_uuid=True), db.ForeignKey("package_item.id", ondelete="CASCADE"), nullable=False)
+    depot_id = db.Column(UUID(as_uuid=True), db.ForeignKey("location.id"), nullable=False)
     allocated_qty = db.Column(db.Integer, nullable=False)  # Quantity to be fulfilled from this depot
     
     package_item = db.relationship("PackageItem", back_populates="allocations")
@@ -326,8 +328,8 @@ class PackageItemAllocation(db.Model):
 
 class PackageStatusHistory(db.Model):
     """Audit trail of package status changes"""
-    id = db.Column(db.Integer, primary_key=True)
-    package_id = db.Column(db.Integer, db.ForeignKey("distribution_package.id"), nullable=False)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    package_id = db.Column(UUID(as_uuid=True), db.ForeignKey("distribution_package.id"), nullable=False)
     old_status = db.Column(db.String(50), nullable=True)
     new_status = db.Column(db.String(50), nullable=False)
     changed_by = db.Column(db.String(200), nullable=False)
@@ -339,11 +341,11 @@ class PackageStatusHistory(db.Model):
 class NeedsList(db.Model):
     """Needs lists created by AGENCY and SUB hubs for logistics review and fulfilment"""
     __tablename__ = 'needs_list'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     list_number = db.Column(db.String(64), unique=True, nullable=False, index=True)  # e.g., NL-000001
-    agency_hub_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=False)  # AGENCY/SUB hub creating the needs list
-    main_hub_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=True)  # Legacy field, may be null
-    event_id = db.Column(db.Integer, db.ForeignKey("disaster_event.id"), nullable=True)
+    agency_hub_id = db.Column(UUID(as_uuid=True), db.ForeignKey("location.id"), nullable=False)  # AGENCY/SUB hub creating the needs list
+    main_hub_id = db.Column(UUID(as_uuid=True), db.ForeignKey("location.id"), nullable=True)  # Legacy field, may be null
+    event_id = db.Column(UUID(as_uuid=True), db.ForeignKey("disaster_event.id"), nullable=True)
     
     # Status: Draft, Submitted, Fulfilment Prepared, Awaiting Approval, Approved, Dispatched, Received, Completed, Rejected
     status = db.Column(db.String(50), nullable=False, default="Draft")
@@ -370,12 +372,12 @@ class NeedsList(db.Model):
     approval_notes = db.Column(db.Text, nullable=True)  # Notes from Logistics Manager
     
     # Dispatch tracking (Logistics Officer/Manager) - Uses FK for referential integrity
-    dispatched_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)  # User who dispatched items
+    dispatched_by_id = db.Column(UUID(as_uuid=True), db.ForeignKey("user.id"), nullable=True)  # User who dispatched items
     dispatched_at = db.Column(db.DateTime, nullable=True)  # When items were dispatched
     dispatch_notes = db.Column(db.Text, nullable=True)  # Notes from dispatcher
     
     # Receipt tracking (Agency Hub) - Uses FK for referential integrity
-    received_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)  # Agency user who confirmed receipt
+    received_by_id = db.Column(UUID(as_uuid=True), db.ForeignKey("user.id"), nullable=True)  # Agency user who confirmed receipt
     received_at = db.Column(db.DateTime, nullable=True)  # When receipt was confirmed
     receipt_notes = db.Column(db.Text, nullable=True)  # Notes from agency on receipt
     
@@ -388,7 +390,7 @@ class NeedsList(db.Model):
     review_notes = db.Column(db.Text, nullable=True)
     
     # Concurrency control for fulfilment editing (Logistics Officers/Managers)
-    locked_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True, index=True)  # User currently editing
+    locked_by_id = db.Column(UUID(as_uuid=True), db.ForeignKey("user.id"), nullable=True, index=True)  # User currently editing
     locked_at = db.Column(db.DateTime, nullable=True)  # When lock was acquired/extended
     
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -407,8 +409,8 @@ class NeedsList(db.Model):
 class NeedsListItem(db.Model):
     """Items requested in an agency/sub hub's needs list"""
     __tablename__ = 'needs_list_item'
-    id = db.Column(db.Integer, primary_key=True)
-    needs_list_id = db.Column(db.Integer, db.ForeignKey("needs_list.id"), nullable=False)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    needs_list_id = db.Column(UUID(as_uuid=True), db.ForeignKey("needs_list.id"), nullable=False)
     item_sku = db.Column(db.String(64), db.ForeignKey("item.sku"), nullable=False)
     requested_qty = db.Column(db.Integer, nullable=False)
     justification = db.Column(db.Text, nullable=True)  # Why this item is needed
@@ -419,10 +421,10 @@ class NeedsListItem(db.Model):
 class NeedsListFulfilment(db.Model):
     """Fulfilment allocations for needs list items - tracks which source hubs will supply which quantities"""
     __tablename__ = 'needs_list_fulfilment'
-    id = db.Column(db.Integer, primary_key=True)
-    needs_list_id = db.Column(db.Integer, db.ForeignKey("needs_list.id"), nullable=False)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    needs_list_id = db.Column(UUID(as_uuid=True), db.ForeignKey("needs_list.id"), nullable=False)
     item_sku = db.Column(db.String(64), db.ForeignKey("item.sku"), nullable=False)
-    source_hub_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=False)  # MAIN or SUB hub supplying stock
+    source_hub_id = db.Column(UUID(as_uuid=True), db.ForeignKey("location.id"), nullable=False)  # MAIN or SUB hub supplying stock
     allocated_qty = db.Column(db.Integer, nullable=False)  # Quantity to be supplied from this source
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     
@@ -438,15 +440,15 @@ class FulfilmentChangeRequest(db.Model):
         db.Index('idx_change_request_needs_list', 'needs_list_id'),
     )
     
-    id = db.Column(db.Integer, primary_key=True)
-    needs_list_id = db.Column(db.Integer, db.ForeignKey("needs_list.id"), nullable=False)
-    requesting_hub_id = db.Column(db.Integer, db.ForeignKey("location.id"), nullable=False)  # Sub-Hub where request originates
-    requested_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)  # Warehouse Supervisor/Officer
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    needs_list_id = db.Column(UUID(as_uuid=True), db.ForeignKey("needs_list.id"), nullable=False)
+    requesting_hub_id = db.Column(UUID(as_uuid=True), db.ForeignKey("location.id"), nullable=False)  # Sub-Hub where request originates
+    requested_by_id = db.Column(UUID(as_uuid=True), db.ForeignKey("user.id"), nullable=False)  # Warehouse Supervisor/Officer
     request_comments = db.Column(db.Text, nullable=False)  # Why change is needed
     status = db.Column(db.String(50), nullable=False, default="Pending Review")  # Pending Review, In Progress, Approved & Resent, Rejected, Clarification Needed
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     
-    reviewed_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)  # Logistics Officer/Manager who processed
+    reviewed_by_id = db.Column(UUID(as_uuid=True), db.ForeignKey("user.id"), nullable=True)  # Logistics Officer/Manager who processed
     reviewed_at = db.Column(db.DateTime, nullable=True)
     review_comments = db.Column(db.Text, nullable=True)  # Logistics team response
     
@@ -464,12 +466,12 @@ class NeedsListFulfilmentVersion(db.Model):
         db.Index('idx_version_change_request', 'change_request_id'),
     )
     
-    id = db.Column(db.Integer, primary_key=True)
-    needs_list_id = db.Column(db.Integer, db.ForeignKey("needs_list.id"), nullable=False)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    needs_list_id = db.Column(UUID(as_uuid=True), db.ForeignKey("needs_list.id"), nullable=False)
     version_number = db.Column(db.Integer, nullable=False)  # Sequential version per needs_list
-    change_request_id = db.Column(db.Integer, db.ForeignKey("fulfilment_change_request.id"), nullable=True)  # Nullable for proactive adjustments
+    change_request_id = db.Column(UUID(as_uuid=True), db.ForeignKey("fulfilment_change_request.id"), nullable=True)  # Nullable for proactive adjustments
     
-    adjusted_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    adjusted_by_id = db.Column(UUID(as_uuid=True), db.ForeignKey("user.id"), nullable=False)
     adjusted_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     adjustment_reason = db.Column(db.Text, nullable=False)
     
