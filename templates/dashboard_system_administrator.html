@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}System Administrator Dashboard{% endblock %}
+{% block content %}
+<div class="container-fluid px-4 py-3">
+  <!-- Page Header -->
+  <div class="mb-3">
+    <h2 class="mb-1 fw-bold"><i class="bi bi-graph-up-arrow me-2"></i>System Administrator Dashboard</h2>
+    <p class="text-muted small mb-0">System configuration and user management</p>
+  </div>
+
+  <!-- Compact KPI Cards Row -->
+  <div class="row g-3 mb-3">
+    <div class="col-lg col-md-4 col-6">
+      <div class="card border-0 shadow-sm h-100 kpi-card">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center">
+            <div class="me-3 text-success"><i class="bi bi-people fs-3"></i></div>
+            <div>
+              <div class="text-muted small">Active Users</div>
+              <div class="h4 mb-0 fw-bold">{{ kpi_cards.active_users }}<span class="text-muted fs-6">/{{ kpi_cards.total_users }}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg col-md-4 col-6">
+      <div class="card border-0 shadow-sm h-100 kpi-card">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center">
+            <div class="me-3 text-primary"><i class="bi bi-building fs-3"></i></div>
+            <div>
+              <div class="text-muted small">Active Hubs</div>
+              <div class="h4 mb-0 fw-bold">{{ kpi_cards.active_hubs }}<span class="text-muted fs-6">/{{ kpi_cards.total_hubs }}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg col-md-4 col-6">
+      <div class="card border-0 shadow-sm h-100 kpi-card">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center">
+            <div class="me-3 text-info"><i class="bi bi-buildings fs-3"></i></div>
+            <div>
+              <div class="text-muted small">Main Hubs</div>
+              <div class="h4 mb-0 fw-bold">{{ kpi_cards.main_hubs }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg col-md-4 col-6">
+      <div class="card border-0 shadow-sm h-100 kpi-card">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center">
+            <div class="me-3 text-secondary"><i class="bi bi-building fs-3"></i></div>
+            <div>
+              <div class="text-muted small">Sub-Hubs</div>
+              <div class="h4 mb-0 fw-bold">{{ kpi_cards.sub_hubs }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg col-md-4 col-6">
+      <div class="card border-0 shadow-sm h-100 kpi-card">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center">
+            <div class="me-3 text-warning"><i class="bi bi-geo-alt fs-3"></i></div>
+            <div>
+              <div class="text-muted small">Agency Hubs</div>
+              <div class="h4 mb-0 fw-bold">{{ kpi_cards.agency_hubs }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Admin Actions -->
+  <div class="row g-3 mb-3">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-lightning me-2"></i>Quick Actions</h6>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <a href="{{ url_for('manage_users') }}" class="btn btn-primary w-100 py-3" aria-label="Manage users">
+                <i class="bi bi-person-gear fs-4 d-block mb-2"></i>
+                <div class="fw-semibold">Manage Users</div>
+              </a>
+            </div>
+            <div class="col-md-3">
+              <a href="{{ url_for('manage_hubs') }}" class="btn btn-info w-100 py-3" aria-label="Manage hubs">
+                <i class="bi bi-building-gear fs-4 d-block mb-2"></i>
+                <div class="fw-semibold">Manage Hubs</div>
+              </a>
+            </div>
+            <div class="col-md-3">
+              <a href="{{ url_for('system_settings') }}" class="btn btn-secondary w-100 py-3" aria-label="System settings">
+                <i class="bi bi-gear fs-4 d-block mb-2"></i>
+                <div class="fw-semibold">System Settings</div>
+              </a>
+            </div>
+            <div class="col-md-3">
+              <a href="{{ url_for('export_data') }}" class="btn btn-success w-100 py-3" aria-label="Export data">
+                <i class="bi bi-download fs-4 d-block mb-2"></i>
+                <div class="fw-semibold">Export Data</div>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Changes -->
+  <div class="row g-3 mb-3">
+    <!-- Recent Users -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-person-plus me-2 text-success"></i>Recent User Changes (30d)</h6>
+        </div>
+        <div class="card-body p-0">
+          {% if recent_users %}
+            <div class="table-responsive">
+              <table class="table table-hover table-sm mb-0">
+                <thead class="bg-light">
+                  <tr>
+                    <th class="py-2 px-3">Name</th>
+                    <th class="py-2 px-3">Email</th>
+                    <th class="py-2 px-3">Status</th>
+                    <th class="py-2 px-3">Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for user in recent_users %}
+                  <tr>
+                    <td class="py-2 px-3 small fw-medium">{{ user.display_name or user.email }}</td>
+                    <td class="py-2 px-3 small text-muted">{{ user.email }}</td>
+                    <td class="py-2 px-3">
+                      {% if user.is_active %}
+                      <span class="badge bg-success rounded-pill">Active</span>
+                      {% else %}
+                      <span class="badge bg-secondary rounded-pill">Inactive</span>
+                      {% endif %}
+                    </td>
+                    <td class="py-2 px-3 text-muted small">{{ user.created_at.strftime('%b %d, %Y') if user.created_at else 'N/A' }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <p class="text-muted text-center py-4 mb-0 small"><i class="bi bi-inbox me-2"></i>No recent user changes</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Hubs -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-building-add me-2 text-primary"></i>Recent Hub Changes</h6>
+        </div>
+        <div class="card-body p-0">
+          {% if recent_hubs %}
+            <div class="table-responsive">
+              <table class="table table-hover table-sm mb-0">
+                <thead class="bg-light">
+                  <tr>
+                    <th class="py-2 px-3">Hub Name</th>
+                    <th class="py-2 px-3">Type</th>
+                    <th class="py-2 px-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for hub in recent_hubs %}
+                  <tr>
+                    <td class="py-2 px-3 small fw-medium">{{ hub.name }}</td>
+                    <td class="py-2 px-3">
+                      {% if hub.hub_type == 'MAIN' %}
+                      <span class="badge bg-primary rounded-pill">Main</span>
+                      {% elif hub.hub_type == 'SUB' %}
+                      <span class="badge bg-info rounded-pill">Sub</span>
+                      {% else %}
+                      <span class="badge bg-warning rounded-pill">Agency</span>
+                      {% endif %}
+                    </td>
+                    <td class="py-2 px-3">
+                      {% if hub.status == 'Active' %}
+                      <span class="badge bg-success rounded-pill">Active</span>
+                      {% else %}
+                      <span class="badge bg-secondary rounded-pill">Inactive</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <p class="text-muted text-center py-4 mb-0 small"><i class="bi bi-inbox me-2"></i>No recent hub changes</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .kpi-card {
+    transition: transform 0.2s ease;
+  }
+  .kpi-card:hover {
+    transform: translateY(-2px);
+  }
+  .btn:focus {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+  }
+</style>
+{% endblock %}

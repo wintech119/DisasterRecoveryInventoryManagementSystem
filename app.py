@@ -688,7 +688,9 @@ def get_dashboard_context(user):
             primary_role = legacy_role_mapping[user.role]
     
     # Route to appropriate dashboard builder
-    if primary_role == ROLE_LOGISTICS_MANAGER:
+    if primary_role == ROLE_ADMIN:
+        return build_system_administrator_dashboard(user)
+    elif primary_role == ROLE_LOGISTICS_MANAGER:
         return build_logistics_manager_dashboard(user)
     elif primary_role == ROLE_LOGISTICS_OFFICER:
         return build_logistics_officer_dashboard(user)
@@ -696,9 +698,12 @@ def get_dashboard_context(user):
         return build_main_hub_dashboard(user)
     elif primary_role == ROLE_SUB_HUB_USER:
         return build_sub_hub_dashboard(user)
-    elif primary_role == ROLE_ADMIN:
-        # Admin gets logistics manager view for now (can be customized later)
-        return build_logistics_manager_dashboard(user)
+    elif primary_role == ROLE_AGENCY_HUB_USER:
+        return build_agency_hub_dashboard(user)
+    elif primary_role == ROLE_AUDITOR:
+        return build_auditor_dashboard(user)
+    elif primary_role == ROLE_INVENTORY_CLERK:
+        return build_inventory_clerk_dashboard(user)
     else:
         # Fallback to basic view
         return build_basic_dashboard(user)
@@ -1064,6 +1069,301 @@ def build_sub_hub_dashboard(user):
     ).order_by(NeedsList.created_at.desc()).limit(10).all()
     
     context['pending_transfers'] = pending_transfers
+    
+    return context
+
+def build_agency_hub_dashboard(user):
+    """
+    Build dashboard context for Agency Hub User role.
+    Scoped to their agency's requests and allocations only.
+    Agency hubs do NOT see government internal stock or fulfilment details.
+    """
+    from datetime import datetime, timedelta
+    
+    context = {'role': 'Agency Hub User', 'template': 'agency_hub'}
+    
+    # Default KPI cards for error states
+    default_kpi = {
+        'needs_lists_submitted': 0,
+        'approved_vs_pending_approved': 0,
+        'approved_vs_pending_pending': 0,
+        'total_allocations': 0,
+        'last_allocation_date': None
+    }
+    context['kpi_cards'] = default_kpi.copy()
+    context['work_queues'] = {'my_needs_lists': [], 'transfers_received': []}
+    
+    # Verify user is assigned to an AGENCY hub
+    if not user.assigned_location_id:
+        context['error'] = "You must be assigned to a hub."
+        return context
+    
+    agency_hub = Depot.query.get(user.assigned_location_id)
+    if not agency_hub or agency_hub.hub_type != 'AGENCY':
+        context['error'] = "Agency Hub dashboard requires assignment to an AGENCY hub."
+        return context
+    
+    context['hub'] = agency_hub
+    
+    # Needs Lists submitted by this agency (no fulfilment details exposed)
+    agency_needs_lists = NeedsList.query.filter_by(agency_hub_id=agency_hub.id)\
+                                  .order_by(NeedsList.created_at.desc()).all()
+    
+    submitted_count = sum(1 for nl in agency_needs_lists if nl.status == 'Submitted')
+    approved_count = sum(1 for nl in agency_needs_lists if nl.status in ['Approved', 'Dispatched', 'Received', 'Completed'])
+    pending_count = sum(1 for nl in agency_needs_lists if nl.status in ['Fulfilment Prepared', 'Awaiting Approval'])
+    
+    # Last allocation received (dispatched means sent to agency, no gov hub details)
+    last_allocation = NeedsList.query.filter_by(agency_hub_id=agency_hub.id)\
+                               .filter(NeedsList.status.in_(['Dispatched', 'Received', 'Completed']))\
+                               .order_by(NeedsList.dispatched_at.desc()).first()
+    
+    last_allocation_date = last_allocation.dispatched_at if last_allocation and last_allocation.dispatched_at else None
+    
+    # Total allocations received (completed needs lists)
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    total_allocations = NeedsList.query.filter(
+        NeedsList.agency_hub_id == agency_hub.id,
+        NeedsList.status.in_(['Received', 'Completed']),
+        NeedsList.received_at.isnot(None),
+        NeedsList.received_at >= thirty_days_ago
+    ).count()
+    
+    context['kpi_cards'] = {
+        'needs_lists_submitted': submitted_count,
+        'approved_vs_pending_approved': approved_count,
+        'approved_vs_pending_pending': pending_count,
+        'total_allocations': total_allocations,
+        'last_allocation_date': last_allocation_date
+    }
+    
+    # Work queues - Convert to DTOs to prevent accessing government fulfilment data
+    # DTOs are simple dicts without ORM relationships
+    my_needs_lists_dto = []
+    for nl in agency_needs_lists[:15]:
+        my_needs_lists_dto.append({
+            'id': nl.id,
+            'list_number': nl.list_number,
+            'status': nl.status,
+            'created_at': nl.created_at,
+            'submitted_at': nl.submitted_at,
+            'dispatched_at': nl.dispatched_at
+        })
+    
+    transfers_received_query = NeedsList.query.filter(
+        NeedsList.agency_hub_id == agency_hub.id,
+        NeedsList.status.in_(['Dispatched', 'Received'])
+    ).order_by(NeedsList.dispatched_at.desc()).limit(10).all()
+    
+    transfers_received_dto = []
+    for nl in transfers_received_query:
+        transfers_received_dto.append({
+            'id': nl.id,
+            'list_number': nl.list_number,
+            'status': nl.status,
+            'dispatched_at': nl.dispatched_at
+        })
+    
+    context['work_queues'] = {
+        'my_needs_lists': my_needs_lists_dto,
+        'transfers_received': transfers_received_dto
+    }
+    
+    return context
+
+def build_inventory_clerk_dashboard(user):
+    """
+    Build dashboard context for Inventory Clerk role.
+    Operational dashboard focused on daily intake/distribution at assigned hub.
+    """
+    from datetime import datetime, date
+    
+    context = {'role': 'Inventory Clerk', 'template': 'inventory_clerk'}
+    
+    # Verify user is assigned to a hub
+    if not user.assigned_location_id:
+        context['error'] = "You must be assigned to a hub."
+        return context
+    
+    clerk_hub = Depot.query.get(user.assigned_location_id)
+    if not clerk_hub:
+        context['error'] = "Invalid hub assignment."
+        return context
+    
+    context['hub'] = clerk_hub
+    
+    # Today's transactions
+    today = date.today()
+    today_start = datetime.combine(today, datetime.min.time())
+    today_end = datetime.combine(today, datetime.max.time())
+    
+    todays_intakes = Transaction.query.filter(
+        Transaction.location_id == clerk_hub.id,
+        Transaction.ttype == 'IN',
+        Transaction.created_at >= today_start,
+        Transaction.created_at <= today_end
+    ).all()
+    
+    todays_distributions = Transaction.query.filter(
+        Transaction.location_id == clerk_hub.id,
+        Transaction.ttype == 'OUT',
+        Transaction.created_at >= today_start,
+        Transaction.created_at <= today_end
+    ).all()
+    
+    # Current stock
+    stock_map = get_stock_by_location()
+    items = Item.query.all()
+    stock_lines_count = sum(1 for item in items if stock_map.get((item.sku, clerk_hub.id), 0) > 0)
+    
+    context['kpi_cards'] = {
+        'todays_intakes': sum(t.qty for t in todays_intakes),
+        'todays_distributions': sum(t.qty for t in todays_distributions),
+        'stock_lines': stock_lines_count,
+        'pending_entries': 0  # Placeholder for future feature
+    }
+    
+    # Recent transactions
+    recent_transactions = Transaction.query.filter_by(location_id=clerk_hub.id)\
+                                     .order_by(Transaction.created_at.desc()).limit(20).all()
+    
+    context['recent_transactions'] = recent_transactions
+    
+    return context
+
+def build_auditor_dashboard(user):
+    """
+    Build dashboard context for Auditor/M&E Officer role.
+    Read-only oversight with fulfilment metrics and exception tracking.
+    """
+    from datetime import datetime, timedelta
+    
+    context = {'role': 'Auditor', 'template': 'auditor'}
+    
+    # Default KPI cards for error states
+    context['kpi_cards'] = {
+        'total_needs_lists': 0,
+        'approved_fulfilled_approved': 0,
+        'approved_fulfilled_fulfilled': 0,
+        'on_time_percentage': 0,
+        'total_items_dispatched': 0,
+        'active_hubs': 0
+    }
+    context['fulfilment_log'] = []
+    context['exceptions'] = []
+    
+    # Date range for metrics (last 30 days)
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    
+    # Needs Lists metrics
+    total_needs_lists = NeedsList.query.count()
+    approved_lists = NeedsList.query.filter(
+        NeedsList.status.in_(['Approved', 'Dispatched', 'Received', 'Completed'])
+    ).count()
+    fulfilled_lists = NeedsList.query.filter_by(status='Completed').count()
+    
+    # On-time fulfilment (simplified: within 14 days of submission)
+    # Guard against missing timestamps
+    on_time_count = NeedsList.query.filter(
+        NeedsList.status == 'Completed',
+        NeedsList.fulfilled_at.isnot(None),
+        NeedsList.submitted_at.isnot(None)
+    ).all()
+    
+    on_time_fulfilled = 0
+    for nl in on_time_count:
+        try:
+            if nl.fulfilled_at and nl.submitted_at and (nl.fulfilled_at - nl.submitted_at).days <= 14:
+                on_time_fulfilled += 1
+        except (AttributeError, TypeError):
+            continue  # Skip if timestamps are invalid
+    
+    on_time_percentage = round((on_time_fulfilled / len(on_time_count) * 100)) if on_time_count else 0
+    
+    # Government hubs only (Main + Sub)
+    gov_hubs = Depot.query.filter(Depot.hub_type.in_(['MAIN', 'SUB'])).all()
+    stock_map = get_stock_by_location()
+    total_items_dispatched = sum(
+        stock_map.get((item.sku, hub.id), 0)
+        for item in Item.query.all()
+        for hub in gov_hubs
+    )
+    
+    active_hubs = Depot.query.filter_by(status='Active').count()
+    
+    context['kpi_cards'] = {
+        'total_needs_lists': total_needs_lists,
+        'approved_fulfilled_approved': approved_lists,
+        'approved_fulfilled_fulfilled': fulfilled_lists,
+        'on_time_percentage': on_time_percentage,
+        'total_items_dispatched': total_items_dispatched,
+        'active_hubs': active_hubs
+    }
+    
+    # Fulfilment log (last 30 days) - guard against missing updated_at
+    fulfilment_log = NeedsList.query.filter(
+        NeedsList.updated_at.isnot(None),
+        NeedsList.updated_at >= thirty_days_ago
+    ).order_by(NeedsList.updated_at.desc()).limit(50).all()
+    
+    # Exceptions (partial fulfilments, change requests, delays)
+    exceptions = NeedsList.query.filter(
+        db.or_(
+            NeedsList.status == 'Resent for Dispatch',
+            NeedsList.adjustment_reason.isnot(None)
+        )
+    ).order_by(NeedsList.updated_at.desc()).limit(20).all()
+    
+    context['fulfilment_log'] = fulfilment_log
+    context['exceptions'] = exceptions
+    
+    return context
+
+def build_system_administrator_dashboard(user):
+    """
+    Build dashboard context for System Administrator role.
+    Focus on configuration, users, and hubs - no stock/fulfilment metrics.
+    """
+    from datetime import datetime, timedelta
+    
+    context = {'role': 'System Administrator', 'template': 'system_administrator'}
+    
+    # User metrics
+    active_users = User.query.filter_by(is_active=True).count()
+    total_users = User.query.count()
+    
+    # Hub metrics
+    total_hubs = Depot.query.count()
+    active_hubs = Depot.query.filter_by(status='Active').count()
+    main_hubs = Depot.query.filter_by(hub_type='MAIN').count()
+    sub_hubs = Depot.query.filter_by(hub_type='SUB').count()
+    agency_hubs = Depot.query.filter_by(hub_type='AGENCY').count()
+    
+    # Pending user approvals (placeholder - no approval system yet)
+    pending_approvals = 0
+    
+    context['kpi_cards'] = {
+        'active_users': active_users,
+        'total_users': total_users,
+        'active_hubs': active_hubs,
+        'total_hubs': total_hubs,
+        'main_hubs': main_hubs,
+        'sub_hubs': sub_hubs,
+        'agency_hubs': agency_hubs,
+        'pending_approvals': pending_approvals
+    }
+    
+    # Recent user changes (last 30 days)
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    recent_users = User.query.filter(
+        User.created_at >= thirty_days_ago
+    ).order_by(User.created_at.desc()).limit(20).all()
+    
+    # Recent hub changes
+    recent_hubs = Depot.query.order_by(Depot.id.desc()).limit(15).all()
+    
+    context['recent_users'] = recent_users
+    context['recent_hubs'] = recent_hubs
     
     return context
 

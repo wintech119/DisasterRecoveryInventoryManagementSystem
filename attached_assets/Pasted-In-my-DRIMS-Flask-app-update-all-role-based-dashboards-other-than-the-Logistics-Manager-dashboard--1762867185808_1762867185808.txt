@@ -1,0 +1,287 @@
+In my DRIMS Flask app, update all role-based dashboards (other than the Logistics Manager dashboard already defined) to use a modern, compact, consistent UI that follows:
+
+Good dashboard design principles
+
+WCAG 2.1 accessibility guidelines (color contrast, keyboard access, semantics)
+
+Consistent layout, icons, and spacing across all roles
+
+Apply these changes using our existing left-side navigation layout and base template.
+
+Global Dashboard Design Standards (Apply to ALL dashboards)
+
+Use a shared, modern layout:
+
+Page heading with:
+
+A consistent modern icon (e.g. simple outlined “dashboard/analytics” icon).
+
+Role-specific title (e.g. “System Administrator Dashboard”, “Main Hub Dashboard”).
+
+Light, clean background.
+
+Clear visual hierarchy:
+
+Top row: 3–5 compact KPI cards.
+
+Below: tables or charts with real content.
+
+UI/UX best practices:
+
+Avoid clutter; use whitespace and tight but readable spacing.
+
+No 3D charts, no garish colors.
+
+Use consistent typography, icons, and card styles.
+
+Make key sections scannable: labels, tooltips, and short headings.
+
+Accessibility (WCAG 2.1):
+
+Sufficient color contrast for text, icons, and status badges.
+
+Focus states for interactive elements.
+
+All icons accompanied by text labels or aria-labels.
+
+Keyboard navigable (TAB through KPI cards, filters, tables, actions).
+
+Data security:
+
+Only show data each role is allowed to see based on DRIMS rules.
+
+Agency Hubs remain independent: internal stock never shown in government dashboards.
+
+Now implement dashboards per role as follows:
+
+1. System Administrator Dashboard
+
+Audience: System Administrator
+
+Top KPI cards (compact):
+
+Active Users
+
+Active Hubs
+
+Main vs Sub vs Agency Hub count
+
+Pending user approvals (if applicable)
+
+Sections:
+
+Recent user changes / role assignments (table)
+
+Recent hub creations/updates (table)
+
+Notes:
+
+No stock or fulfilment metrics.
+
+Focus on configuration, users, and hubs.
+
+All read/write actions link to existing Admin pages.
+
+2. Logistics Officer Dashboard
+
+Audience: Logistics Officer
+
+Top KPI cards:
+
+Needs Lists: Submitted (awaiting review)
+
+Needs Lists: Fulfilment Prepared (awaiting LM approval)
+
+Pending Fulfilment Change Requests
+
+Transfers pending execution
+
+Sections:
+
+Table: Needs Lists queue (status, requesting hub, age, priority)
+
+Table: Fulfilment drafts prepared by officer
+
+Table: Change Requests requiring follow-up
+
+Notes:
+
+Emphasize workflow: “Review → Prepare Fulfilment → Send to LM”.
+
+No final approval controls; all clearly marked as “Pending Logistics Manager”.
+
+3. Main Hub User Dashboard
+
+Audience: Main Hub User (for MAIN hubs only)
+
+Top KPI cards (scoped to their Main Hub):
+
+Current stock (units)
+
+Open Needs Lists assigned to their Main Hub
+
+Pending dispatches from this Main Hub
+
+Recent transactions (last 7 days)
+
+Sections:
+
+Table: Needs Lists to fulfil (Sub-Hub / Agency) for their Main Hub
+
+Table: Approved dispatches to execute
+
+Optional mini-chart: Category distribution of their hub’s stock
+
+Notes:
+
+Show only their hub + linked workloads.
+
+No global view; no internal Agency stock.
+
+4. Sub-Hub User Dashboard
+
+Audience: Sub-Hub User
+
+Top KPI cards (scoped to their Sub-Hub):
+
+Current stock
+
+Needs Lists: Draft / Submitted
+
+Incoming transfers pending
+
+Distributions made (last 7 days)
+
+Sections:
+
+Table: Their Needs Lists + statuses
+
+Table: Incoming transfers from Main Hub
+
+Table: Recent intake and distributions
+
+Notes:
+
+No cross-hub visibility.
+
+Clean, simple, focused on local operations.
+
+5. Agency Hub User Dashboard
+
+Audience: Agency Hub User (e.g. Red Cross, Food for the Poor, Shelters)
+
+Top KPI cards (scoped to their Agency):
+
+Needs Lists submitted
+
+Approved vs Pending requests
+
+Total allocations received from government
+
+Last allocation date
+
+Sections:
+
+Table: Needs Lists (status, date, Main Hub)
+
+Table: Transfers received (origin hub, date, items)
+
+Optional: Download/print acknowledgement summary
+
+Rules:
+
+Do NOT show government internal stock.
+
+Do NOT appear in global stock totals elsewhere.
+
+6. Inventory Clerk Dashboard
+
+Audience: Inventory Clerk (assigned to a single hub)
+
+Top KPI cards:
+
+Today’s intakes
+
+Today’s distributions
+
+Current stock lines (item count)
+
+Pending data entries (if applicable)
+
+Sections:
+
+Table: Recent transactions at their hub
+
+Quick actions panel:
+
+“Record Intake”
+
+“Record Distribution”
+
+“Search Inventory”
+
+Notes:
+
+Highly operational, minimal analytics.
+
+Strictly scoped to assigned hub.
+
+7. Auditor / M&E Officer Dashboard
+
+Audience: Auditor / M&E Officer
+
+Top KPI cards:
+
+Total Needs Lists (Approved / Fulfilled)
+
+% Needs Lists fulfilled on time
+
+Total items dispatched (Main + Sub Hubs)
+
+Number of active hubs
+
+Sections:
+
+Table: Filterable fulfilment log (hub, status, dates)
+
+Table: Exceptions/anomalies (e.g. partial fulfilments, change requests, delays)
+
+Export buttons (CSV/XLSX) for reporting
+
+Rules:
+
+Read-only.
+
+No internal Agency stock; show only transactions involving Agencies.
+
+Technical Implementation Notes
+
+Use a single /dashboard route:
+
+Detect current_user.role (and hub if needed).
+
+Render a role-specific partial or template that follows the shared layout.
+
+Create reusable components:
+
+KPI card component
+
+Status pill component (Active/Inactive, etc.)
+
+Standard heading with icon
+
+Ensure all data queries enforce:
+
+Role-based access
+
+Hub-based scoping
+
+Agency independence rules
+
+Implement these changes so all role-based dashboards:
+
+Look visually consistent and modern.
+
+Are compact and easy to scan.
+
+Follow WCAG-aligned accessibility and DRIMS security rules.

@@ -1,69 +1,66 @@
 {% extends "base.html" %}
 {% block title %}Logistics Officer Dashboard{% endblock %}
 {% block content %}
-<div class="container-fluid px-4 py-4">
-  <div class="mb-4">
-    <h2 class="mb-1"><i class="bi bi-clipboard-data me-2"></i>Logistics Officer Dashboard</h2>
-    <p class="text-muted mb-0">Prepare fulfilments and manage needs list workflow</p>
+<div class="container-fluid px-4 py-3">
+  <!-- Page Header -->
+  <div class="mb-3">
+    <h2 class="mb-1 fw-bold"><i class="bi bi-graph-up-arrow me-2"></i>Logistics Officer Dashboard</h2>
+    <p class="text-muted small mb-0">Prepare fulfilments and manage needs list workflow</p>
   </div>
 
-  <!-- Key Metrics -->
-  <div class="row g-4 mb-4">
-    <div class="col-xl-3 col-md-6">
-      <div class="card border-0 shadow-sm h-100 hero-card">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between">
-            <div class="flex-grow-1">
-              <p class="text-muted mb-1 fw-medium small text-uppercase">Submitted</p>
-              <h2 class="mb-2 fw-bold display-6">{{ cards.submitted_count }}</h2>
-              <small class="text-warning"><i class="bi bi-inbox me-1"></i>Needs Review</small>
+  <!-- Compact KPI Cards Row -->
+  <div class="row g-3 mb-3">
+    <div class="col-lg-3 col-md-6">
+      <div class="card border-0 shadow-sm h-100 kpi-card">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center">
+            <div class="me-3 text-warning"><i class="bi bi-inbox fs-3"></i></div>
+            <div>
+              <div class="text-muted small">Submitted</div>
+              <div class="h4 mb-0 fw-bold">{{ cards.submitted_count }}</div>
             </div>
-            <div class="icon-box bg-warning bg-gradient"><i class="bi bi-inbox"></i></div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="col-xl-3 col-md-6">
-      <div class="card border-0 shadow-sm h-100 hero-card">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between">
-            <div class="flex-grow-1">
-              <p class="text-muted mb-1 fw-medium small text-uppercase">Fulfilment Prepared</p>
-              <h2 class="mb-2 fw-bold display-6">{{ cards.prepared_count }}</h2>
-              <small class="text-primary"><i class="bi bi-check2-circle me-1"></i>Ready</small>
+    <div class="col-lg-3 col-md-6">
+      <div class="card border-0 shadow-sm h-100 kpi-card">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center">
+            <div class="me-3 text-primary"><i class="bi bi-clipboard-check fs-3"></i></div>
+            <div>
+              <div class="text-muted small">Fulfilment Prepared</div>
+              <div class="h4 mb-0 fw-bold">{{ cards.prepared_count }}</div>
             </div>
-            <div class="icon-box bg-primary bg-gradient"><i class="bi bi-check-circle"></i></div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="col-xl-3 col-md-6">
-      <div class="card border-0 shadow-sm h-100 hero-card">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between">
-            <div class="flex-grow-1">
-              <p class="text-muted mb-1 fw-medium small text-uppercase">Awaiting Approval</p>
-              <h2 class="mb-2 fw-bold display-6">{{ cards.awaiting_count }}</h2>
-              <small class="text-info"><i class="bi bi-clock me-1"></i>Pending LM</small>
+    <div class="col-lg-3 col-md-6">
+      <div class="card border-0 shadow-sm h-100 kpi-card">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center">
+            <div class="me-3 text-info"><i class="bi bi-hourglass-split fs-3"></i></div>
+            <div>
+              <div class="text-muted small">Awaiting Approval</div>
+              <div class="h4 mb-0 fw-bold">{{ cards.awaiting_count }}</div>
             </div>
-            <div class="icon-box bg-info bg-gradient"><i class="bi bi-hourglass-split"></i></div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="col-xl-3 col-md-6">
-      <div class="card border-0 shadow-sm h-100 hero-card">
-        <div class="card-body">
-          <div class="d-flex align-items-center justify-content-between">
-            <div class="flex-grow-1">
-              <p class="text-muted mb-1 fw-medium small text-uppercase">My Prepared</p>
-              <h2 class="mb-2 fw-bold display-6">{{ cards.my_prepared_count }}</h2>
-              <small class="text-success"><i class="bi bi-person-check me-1"></i>By Me</small>
+    <div class="col-lg-3 col-md-6">
+      <div class="card border-0 shadow-sm h-100 kpi-card">
+        <div class="card-body p-3">
+          <div class="d-flex align-items-center">
+            <div class="me-3 text-success"><i class="bi bi-person-check fs-3"></i></div>
+            <div>
+              <div class="text-muted small">My Prepared</div>
+              <div class="h4 mb-0 fw-bold">{{ cards.my_prepared_count }}</div>
             </div>
-            <div class="icon-box bg-success bg-gradient"><i class="bi bi-person-badge"></i></div>
           </div>
         </div>
       </div>
@@ -71,117 +68,161 @@
   </div>
 
   <!-- Work Queues -->
-  <div class="row g-4 mb-4">
+  <div class="row g-3 mb-3">
     <!-- Submitted Queue -->
     <div class="col-lg-6">
       <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-white border-0 pt-4 pb-0">
-          <h5 class="mb-1 fw-semibold"><i class="bi bi-inbox me-2 text-warning"></i>Submitted Needs Lists</h5>
-          <p class="text-muted small mb-0">{{ cards.submitted_count }} awaiting fulfilment preparation</p>
+        <div class="card-header bg-white border-bottom">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-inbox me-2 text-warning"></i>Submitted Needs Lists</h6>
         </div>
-        <div class="card-body">
+        <div class="card-body p-0">
           {% if work_queues.submitted %}
             <div class="list-group list-group-flush">
               {% for nl in work_queues.submitted %}
-                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action px-0">
-                  <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                      <div class="fw-semibold">{{ nl.list_number }}</div>
-                      <small class="text-muted">
+                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action border-0 py-2 px-3" aria-label="View needs list {{ nl.list_number }}">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div class="flex-grow-1">
+                      <div class="small fw-semibold">{{ nl.list_number }}</div>
+                      <div class="text-muted" style="font-size: 0.75rem;">
                         <i class="bi bi-building me-1"></i>{{ nl.agency_hub.name if nl.agency_hub else 'Unknown' }}
-                      </small>
+                      </div>
                     </div>
                     <div class="text-end">
-                      <span class="badge bg-warning">{{ nl.items|length }} items</span>
-                      <div><small class="text-muted">{{ nl.submitted_at.strftime('%b %d, %Y') if nl.submitted_at else '' }}</small></div>
+                      <span class="badge bg-warning rounded-pill">{{ nl.items|length }}</span>
+                      <div class="text-muted" style="font-size: 0.7rem;">{{ nl.submitted_at.strftime('%b %d') if nl.submitted_at else '' }}</div>
                     </div>
                   </div>
                 </a>
               {% endfor %}
             </div>
           {% else %}
-            <p class="text-muted text-center py-4"><i class="bi bi-check-circle me-2"></i>All caught up!</p>
+            <p class="text-muted text-center py-4 mb-0 small"><i class="bi bi-check-circle me-2"></i>All caught up!</p>
           {% endif %}
         </div>
       </div>
     </div>
 
+    <!-- Fulfilment Prepared Queue -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-clipboard-check me-2 text-primary"></i>Fulfilment Prepared</h6>
+        </div>
+        <div class="card-body p-0">
+          {% if work_queues.fulfilment_prepared %}
+            <div class="list-group list-group-flush">
+              {% for nl in work_queues.fulfilment_prepared %}
+                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action border-0 py-2 px-3" aria-label="View needs list {{ nl.list_number }}">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div class="flex-grow-1">
+                      <div class="small fw-semibold">{{ nl.list_number }}</div>
+                      <div class="text-muted" style="font-size: 0.75rem;">
+                        <i class="bi bi-building me-1"></i>{{ nl.agency_hub.name if nl.agency_hub else 'Unknown' }}
+                      </div>
+                    </div>
+                    <div class="text-end">
+                      <span class="badge bg-primary rounded-pill">{{ nl.items|length }}</span>
+                      <div class="text-muted" style="font-size: 0.7rem;">{{ nl.prepared_at.strftime('%b %d') if nl.prepared_at else '' }}</div>
+                    </div>
+                  </div>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="text-muted text-center py-4 mb-0 small"><i class="bi bi-check-circle me-2"></i>None pending</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Awaiting Approval & My Recent Work -->
+  <div class="row g-3 mb-3">
     <!-- Awaiting Approval Queue -->
     <div class="col-lg-6">
       <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-white border-0 pt-4 pb-0">
-          <h5 class="mb-1 fw-semibold"><i class="bi bi-hourglass-split me-2 text-info"></i>Awaiting Manager Approval</h5>
-          <p class="text-muted small mb-0">{{ cards.awaiting_count }} pending Logistics Manager review</p>
+        <div class="card-header bg-white border-bottom">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-hourglass-split me-2 text-info"></i>Awaiting Logistics Manager Approval</h6>
         </div>
-        <div class="card-body">
+        <div class="card-body p-0">
           {% if work_queues.awaiting_approval %}
             <div class="list-group list-group-flush">
               {% for nl in work_queues.awaiting_approval %}
-                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action px-0">
-                  <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                      <div class="fw-semibold">{{ nl.list_number }}</div>
-                      <small class="text-muted">
-                        <i class="bi bi-person me-1"></i>{{ nl.prepared_by or 'Unknown' }}
-                      </small>
+                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action border-0 py-2 px-3" aria-label="View needs list {{ nl.list_number }}">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div class="flex-grow-1">
+                      <div class="small fw-semibold">{{ nl.list_number }}</div>
+                      <div class="text-muted" style="font-size: 0.75rem;">
+                        <i class="bi bi-building me-1"></i>{{ nl.agency_hub.name if nl.agency_hub else 'Unknown' }}
+                      </div>
                     </div>
                     <div class="text-end">
-                      <span class="badge bg-info">{{ nl.status }}</span>
-                      <div><small class="text-muted">{{ nl.prepared_at.strftime('%b %d, %Y') if nl.prepared_at else '' }}</small></div>
+                      <span class="badge bg-info rounded-pill">{{ nl.items|length }}</span>
+                      <div class="text-muted" style="font-size: 0.7rem;">{{ nl.prepared_at.strftime('%b %d') if nl.prepared_at else '' }}</div>
                     </div>
                   </div>
                 </a>
               {% endfor %}
             </div>
           {% else %}
-            <p class="text-muted text-center py-4">No lists awaiting approval</p>
+            <p class="text-muted text-center py-4 mb-0 small"><i class="bi bi-check-circle me-2"></i>None pending</p>
           {% endif %}
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- My Recent Work -->
-  <div class="row g-4">
-    <div class="col-12">
-      <div class="card border-0 shadow-sm">
-        <div class="card-header bg-white border-0 pt-4 pb-0">
-          <h5 class="mb-1 fw-semibold"><i class="bi bi-person-badge me-2 text-success"></i>My Recent Work</h5>
-          <p class="text-muted small mb-0">Needs lists I've prepared</p>
+    <!-- My Recent Work -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="mb-0 fw-semibold"><i class="bi bi-person-badge me-2 text-success"></i>My Recent Work</h6>
         </div>
-        <div class="card-body">
+        <div class="card-body p-0">
           {% if my_recent_work %}
-            <div class="table-responsive">
-              <table class="table table-hover align-middle">
-                <thead class="table-light">
-                  <tr>
-                    <th>List Number</th>
-                    <th>Requesting Hub</th>
-                    <th>Status</th>
-                    <th>Prepared Date</th>
-                    <th class="text-end">Items</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for nl in my_recent_work %}
-                    <tr onclick="window.location='{{ url_for('needs_list_details', list_id=nl.id) }}'" style="cursor: pointer;">
-                      <td class="fw-semibold">{{ nl.list_number }}</td>
-                      <td><i class="bi bi-building me-1"></i>{{ nl.agency_hub.name if nl.agency_hub else 'Unknown' }}</td>
-                      <td><span class="badge bg-{{ 'success' if nl.status in ['Approved', 'Dispatched', 'Completed'] else 'primary' if nl.status == 'Fulfilment Prepared' else 'warning' }}">{{ nl.status }}</span></td>
-                      <td>{{ nl.prepared_at.strftime('%b %d, %Y %I:%M %p') if nl.prepared_at else '-' }}</td>
-                      <td class="text-end">{{ nl.items|length }}</td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
+            <div class="list-group list-group-flush">
+              {% for nl in my_recent_work %}
+                <a href="{{ url_for('needs_list_details', list_id=nl.id) }}" class="list-group-item list-group-item-action border-0 py-2 px-3" aria-label="View needs list {{ nl.list_number }}">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div class="flex-grow-1">
+                      <div class="small fw-semibold">{{ nl.list_number }}</div>
+                      <div class="text-muted" style="font-size: 0.75rem;">
+                        {% if nl.status == 'Fulfilment Prepared' %}
+                        <span class="badge bg-primary rounded-pill">Fulfilment Prepared</span>
+                        {% elif nl.status == 'Awaiting Approval' %}
+                        <span class="badge bg-info rounded-pill">Awaiting Approval</span>
+                        {% elif nl.status == 'Approved' %}
+                        <span class="badge bg-success rounded-pill">Approved</span>
+                        {% else %}
+                        <span class="badge bg-secondary rounded-pill">{{ nl.status }}</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="text-end">
+                      <div class="text-muted" style="font-size: 0.7rem;">{{ nl.prepared_at.strftime('%b %d') if nl.prepared_at else '' }}</div>
+                    </div>
+                  </div>
+                </a>
+              {% endfor %}
             </div>
           {% else %}
-            <p class="text-muted text-center py-4">No recent work to display</p>
+            <p class="text-muted text-center py-4 mb-0 small"><i class="bi bi-inbox me-2"></i>No recent activity</p>
           {% endif %}
         </div>
       </div>
     </div>
   </div>
-
 </div>
+
+<style>
+  .kpi-card {
+    transition: transform 0.2s ease;
+  }
+  .kpi-card:hover {
+    transform: translateY(-2px);
+  }
+  .list-group-item:focus {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+  }
+</style>
 {% endblock %}
