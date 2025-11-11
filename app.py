@@ -881,6 +881,13 @@ def can_view_needs_list(user, needs_list):
     """
     Check if user can view a specific needs list.
     
+    Hub-based access control:
+    - ADMIN/LOGISTICS: Global visibility
+    - SUB_HUB_USER: Can view if their hub is the requesting hub OR a source hub in fulfilments
+    - MAIN_HUB_USER: Can view if their hub is the requesting hub OR a source hub in fulfilments
+    - AGENCY_HUB_USER: Can only view if their hub is the requesting hub
+    - AUDITOR: Global visibility (read-only)
+    
     Returns:
         tuple: (allowed: bool, error_message: str or None)
     """
@@ -892,25 +899,61 @@ def can_view_needs_list(user, needs_list):
     if user.has_any_role(ROLE_LOGISTICS_OFFICER, ROLE_LOGISTICS_MANAGER):
         return (True, None)
     
-    # Warehouse Supervisors/Officers: check if their Sub-Hub is a source hub for this needs list
-    if user.has_any_role(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
-        if user.assigned_location_id:
-            # Check if this needs list has fulfilments from their assigned hub
-            has_fulfilment = NeedsListFulfilment.query.filter_by(
-                needs_list_id=needs_list.id,
-                source_hub_id=user.assigned_location_id
-            ).first()
-            
-            if has_fulfilment:
-                return (True, None)
-        
-        return (False, "You can only view needs lists assigned to your Sub-Hub.")
+    # Auditors have global read-only access
+    if user.has_role(ROLE_AUDITOR):
+        return (True, None)
     
-    # Hub-based users: check if they own this needs list
-    if user.assigned_location_id:
-        user_depot = Depot.query.get(user.assigned_location_id)
-        if user_depot and user_depot.id == needs_list.agency_hub_id:
+    # Hub-based access control - require hub assignment
+    if not user.assigned_location_id:
+        return (False, "You must be assigned to a hub to view needs lists.")
+    
+    user_depot = Depot.query.get(user.assigned_location_id)
+    if not user_depot:
+        return (False, "Invalid hub assignment.")
+    
+    # SUB_HUB_USER: Can view if their hub is requesting hub OR a source hub
+    if user.has_role(ROLE_SUB_HUB_USER):
+        # Check if they own this needs list (are the requesting hub)
+        if user_depot.id == needs_list.agency_hub_id:
             return (True, None)
+        
+        # Check if their hub is a source hub for this needs list
+        has_fulfilment = NeedsListFulfilment.query.filter_by(
+            needs_list_id=needs_list.id,
+            source_hub_id=user.assigned_location_id
+        ).first()
+        
+        if has_fulfilment:
+            return (True, None)
+        
+        return (False, "You can only view needs lists where your hub is involved.")
+    
+    # MAIN_HUB_USER: Can view if their hub is requesting hub OR a source hub
+    if user.has_role(ROLE_MAIN_HUB_USER):
+        # Check if they own this needs list
+        if user_depot.id == needs_list.agency_hub_id:
+            return (True, None)
+        
+        # Check if their hub is a source hub for this needs list
+        has_fulfilment = NeedsListFulfilment.query.filter_by(
+            needs_list_id=needs_list.id,
+            source_hub_id=user.assigned_location_id
+        ).first()
+        
+        if has_fulfilment:
+            return (True, None)
+        
+        return (False, "You can only view needs lists where your hub is involved.")
+    
+    # AGENCY_HUB_USER: Can only view their own needs lists
+    if user.has_role(ROLE_AGENCY_HUB_USER):
+        if user_depot.id == needs_list.agency_hub_id:
+            return (True, None)
+        return (False, "You can only view needs lists from your agency hub.")
+    
+    # Fallback for any other hub-based users (legacy compatibility)
+    if user_depot.id == needs_list.agency_hub_id:
+        return (True, None)
     
     return (False, "You don't have permission to view this needs list.")
 
@@ -1100,7 +1143,12 @@ def is_warehouse_user_assigned_to_source_hub(user, needs_list):
 def can_dispatch_needs_list(user, needs_list):
     """
     Check if user can dispatch an approved needs list.
-    Only Warehouse Supervisors and Warehouse Officers at the source Sub-Hub can dispatch.
+    
+    Dispatch permissions:
+    - ADMIN: Can dispatch any approved needs list
+    - LOGISTICS_MANAGER/OFFICER: Can dispatch any approved needs list
+    - SUB_HUB_USER: Can dispatch if their hub is a source hub in the fulfilment
+    - MAIN_HUB_USER: Can dispatch if their hub is a source hub in the fulfilment
     
     Returns:
         tuple: (allowed: bool, error_message: str or None)
@@ -1109,17 +1157,21 @@ def can_dispatch_needs_list(user, needs_list):
     if needs_list.status != 'Approved':
         return (False, "Only approved needs lists can be dispatched.")
     
-    # Only ADMIN, Warehouse Supervisors, and Warehouse Officers can dispatch
-    if not user.has_any_role(ROLE_ADMIN, ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
-        return (False, "Only Warehouse Supervisors and Warehouse Officers can dispatch items.")
+    # ADMIN and Logistics staff can dispatch any approved needs list
+    if user.has_any_role(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER):
+        return (True, None)
     
-    # For non-admin warehouse users, verify they are assigned to a source hub
-    if user.has_any_role(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
-        if not user.assigned_location_id:
-            return (False, "You must be assigned to a hub to dispatch items.")
-        
-        if not is_warehouse_user_assigned_to_source_hub(user, needs_list):
-            return (False, "You can only dispatch items from your assigned hub.")
+    # Hub users can only dispatch if authorized for their hub
+    if not user.has_any_role(ROLE_SUB_HUB_USER, ROLE_MAIN_HUB_USER):
+        return (False, "You don't have permission to dispatch items.")
+    
+    # Verify user is assigned to a hub
+    if not user.assigned_location_id:
+        return (False, "You must be assigned to a hub to dispatch items.")
+    
+    # Check if user's hub is a source hub for this needs list
+    if not is_warehouse_user_assigned_to_source_hub(user, needs_list):
+        return (False, "You can only dispatch items from your assigned hub.")
     
     return (True, None)
 
@@ -1690,9 +1742,9 @@ def dashboard():
                            fulfillment_data=fulfillment_data)
 
 @app.route("/warehouse-dashboard")
-@role_required(ROLE_ADMIN, ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER)
+@role_required(ROLE_ADMIN, ROLE_SUB_HUB_USER)
 def warehouse_dashboard():
-    """Dedicated dashboard for warehouse supervisors and officers at Sub-Hubs"""
+    """Dedicated dashboard for Sub-Hub users"""
     from datetime import datetime, timedelta
     
     # Ensure user is assigned to a hub
@@ -1768,7 +1820,7 @@ def warehouse_dashboard():
                          dispatches_this_month=dispatches_this_month)
 
 @app.route("/items")
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF, ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER, ROLE_AUDITOR, ROLE_EXECUTIVE)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_INVENTORY_CLERK, ROLE_SUB_HUB_USER, ROLE_MAIN_HUB_USER, ROLE_AUDITOR)
 def items():
     q = request.args.get("q", "").strip()
     cat = request.args.get("category", "").strip()
@@ -1823,7 +1875,7 @@ def items():
                           all_hubs=all_hubs, hub_filter=hub_filter)
 
 @app.route("/items/new", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_INVENTORY_CLERK)
 def item_new():
     if request.method == "POST":
         from datetime import datetime as dt
@@ -1878,7 +1930,7 @@ def item_new():
     return render_template("item_form.html", item=None)
 
 @app.route("/items/<item_sku>/edit", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_INVENTORY_CLERK)
 def item_edit(item_sku):
     from datetime import datetime as dt
     item = Item.query.get_or_404(item_sku)
@@ -1927,7 +1979,7 @@ def item_edit(item_sku):
     return render_template("item_form.html", item=item)
 
 @app.route("/intake", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_INVENTORY_CLERK)
 def intake():
     items = Item.query.order_by(Item.name.asc()).all()
     locations = Depot.query.order_by(Depot.name.asc()).all()
@@ -2054,7 +2106,7 @@ def api_lock_status(list_id):
     })
 
 @app.route("/distribute", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF, ROLE_FIELD_PERSONNEL)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_INVENTORY_CLERK, ROLE_AGENCY_HUB_USER)
 def distribute():
     items = Item.query.order_by(Item.name.asc()).all()
     locations = Depot.query.order_by(Depot.name.asc()).all()
@@ -2230,7 +2282,7 @@ def import_items():
     return render_template("import_items.html")
 
 @app.route("/depots")
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_INVENTORY_CLERK)
 def depots():
     locs = Depot.query.order_by(Depot.name.asc()).all()
     # Get stock counts per location
@@ -2370,7 +2422,7 @@ def depot_edit(location_id):
     return render_template("depot_form.html", depot=location, main_hubs=main_hubs)
 
 @app.route("/locations/<int:location_id>/inventory")
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_INVENTORY_CLERK)
 def depot_inventory(location_id):
     location = Depot.query.get_or_404(location_id)
     
@@ -2395,7 +2447,7 @@ def depot_inventory(location_id):
 # ---------- Distribution Package Routes ----------
 
 @app.route("/packages")
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_INVENTORY_CLERK)
 def packages():
     """List all distribution packages with filters"""
     status_filter = request.args.get("status")
@@ -2562,7 +2614,7 @@ def package_create():
                          stock_map=stock_map)
 
 @app.route("/stock-transfer", methods=["GET", "POST"])
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_INVENTORY_CLERK)
 def stock_transfer():
     """Transfer stock between depots with approval workflow based on hub type"""
     if request.method == "POST":
@@ -2835,8 +2887,8 @@ def needs_lists():
     if current_user.assigned_location_id:
         user_depot = Depot.query.get(current_user.assigned_location_id)
     
-    # Warehouse Supervisor/Officer view: All relevant statuses for their Sub-Hub
-    if current_user.has_any_role(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER):
+    # Sub-Hub User view: All relevant statuses for their Sub-Hub
+    if current_user.has_role(ROLE_SUB_HUB_USER):
         if not current_user.assigned_location_id:
             flash("You must be assigned to a hub to view needs lists.", "danger")
             return redirect(url_for("warehouse_dashboard"))
@@ -2846,13 +2898,16 @@ def needs_lists():
             flash("Needs list access is only available for Sub-Hub assignments.", "danger")
             return redirect(url_for("warehouse_dashboard"))
         
-        # Show all needs lists (Approved, Resent for Dispatch, Dispatched, Received, Completed) where their Sub-Hub is the fulfilment/dispatch hub
-        # This ensures warehouse supervisors only see lists assigned to their specific hub
-        hub_needs_lists = db.session.query(NeedsList).join(
+        # Show all needs lists where their Sub-Hub is the fulfilment/dispatch hub OR the requesting hub
+        # This ensures Sub-Hub users see lists they're involved with (either as source or requester)
+        hub_needs_lists = db.session.query(NeedsList).outerjoin(
             NeedsListFulfilment, NeedsList.id == NeedsListFulfilment.needs_list_id
         ).filter(
-            NeedsList.status.in_(['Approved', 'Resent for Dispatch', 'Dispatched', 'Received', 'Completed']),
-            NeedsListFulfilment.source_hub_id == assigned_hub.id
+            db.or_(
+                NeedsListFulfilment.source_hub_id == assigned_hub.id,
+                NeedsList.agency_hub_id == assigned_hub.id
+            ),
+            NeedsList.status.in_(['Submitted', 'Fulfilment Prepared', 'Awaiting Approval', 'Approved', 'Resent for Dispatch', 'Dispatched', 'Received', 'Completed'])
         ).distinct().order_by(NeedsList.updated_at.desc()).all()
         
         # Organize lists by status for better UI presentation
@@ -3723,10 +3778,10 @@ def needs_list_reject(list_id):
     return redirect(url_for("needs_list_details", list_id=list_id))
 
 @app.route("/needs-lists/<int:list_id>/dispatch", methods=["POST"])
-@role_required(ROLE_ADMIN, ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_SUB_HUB_USER, ROLE_MAIN_HUB_USER)
 def needs_list_dispatch(list_id):
     """Dispatch approved needs list - Creates stock transactions and updates status to Dispatched
-    Only Admins, Warehouse Supervisors and Warehouse Officers at source Sub-Hubs can dispatch."""
+    Authorized users: Admins, Logistics staff, and Sub/Main Hub users at source hubs."""
     needs_list = NeedsList.query.get_or_404(list_id)
     
     # Permission check using centralized helper
@@ -3993,9 +4048,9 @@ def needs_list_delete(list_id):
     return redirect(url_for("needs_lists"))
 
 @app.route("/needs-lists/<int:list_id>/request-change", methods=["POST"])
-@role_required(ROLE_WAREHOUSE_SUPERVISOR, ROLE_WAREHOUSE_OFFICER)
+@role_required(ROLE_SUB_HUB_USER)
 def fulfilment_change_request_create(list_id):
-    """Create a fulfilment change request - Warehouse Supervisors and Officers only"""
+    """Create a fulfilment change request - Sub-Hub users only"""
     needs_list = NeedsList.query.get_or_404(list_id)
     
     if needs_list.status != 'Approved':
@@ -4264,7 +4319,7 @@ def package_fulfill(package_id):
                          item_depot_options=item_depot_options)
 
 @app.route("/packages/<int:package_id>")
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_INVENTORY_CLERK)
 def package_details(package_id):
     """View package details with full audit trail"""
     package = DistributionPackage.query.get_or_404(package_id)
@@ -4338,7 +4393,7 @@ def package_approve(package_id):
     return redirect(url_for("package_details", package_id=package_id))
 
 @app.route("/packages/<int:package_id>/dispatch", methods=["POST"])
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_INVENTORY_CLERK)
 def package_dispatch(package_id):
     """Dispatch package (Approved → Dispatched) and generate OUT transactions"""
     package = DistributionPackage.query.get_or_404(package_id)
@@ -4396,7 +4451,7 @@ def package_dispatch(package_id):
     return redirect(url_for("package_details", package_id=package_id))
 
 @app.route("/packages/<int:package_id>/deliver", methods=["POST"])
-@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_WAREHOUSE_STAFF)
+@role_required(ROLE_ADMIN, ROLE_LOGISTICS_MANAGER, ROLE_LOGISTICS_OFFICER, ROLE_INVENTORY_CLERK)
 def package_deliver(package_id):
     """Mark package as delivered (Dispatched → Delivered)"""
     package = DistributionPackage.query.get_or_404(package_id)
