@@ -1,0 +1,197 @@
+In my DRIMS Flask app (DRIMS), implement a robust Offline Mode suitable for disaster environments with unstable or no internet, while preserving data integrity, security, and our existing role/permissions model.
+
+1. General Concept
+
+Add support so that authorized users can:
+
+Use key features when offline
+
+Queue actions locally
+
+Automatically sync with the server when connectivity is restored
+
+Implement this using standard web best practices:
+
+Progressive Web App (PWA) style approach
+
+Service Worker for caching
+
+Local storage mechanism (preferably IndexedDB) for queued actions and cached data
+
+Make sure Offline Mode is:
+
+Transparent to users
+
+Secure
+
+Respectful of DRIMS rules (Hubs, Roles, Agency independence)
+
+2. What Must Work Offline
+
+Enable offline capability for field and hub operations that are critical during disasters:
+
+Login (limited mode):
+
+If a user has logged in successfully before on that device:
+
+Allow “offline session reuse” using a securely stored token or encrypted offline session (short-lived).
+
+If no prior session exists → show “Offline access not available. Please connect at least once.”
+
+Key screens & actions cached for offline use:
+
+Dashboard for current role (with last-synced data).
+
+Inventory view for the user’s assigned Hub (Main/Sub/Agency) with last synced snapshot.
+
+Ability to:
+
+Record Intake (donations/stock in).
+
+Record Distributions (stock out).
+
+Create Needs Lists (Sub-Hubs, Agency Hubs).
+
+All these actions should be stored as pending sync operations when offline.
+
+What should NOT be finalised offline:
+
+Final approvals (Logistics Manager).
+
+Cross-hub transfers & fulfilment approvals.
+
+Edit Fulfilment after completion.
+
+Any operation that changes multi-hub state.
+
+These must be queued, flagged, and only confirmed on the server once online.
+
+3. Technical Implementation
+
+a) Service Worker & Caching
+
+Add a Service Worker that:
+
+Caches core assets: CSS, JS, icons, layout, main dashboard & form pages.
+
+Serves cached pages when offline.
+
+Add a web app manifest so DRIMS can be installed as an app (PWA-style).
+
+b) Local Storage Layer (IndexedDB)
+
+Implement a small offline storage module (e.g. with IndexedDB) to:
+
+Store:
+
+pending_operations (JSON records for actions)
+
+last_synced_inventory per Hub
+
+last_synced_needs_lists per user/hub
+
+Each pending operation should include:
+
+Type: intake, distribution, needs_list_create
+
+Hub ID
+
+Payload (items, qty, timestamps, user id)
+
+Local ID for tracking
+
+Created at (local timestamp)
+
+c) Sync Engine
+
+On app load and when connection is restored:
+
+Detect online status (navigator.onLine + background ping).
+
+If online:
+
+Read pending_operations from IndexedDB.
+
+Send them to new backend endpoints like:
+
+POST /api/offline/sync
+
+Ensure:
+
+Responses confirm success/failure.
+
+Successful ones are removed from the queue.
+
+Failures are shown in a simple “Sync Issues” list.
+
+Use idempotent design (e.g. client-generated IDs) to avoid duplicates.
+
+4. UX & Indicators
+
+Add clear, compact indicators:
+
+In the header/top-right:
+
+A small status pill:
+
+🟢 Online – Synced
+
+🟡 Online – Syncing...
+
+🔴 Offline – Working in offline mode
+
+On relevant pages (Intake, Distribution, Needs List):
+
+If offline:
+
+Show: “You are offline. Entries will be saved locally and synced when connection is restored.”
+
+Add a small “Sync Now” button (for when back online) to manually trigger sync.
+
+All indicators must be:
+
+Accessible (icons + text, aria-label)
+
+High contrast (WCAG-compliant)
+
+5. Security & Permissions
+
+Respect existing DRIMS permissions:
+
+Only allow offline actions the user is normally allowed to do online.
+
+Do not expose:
+
+Other hubs' data offline beyond user’s allowed scope.
+
+Internal Agency data to government users (unchanged).
+
+Store only what is necessary:
+
+Use IndexedDB instead of plain localStorage.
+
+Consider basic encryption wrapper if implemented; otherwise structure code so adding it later is easy.
+
+6. Conflict Handling (Simple Version)
+
+If the server state has changed when syncing (e.g. item deleted, hub inactive):
+
+Mark those operations as “Sync Failed” with a reason.
+
+Show them in a small “Sync Issues” panel for the user (or LM) to resolve manually.
+
+Do not silently override server data.
+
+7. Implementation Notes
+
+Keep all offline logic encapsulated in:
+
+A JS module (e.g. /static/js/offline.js)
+
+A Service Worker file (e.g. /service-worker.js)
+
+Don’t break existing online-only behavior:
+
+If JS fails, normal online operation should still work.
+
+Implement this Offline Mode so DRIMS is usable for hubs and agencies operating in disaster zones with weak connectivity, while maintaining auditability, security, and proper approvals.
